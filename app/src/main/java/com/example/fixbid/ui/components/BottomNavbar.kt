@@ -16,9 +16,9 @@ fun BottomNavbar(
     onItemSelected: (Int) -> Unit
 ) {
     val items = listOf(
-        Triple("Home", Icons.Filled.Home, Icons.Outlined.Home),
-        Triple("Bookings", Icons.Filled.List, Icons.Outlined.List),
-        Triple("Profile", Icons.Filled.Person, Icons.Outlined.Person)
+        Triple("Trang chủ", Icons.Filled.Home, Icons.Outlined.Home),
+        Triple("Đặt dịch vụ", Icons.Filled.List, Icons.Outlined.List),
+        Triple("Hồ sơ", Icons.Filled.Person, Icons.Outlined.Person)
     )
 
     NavigationBar(

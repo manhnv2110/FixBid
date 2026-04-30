@@ -22,7 +22,7 @@ fun SeachBar(
         onValueChange = onQueryChange,
         placeholder = {
             Text(
-                text = "What do you need help with?",
+                text = "Công việc bạn cần trợ giúp",
                 color = Color.Gray,
                 style = MaterialTheme.typography.bodyLarge
             )
@@ -30,7 +30,7 @@ fun SeachBar(
         leadingIcon = {
             Icon(
                 imageVector = Icons.Default.Search,
-                contentDescription = "Search",
+                contentDescription = "Tìm kiếm",
                 tint = Color.Gray
             )
         },

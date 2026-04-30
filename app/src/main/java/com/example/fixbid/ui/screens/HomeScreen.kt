@@ -21,6 +21,8 @@ import com.example.fixbid.ui.components.PromoBanner
 import com.example.fixbid.ui.theme.BackgroundGray
 import com.example.fixbid.ui.theme.PrimaryBlue
 import com.example.fixbid.ui.components.SeachBar
+import com.example.fixbid.ui.components.NotificationCard
+import com.example.fixbid.data.SampleNotifications
 import com.example.fixbid.ui.theme.TextPrimary
 import com.example.fixbid.model.Category
 import com.example.fixbid.R
@@ -67,13 +69,13 @@ fun HomeScreen() {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             imageVector = Icons.Outlined.LocationOn,
-                            contentDescription = "Location",
+                            contentDescription = "Vị trí",
                             tint = Color.White,
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "New York",
+                            text = "Hà Nội",
                             color = Color.White,
                             fontWeight = FontWeight.Medium,
                             fontSize = 16.sp
@@ -82,7 +84,7 @@ fun HomeScreen() {
                     IconButton(onClick = {}) {
                         Icon(
                             imageVector = Icons.Outlined.Notifications,
-                            contentDescription = "Notifications",
+                            contentDescription = "Thông báo",
                             tint = Color.White
                         )
                     }
@@ -91,7 +93,7 @@ fun HomeScreen() {
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
-                    text = "I need help with",
+                    text = "Bạn cần giúp gì nào?",
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontSize = 22.sp
@@ -116,9 +118,11 @@ fun HomeScreen() {
             ) {
                 PromoBanner()
 
+                NotificationCard(notifications = SampleNotifications.all)
+
                 Column {
                     Text(
-                        text = "Categories",
+                        text = "Danh mục",
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp,
                         color = TextPrimary
