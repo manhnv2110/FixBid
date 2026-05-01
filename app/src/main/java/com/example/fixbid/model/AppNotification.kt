@@ -8,7 +8,7 @@ enum class NotificationType {
 }
 
 data class AppNotification(
-    val id: Int,
+    val id: String,
     val type: NotificationType,
     val label: String,
     val title: String,
