@@ -2,6 +2,7 @@ package com.example.fixbid.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -22,15 +23,25 @@ import com.example.fixbid.ui.theme.BackgroundGray
 import com.example.fixbid.ui.theme.PrimaryBlue
 import com.example.fixbid.ui.components.SeachBar
 import com.example.fixbid.ui.components.NotificationCard
-import com.example.fixbid.data.SampleNotifications
 import com.example.fixbid.ui.theme.TextPrimary
 import com.example.fixbid.model.Category
 import com.example.fixbid.R
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import com.example.fixbid.data.mapper.toModel
+import com.example.fixbid.ui.viewmodel.HomeViewModel
+import com.example.fixbid.ui.viewmodel.NotificationUIState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 
 @Composable
-fun HomeScreen() {
+fun HomeScreen(
+    viewModel: HomeViewModel = viewModel()
+) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedNavIndex by remember { mutableStateOf(0) }
+    val notificationState by viewModel.notificationState.collectAsState()
 
     val categories = listOf(
         Category(1,  "Sửa chữa nhà ở", R.drawable.home_repairs),
@@ -118,7 +129,39 @@ fun HomeScreen() {
             ) {
                 PromoBanner()
 
-                NotificationCard(notifications = SampleNotifications.all)
+                when (val state = notificationState) {
+                    is NotificationUIState.Loading -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(80.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Color.LightGray.copy(alpha = 0.3f))
+                        )
+                    }
+                    is NotificationUIState.Success -> {
+                        val notifications = state.notifications.map { it.toModel() }
+                        if (notifications.isNotEmpty()) {
+                            NotificationCard(notifications = notifications)
+                        }
+                    }
+                    is NotificationUIState.Error -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = state.message,
+                                color = Color.Red.copy(alpha = 0.7f),
+                                fontSize = 13.sp
+                            )
+                            TextButton(onClick = { viewModel.loadNotifications() }) {
+                                Text("Thử lại")
+                            }
+                        }
+                    }
+                }
 
                 Column {
                     Text(

@@ -6,7 +6,7 @@ import com.example.fixbid.model.NotificationType
 object SampleNotifications {
     val all = listOf(
         AppNotification(
-            id = 1,
+            id = "1",
             type = NotificationType.UPCOMING_TASK,
             label = "Nhiệm vụ sắp tới",
             title = "Lắp TV treo tường",
@@ -14,7 +14,7 @@ object SampleNotifications {
             time = "14:30"
         ),
         AppNotification(
-            id = 2,
+            id = "2",
             type = NotificationType.UPCOMING_TASK,
             label = "Nhiệm vụ sắp tới",
             title = "Tỉa cây",
@@ -22,7 +22,7 @@ object SampleNotifications {
             time = "10:00"
         ),
         AppNotification(
-            id = 3,
+            id = "3",
             type = NotificationType.INVOICE,
             label = "Hóa đơn",
             title = "Dịch vụ sửa điện nước",
