@@ -1,4 +1,4 @@
-package com.example.fixbid.ui.viewmodel
+package com.example.fixbid.presentation.customer.home
 
 import android.util.Log
 import androidx.lifecycle.ViewModel

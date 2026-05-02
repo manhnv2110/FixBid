@@ -1,4 +1,4 @@
-package com.example.fixbid.ui.screens
+package com.example.fixbid.presentation.customer.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -24,14 +24,12 @@ import com.example.fixbid.ui.theme.PrimaryBlue
 import com.example.fixbid.ui.components.SeachBar
 import com.example.fixbid.ui.components.NotificationCard
 import com.example.fixbid.ui.theme.TextPrimary
-import com.example.fixbid.model.Category
+import com.example.fixbid.domain.model.Category
 import com.example.fixbid.R
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import com.example.fixbid.data.mapper.toModel
-import com.example.fixbid.ui.viewmodel.HomeViewModel
-import com.example.fixbid.ui.viewmodel.NotificationUIState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 

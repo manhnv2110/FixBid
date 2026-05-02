@@ -1,8 +1,8 @@
 package com.example.fixbid.data.mapper
 
 import com.example.fixbid.data.dto.NotificationDto
-import com.example.fixbid.model.AppNotification
-import com.example.fixbid.model.NotificationType
+import com.example.fixbid.domain.model.AppNotification
+import com.example.fixbid.domain.model.NotificationType
 
 fun NotificationDto.toModel() : AppNotification {
     val type = when (this.type) {
