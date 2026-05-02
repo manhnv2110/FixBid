@@ -1,4 +1,4 @@
-package com.example.fixbid.model
+package com.example.fixbid.domain.model
 
 import androidx.annotation.DrawableRes
 

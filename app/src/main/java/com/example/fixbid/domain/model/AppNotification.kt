@@ -1,6 +1,4 @@
-package com.example.fixbid.model
-
-import androidx.annotation.DrawableRes
+package com.example.fixbid.domain.model
 
 enum class NotificationType {
     UPCOMING_TASK,

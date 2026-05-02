@@ -1,7 +1,7 @@
 package com.example.fixbid.data
 
-import com.example.fixbid.model.AppNotification
-import com.example.fixbid.model.NotificationType
+import com.example.fixbid.domain.model.AppNotification
+import com.example.fixbid.domain.model.NotificationType
 
 object SampleNotifications {
     val all = listOf(

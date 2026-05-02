@@ -6,7 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
-import com.example.fixbid.ui.screens.HomeScreen
+import com.example.fixbid.presentation.customer.home.HomeScreen
 import com.example.fixbid.ui.theme.FixBidTheme
 
 class MainActivity : ComponentActivity() {

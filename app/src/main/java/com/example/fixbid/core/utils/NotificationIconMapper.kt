@@ -1,6 +1,6 @@
 package com.example.fixbid.ui.utils
 
-import com.example.fixbid.model.NotificationType
+import com.example.fixbid.domain.model.NotificationType
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Assignment
 import androidx.compose.ui.graphics.vector.ImageVector

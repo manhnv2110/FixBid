@@ -15,7 +15,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.fixbid.model.Category
+import com.example.fixbid.domain.model.Category
 import com.example.fixbid.ui.theme.TextPrimary
 
 @Composable
