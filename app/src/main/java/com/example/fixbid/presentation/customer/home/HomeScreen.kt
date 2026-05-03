@@ -21,10 +21,9 @@ import com.example.fixbid.ui.components.CategoryGrid
 import com.example.fixbid.ui.components.PromoBanner
 import com.example.fixbid.ui.theme.BackgroundGray
 import com.example.fixbid.ui.theme.PrimaryBlue
-import com.example.fixbid.ui.components.SeachBar
+import com.example.fixbid.core.components.SeachBar
 import com.example.fixbid.ui.components.NotificationCard
 import com.example.fixbid.ui.theme.TextPrimary
-import com.example.fixbid.domain.model.Category
 import com.example.fixbid.R
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.collectAsState
