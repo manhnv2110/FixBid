@@ -1,9 +1,8 @@
-package com.example.fixbid.ui.components
+package com.example.fixbid.core.components
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -21,63 +20,56 @@ import com.example.fixbid.R
 @Composable
 fun PromoBanner(modifier: Modifier = Modifier) {
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(130.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = White),
+        modifier  = modifier.fillMaxWidth().height(130.dp),
+        shape     = RoundedCornerShape(16.dp),
+        colors    = CardDefaults.cardColors(containerColor = White),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column {
                 Text(
-                    text = "20% OFF",
+                    text       = "20% OFF",
                     fontWeight = FontWeight.ExtraBold,
-                    fontSize = 24.sp,
-                    color = PrimaryBlue
+                    fontSize   = 24.sp,
+                    color      = PrimaryBlue
                 )
                 Text(
-                    text = "For this Seasonal",
+                    text       = "For this Seasonal",
                     fontWeight = FontWeight.Medium,
-                    fontSize = 14.sp,
-                    color = PrimaryBlue
+                    fontSize   = 14.sp,
+                    color      = PrimaryBlue
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Image(
-                        painter = painterResource(R.drawable.gift),
+                        painter            = painterResource(R.drawable.gift),
                         contentDescription = "Sale Gift",
-                        modifier = Modifier
-                            .size(32.dp)
-                            .padding(end = 6.dp)
+                        modifier           = Modifier.size(32.dp).padding(end = 6.dp)
                     )
                     Text(
-                        text = "CODE : FIXEN",
+                        text       = "CODE : FIXEN",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp,
-                        color = PrimaryBlue
+                        fontSize   = 13.sp,
+                        color      = PrimaryBlue
                     )
                 }
             }
 
             Box(
-                modifier = Modifier
-                    .width(130.dp)
-                    .fillMaxHeight()
-                    .background(White),
+                modifier        = Modifier.width(130.dp).fillMaxHeight().background(White),
                 contentAlignment = Alignment.Center
             ) {
                 Image(
-                    painter = painterResource(R.drawable.banner_1),
+                    painter            = painterResource(R.drawable.banner_1),
                     contentDescription = "Banner",
-                    modifier = Modifier.fillMaxHeight(),
-                    contentScale = ContentScale.FillHeight
+                    modifier           = Modifier.fillMaxHeight(),
+                    contentScale       = ContentScale.FillHeight
                 )
             }
         }

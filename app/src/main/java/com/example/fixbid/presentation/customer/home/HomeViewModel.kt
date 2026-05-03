@@ -1,46 +1,68 @@
 package com.example.fixbid.presentation.customer.home
 
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.fixbid.data.dto.NotificationDto
-import com.example.fixbid.data.repository.NotificationRepository
+import com.example.fixbid.domain.model.Notification
+import com.example.fixbid.domain.model.Resource
+import com.example.fixbid.domain.model.ServiceCategory
+import com.example.fixbid.domain.usecase.shared.GetNotificationsUseCase
+import com.example.fixbid.core.utils.ServiceCategoryMapper
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-sealed class NotificationUIState {
-    object Loading : NotificationUIState()
-    data class Success(val notifications: List<NotificationDto>) : NotificationUIState()
-    data class Error(val message: String) : NotificationUIState()
+// UI State cho notifications
+sealed class NotificationUiState {
+    object Loading : NotificationUiState()
+    data class Success(val notifications: List<Notification>) : NotificationUiState()
+    data class Error(val message: String) : NotificationUiState()
 }
 
-class HomeViewModel(
-    private val notificationRepo: NotificationRepository = NotificationRepository()
+// UI State tổng của HomeScreen
+data class HomeUiState(
+    val categories: List<ServiceCategory> = ServiceCategoryMapper.homeCategories,
+    val searchQuery: String = "",
+    val notificationState: NotificationUiState = NotificationUiState.Loading
+)
+
+@HiltViewModel
+class HomeViewModel @Inject constructor(
+    private val getNotificationsUseCase: GetNotificationsUseCase
 ) : ViewModel() {
-    private val _notificationState = MutableStateFlow<NotificationUIState>(NotificationUIState.Loading)
-    val notificationState: StateFlow<NotificationUIState> = _notificationState.asStateFlow()
+
+    private val _uiState = MutableStateFlow(HomeUiState())
+    val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
     init {
         loadNotifications()
     }
 
+    fun onSearchQueryChange(query: String) {
+        _uiState.value = _uiState.value.copy(searchQuery = query)
+    }
+
     fun loadNotifications() {
         viewModelScope.launch {
-            Log.d("HomeViewModel", ">>> Bắt đầu load notifications...")
-            _notificationState.value = NotificationUIState.Loading
-            notificationRepo.getMyNotifications()
-                .onSuccess { list ->
-                    Log.d("HomeViewModel", ">>> Thành công! Số lượng: ${list.size}")
-                    list.forEach { Log.d("HomeViewModel", ">>> Item: $it") }
-                    _notificationState.value = NotificationUIState.Success(list)
-                }
-                .onFailure { error ->
-                    Log.e("HomeViewModel", ">>> Lỗi: ${error.message}")
-                    Log.e("HomeViewModel", ">>> Chi tiết: ${error.stackTraceToString()}")
-                    _notificationState.value = NotificationUIState.Error(error.message ?: "Không thể tải thông báo")
-                }
+            _uiState.value = _uiState.value.copy(
+                notificationState = NotificationUiState.Loading
+            )
+            _uiState.value = when (val result = getNotificationsUseCase()) {
+                is Resource.Success -> _uiState.value.copy(
+                    notificationState = NotificationUiState.Success(result.data)
+                )
+                is Resource.Error -> _uiState.value.copy(
+                    notificationState = NotificationUiState.Error(result.message)
+                )
+                is Resource.Loading -> _uiState.value   // không xảy ra với suspend fun
+            }
         }
+    }
+
+    fun onCategoryClick(category: ServiceCategory) {
+        // TODO: Navigate sang SearchScreen với filter category
+        // Sẽ xử lý qua NavController ở HomeScreen
     }
 }

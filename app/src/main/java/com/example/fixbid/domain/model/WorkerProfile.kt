@@ -15,16 +15,3 @@ data class WorkerProfile(
     val totalJobsDone: Int,
     val identityVerified: Boolean
 )
-
-enum class ServiceCategory(val displayName: String) {
-    PLUMBING("Sửa ống nước"),
-    ELECTRICAL("Sửa điện"),
-    CARPENTRY("Mộc / Nội thất"),
-    PAINTING("Sơn nhà"),
-    AIR_CONDITIONING("Điều hòa"),
-    APPLIANCE_REPAIR("Sửa đồ gia dụng"),
-    CLEANING("Vệ sinh"),
-    LOCKSMITH("Khóa cửa"),
-    ROOFING("Mái nhà"),
-    OTHER("Khác")
-}

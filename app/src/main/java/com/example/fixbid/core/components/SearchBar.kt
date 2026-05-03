@@ -12,7 +12,7 @@ import androidx.compose.ui.unit.dp
 import com.example.fixbid.ui.theme.PrimaryBlue
 
 @Composable
-fun SeachBar(
+fun SearchBar(
     query: String,
     onQueryChange: (String) -> Unit,
     modifier: Modifier = Modifier

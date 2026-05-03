@@ -22,7 +22,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.fixbid"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -81,6 +81,9 @@ dependencies {
     implementation("io.github.jan-tennert.supabase:realtime-kt")
 
     implementation("io.ktor:ktor-client-android:3.4.3")
+
+    // Datastore
+    implementation("androidx.datastore:datastore-preferences:1.2.1")
 
     // Hilt
     implementation("com.google.dagger:hilt-android:2.59.2")
