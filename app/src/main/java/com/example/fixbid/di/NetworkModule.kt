@@ -1,6 +1,6 @@
 package com.example.fixbid.di
 
-import com.example.fixbid.data.remote.supabase.createFixiFySupabaseClient
+import com.example.fixbid.data.remote.supabase.createFixBidSupabaseClient
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -14,5 +14,5 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideSupabaseClient(): SupabaseClient = createFixiFySupabaseClient()
+    fun provideSupabaseClient(): SupabaseClient = createFixBidSupabaseClient()
 }

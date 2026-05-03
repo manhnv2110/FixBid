@@ -15,7 +15,11 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             FixBidTheme {
-                HomeScreen()
+                HomeScreen(
+                    onCategoryClick = TODO(),
+                    onNotificationClick = TODO(),
+                    viewModel = TODO()
+                )
             }
         }
     }
@@ -25,6 +29,10 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun DefaultPreview() {
     FixBidTheme {
-        HomeScreen()
+        HomeScreen(
+            onCategoryClick = TODO(),
+            onNotificationClick = TODO(),
+            viewModel = TODO()
+        )
     }
 }

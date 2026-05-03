@@ -10,25 +10,24 @@ import com.example.fixbid.domain.repository.AuthRepository
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
-import io.github.jan.supabase.postgrest.postgrest
-import io.github.jan.supabase.postgrest.query.Columns
+import io.github.jan.supabase.auth.status.SessionStatus
+import io.github.jan.supabase.postgrest.from
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import javax.inject.Inject
 
 class AuthRepositoryImpl @Inject constructor(
     private val client: SupabaseClient
 ) : AuthRepository {
 
-    override val currentUser: Flow<User?> = client.auth.sessionStatus.map { status ->
-        runCatching {
-            val session = client.auth.currentSessionOrNull() ?: return@map null
-            client.postgrest[Tables.PROFILES]
-                .select(Columns.ALL) { filter { eq("id", session.user!!.id) } }
-                .decodeSingle<UserDto>()
-                .toDomain()
-        }.getOrNull()
-    }
+    override val currentUser: Flow<User?> =
+        client.auth.sessionStatus.map { status ->
+            if (status is SessionStatus.Authenticated) {
+                getCurrentUser()
+            } else null
+        }
 
     override suspend fun signUp(
         email: String,
@@ -38,44 +37,29 @@ class AuthRepositoryImpl @Inject constructor(
         role: UserRole
     ): Resource<User> = runCatching {
         client.auth.signUpWith(Email) {
-            this.email = email
+            this.email    = email
             this.password = password
+            data = buildJsonObject {
+                put("full_name",     fullName)
+                put("phone_number",  phoneNumber)
+                put("role",          role.name.lowercase())
+            }
         }
-        val userId = client.auth.currentSessionOrNull()!!.user!!.id
-
-        // Tạo profile trong bảng profiles
-        val dto = UserDto(
-            id = userId,
-            email = email,
-            fullName = fullName,
-            phoneNumber = phoneNumber,
-            role = role.name.lowercase()
-        )
-        client.postgrest[Tables.PROFILES].insert(dto)
-
-        // Nếu là thợ, tạo worker_profile rỗng
-        if (role == UserRole.WORKER) {
-            client.postgrest[Tables.WORKER_PROFILES].insert(
-                mapOf("user_id" to userId)
-            )
-        }
-
-        Resource.Success(dto.toDomain())
+        val user = getCurrentUser() ?: return Resource.Error("Không thể tạo tài khoản")
+        Resource.Success(user)
     }.getOrElse { Resource.Error(it.message ?: "Đăng ký thất bại") }
 
-    override suspend fun signIn(email: String, password: String): Resource<User> =
-        runCatching {
-            client.auth.signInWith(Email) {
-                this.email = email
-                this.password = password
-            }
-            val userId = client.auth.currentSessionOrNull()!!.user!!.id
-            val user = client.postgrest[Tables.PROFILES]
-                .select(Columns.ALL) { filter { eq("id", userId) } }
-                .decodeSingle<UserDto>()
-                .toDomain()
-            Resource.Success(user)
-        }.getOrElse { Resource.Error(it.message ?: "Đăng nhập thất bại") }
+    override suspend fun signIn(
+        email: String,
+        password: String
+    ): Resource<User> = runCatching {
+        client.auth.signInWith(Email) {
+            this.email    = email
+            this.password = password
+        }
+        val user = getCurrentUser() ?: return Resource.Error("Đăng nhập thất bại")
+        Resource.Success(user)
+    }.getOrElse { Resource.Error(it.message ?: "Đăng nhập thất bại") }
 
     override suspend fun signOut(): Resource<Unit> = runCatching {
         client.auth.signOut()
@@ -88,15 +72,15 @@ class AuthRepositoryImpl @Inject constructor(
     }.getOrElse { Resource.Error(it.message ?: "Lỗi") }
 
     override suspend fun getCurrentUser(): User? = runCatching {
-        val userId = client.auth.currentSessionOrNull()?.user?.id ?: return null
-        client.postgrest[Tables.PROFILES]
-            .select(Columns.ALL) { filter { eq("id", userId) } }
+        val userId = client.auth.currentUserOrNull()?.id ?: return null
+        client.from(Tables.PROFILES)
+            .select { filter { eq("id", userId) } }
             .decodeSingle<UserDto>()
             .toDomain()
     }.getOrNull()
 
     override suspend fun updateProfile(user: User): Resource<User> = runCatching {
-        client.postgrest[Tables.PROFILES]
+        client.from(Tables.PROFILES)
             .update(user.toDto()) { filter { eq("id", user.id) } }
         Resource.Success(user)
     }.getOrElse { Resource.Error(it.message ?: "Cập nhật thất bại") }

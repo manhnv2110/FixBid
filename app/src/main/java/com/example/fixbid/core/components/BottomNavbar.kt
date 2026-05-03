@@ -1,4 +1,4 @@
-package com.example.fixbid.ui.components
+package com.example.fixbid.core.components
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*

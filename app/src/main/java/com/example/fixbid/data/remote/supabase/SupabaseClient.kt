@@ -21,7 +21,7 @@ object Tables {
     const val FCM_TOKENS      = "fcm_tokens"
 }
 
-fun createFixiFySupabaseClient(): SupabaseClient = createSupabaseClient(
+fun createFixBidSupabaseClient(): SupabaseClient = createSupabaseClient(
     supabaseUrl = BuildConfig.SUPABASE_URL,
     supabaseKey = BuildConfig.SUPABASE_API_KEY
 ) {

@@ -7,7 +7,6 @@ import com.example.fixbid.domain.model.ServiceCategory
 import com.example.fixbid.core.utils.toEpochMillis
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import java.time.Instant
 
 @Serializable
 data class BookingDto(
@@ -54,21 +53,19 @@ data class BookingDto(
 }
 
 fun Booking.toDto() = BookingDto(
-    id = id,
-    customerId = customerId,
-    workerId = workerId,
-    category = category.name.lowercase(),
-    description = description,
-    address = address,
-    latitude = latitude,
-    longitude = longitude,
-    scheduledAt = Instant.ofEpochMilli(scheduledAt).toString(),
+    id                     = id,
+    customerId             = customerId,
+    workerId               = workerId,
+    category               = category.name.lowercase(),
+    description            = description,
+    address                = address,
+    scheduledAt            = java.time.Instant
+        .ofEpochMilli(scheduledAt)
+        .toString(),
     estimatedDurationHours = estimatedDurationHours,
-    status = status.name.lowercase(),
-    type = type.name.lowercase(),
-    agreedPrice = agreedPrice,
-    customerNote = customerNote,
-    workerNote = workerNote,
-    createdAt = Instant.ofEpochMilli(createdAt).toString(),
-    updatedAt = Instant.ofEpochMilli(updatedAt).toString()
+    status                 = status.name.lowercase(),
+    type                   = type.name.lowercase(),
+    agreedPrice            = agreedPrice,
+    customerNote           = customerNote,
+    workerNote             = workerNote
 )

@@ -17,14 +17,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.fixbid.core.utils.NotificationIconMapper
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.example.fixbid.core.utils.ServiceCategoryMapper
 import com.example.fixbid.domain.model.ServiceCategory
-import com.example.fixbid.ui.components.BottomNavbar
-import com.example.fixbid.ui.components.CategoryGrid
-import com.example.fixbid.ui.components.NotificationCard
-import com.example.fixbid.ui.components.PromoBanner
+import com.example.fixbid.core.components.BottomNavbar
+import com.example.fixbid.core.components.CategoryGrid
+import com.example.fixbid.core.components.NotificationCard
+import com.example.fixbid.core.components.PromoBanner
+import com.example.fixbid.core.components.SearchBar
 import com.example.fixbid.ui.theme.BackgroundGray
 import com.example.fixbid.ui.theme.PrimaryBlue
 import com.example.fixbid.ui.theme.TextPrimary
@@ -33,10 +33,10 @@ import com.example.fixbid.ui.theme.TextPrimary
 fun HomeScreen(
     onCategoryClick: (ServiceCategory) -> Unit,     // navigation callback
     onNotificationClick: () -> Unit,                // mở màn hình notifications
-    viewModel: HomeViewModel = hiltViewModel()       // Hilt inject — không cần truyền thủ công
+    viewModel: HomeViewModel = hiltViewModel()       // Hilt inject
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    var selectedNavIndex by remember { mutableStateOf(0) }
+    var selectedNavIndex by remember { mutableIntStateOf(0) }
 
     Scaffold(
         bottomBar = {
@@ -174,7 +174,6 @@ private fun NotificationSection(
             if (recent.isNotEmpty()) {
                 NotificationCard(
                     notifications = recent,
-                    iconMapper    = NotificationIconMapper
                 )
             }
         }

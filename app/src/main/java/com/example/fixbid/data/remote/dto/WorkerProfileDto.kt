@@ -37,3 +37,16 @@ data class WorkerProfileDto(
         identityVerified = identityVerified
     )
 }
+
+fun WorkerProfile.toDto() = WorkerProfileDto(
+    userId            = userId,
+    bio               = bio,
+    skills            = skills.map { it.name.lowercase() },
+    experienceYears   = experienceYears,
+    pricePerHour      = pricePerHour,
+    location          = location,
+    latitude          = latitude,
+    longitude         = longitude,
+    isAvailable       = isAvailable,
+    identityVerified  = identityVerified
+)
