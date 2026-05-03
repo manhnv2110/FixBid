@@ -8,7 +8,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.fixbid.presentation.customer.home.HomeScreen
 import com.example.fixbid.ui.theme.FixBidTheme
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -16,9 +18,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             FixBidTheme {
                 HomeScreen(
-                    onCategoryClick = TODO(),
-                    onNotificationClick = TODO(),
-                    viewModel = TODO()
+                    onCategoryClick = { category -> /* TODO: navigate */ },
+                    onNotificationClick = { /* TODO: navigate */ },
+                    // Bỏ tham số viewModel đi — Hilt tự inject qua hiltViewModel()
                 )
             }
         }
@@ -30,9 +32,9 @@ class MainActivity : ComponentActivity() {
 fun DefaultPreview() {
     FixBidTheme {
         HomeScreen(
-            onCategoryClick = TODO(),
-            onNotificationClick = TODO(),
-            viewModel = TODO()
+            onCategoryClick = { category -> /* TODO: navigate */ },
+            onNotificationClick = { /* TODO: navigate */ },
+            // Bỏ tham số viewModel đi — Hilt tự inject qua hiltViewModel()
         )
     }
 }
