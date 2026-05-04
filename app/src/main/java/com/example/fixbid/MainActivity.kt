@@ -1,7 +1,9 @@
 package com.example.fixbid
 
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
@@ -14,13 +16,16 @@ import dagger.hilt.android.AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(
+                scrim = Color.TRANSPARENT // Đảm bảo nền status bar vẫn trong suốt để lộ nền xanh của bạn
+            )
+        )
         setContent {
             FixBidTheme {
                 HomeScreen(
-                    onCategoryClick = { category -> /* TODO: navigate */ },
+                    onCategoryClick = { /* TODO: navigate */ },
                     onNotificationClick = { /* TODO: navigate */ },
-                    // Bỏ tham số viewModel đi — Hilt tự inject qua hiltViewModel()
                 )
             }
         }
@@ -32,9 +37,8 @@ class MainActivity : ComponentActivity() {
 fun DefaultPreview() {
     FixBidTheme {
         HomeScreen(
-            onCategoryClick = { category -> /* TODO: navigate */ },
-            onNotificationClick = { /* TODO: navigate */ },
-            // Bỏ tham số viewModel đi — Hilt tự inject qua hiltViewModel()
+            onCategoryClick = { },
+            onNotificationClick = { },
         )
     }
 }

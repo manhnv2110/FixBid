@@ -2,6 +2,7 @@ package com.example.fixbid.presentation.customer.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,9 +32,9 @@ import com.example.fixbid.ui.theme.TextPrimary
 
 @Composable
 fun HomeScreen(
-    onCategoryClick: (ServiceCategory) -> Unit,     // navigation callback
-    onNotificationClick: () -> Unit,                // mở màn hình notifications
-    viewModel: HomeViewModel = hiltViewModel()       // Hilt inject
+    onCategoryClick: (ServiceCategory) -> Unit,
+    onNotificationClick: () -> Unit,
+    viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var selectedNavIndex by remember { mutableIntStateOf(0) }
@@ -45,27 +46,26 @@ fun HomeScreen(
                 onItemSelected = { selectedNavIndex = it }
             )
         },
-        containerColor = BackgroundGray
+        containerColor = BackgroundGray,
+        contentWindowInsets = WindowInsets(0,0,0,0)
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
         ) {
-            // ── Header xanh ──────────────────────────────────
+
             HomeHeader(
                 searchQuery        = uiState.searchQuery,
                 onSearchChange     = viewModel::onSearchQueryChange,
                 onNotificationClick = onNotificationClick
             )
 
-            // ── Nội dung cuộn ────────────────────────────────
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 16.dp)
-                    .padding(top = 20.dp, bottom = 16.dp),
+                    .padding(top = 20.dp, bottom = innerPadding.calculateBottomPadding() + 16.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
                 PromoBanner()
@@ -84,22 +84,19 @@ fun HomeScreen(
     }
 }
 
-// ─────────────────────────────────────────────────────────────
-// Sub-composables — tách nhỏ để dễ đọc và tái sử dụng
-// ─────────────────────────────────────────────────────────────
-
 @Composable
 private fun HomeHeader(
     searchQuery: String,
     onSearchChange: (String) -> Unit,
-    onNotificationClick: () -> Unit
+    onNotificationClick: () -> Unit,
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(PrimaryBlue)
+            .statusBarsPadding()
             .padding(horizontal = 20.dp)
-            .padding(top = 48.dp, bottom = 24.dp)
+            .padding(top = 16.dp, bottom = 24.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -211,10 +208,9 @@ private fun CategorySection(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // CategoryGrid nhận ServiceCategory thay vì Category cũ
         CategoryGrid(
-            categories      = categories,
-            iconMapper      = ServiceCategoryMapper::getIconRes,
+            categories = categories,
+            iconMapper = ServiceCategoryMapper::getIconRes,
             onCategoryClick = onCategoryClick
         )
     }
