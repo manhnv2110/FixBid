@@ -31,6 +31,8 @@ import com.example.fixbid.ui.theme.PrimaryBlue
 import com.example.fixbid.ui.theme.TextPrimary
 import com.example.fixbid.presentation.customer.history.BookingHistoryScreen
 
+import androidx.compose.runtime.saveable.rememberSaveable
+
 @Composable
 fun HomeScreen(
     onCategoryClick: (ServiceCategory) -> Unit,
@@ -39,9 +41,10 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    var selectedNavIndex by remember { mutableIntStateOf(0) }
+    var selectedNavIndex by rememberSaveable { mutableIntStateOf(0) }
 
     Scaffold(
+        modifier = Modifier.fillMaxSize(),
         bottomBar = {
             BottomNavbar(
                 selectedIndex = selectedNavIndex,

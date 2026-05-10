@@ -22,6 +22,7 @@ import com.example.fixbid.ui.theme.LightBlue
 import com.example.fixbid.ui.theme.PrimaryBlue
 import com.example.fixbid.ui.theme.TextPrimary
 import com.example.fixbid.ui.theme.TextSecondary
+import androidx.compose.runtime.saveable.rememberSaveable
 
 // ─── Stub data models ───────────────────────────────────────────────────────
 
@@ -106,7 +107,7 @@ private val sampleDone = listOf(
 fun BookingHistoryScreen(
     onBookingClick: (String) -> Unit
 ) {
-    var selectedTab by remember { mutableIntStateOf(0) }
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     val tabs = listOf("Đã đặt", "Đã làm")
 
     Column(
