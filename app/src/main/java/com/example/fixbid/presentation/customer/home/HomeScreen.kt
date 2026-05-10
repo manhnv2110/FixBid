@@ -29,11 +29,13 @@ import com.example.fixbid.core.components.SearchBar
 import com.example.fixbid.ui.theme.BackgroundGray
 import com.example.fixbid.ui.theme.PrimaryBlue
 import com.example.fixbid.ui.theme.TextPrimary
+import com.example.fixbid.presentation.customer.history.BookingHistoryScreen
 
 @Composable
 fun HomeScreen(
     onCategoryClick: (ServiceCategory) -> Unit,
     onNotificationClick: () -> Unit,
+    onBookingClick: (String) -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -47,38 +49,38 @@ fun HomeScreen(
             )
         },
         containerColor = BackgroundGray,
-        contentWindowInsets = WindowInsets(0,0,0,0)
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-        ) {
-
-            HomeHeader(
-                searchQuery        = uiState.searchQuery,
-                onSearchChange     = viewModel::onSearchQueryChange,
-                onNotificationClick = onNotificationClick
-            )
-
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp)
-                    .padding(top = 20.dp, bottom = innerPadding.calculateBottomPadding() + 16.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp)
+        when (selectedNavIndex) {
+            1 -> Box(modifier = Modifier.padding(innerPadding)) {
+                BookingHistoryScreen(onBookingClick = onBookingClick)
+            }
+            else -> Column(
+                modifier = Modifier.fillMaxSize()
             ) {
-                PromoBanner()
-
-                NotificationSection(
-                    state       = uiState.notificationState,
-                    onRetry     = viewModel::loadNotifications
+                HomeHeader(
+                    searchQuery = uiState.searchQuery,
+                    onSearchChange = viewModel::onSearchQueryChange,
+                    onNotificationClick = onNotificationClick
                 )
-
-                CategorySection(
-                    categories      = uiState.categories,
-                    onCategoryClick = onCategoryClick
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp)
+                        .padding(top = 20.dp, bottom = innerPadding.calculateBottomPadding() + 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                ) {
+                    PromoBanner()
+                    NotificationSection(
+                        state = uiState.notificationState,
+                        onRetry = viewModel::loadNotifications
+                    )
+                    CategorySection(
+                        categories = uiState.categories,
+                        onCategoryClick = onCategoryClick
+                    )
+                }
             }
         }
     }

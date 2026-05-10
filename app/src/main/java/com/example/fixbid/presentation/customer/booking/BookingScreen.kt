@@ -2,23 +2,23 @@ package com.example.fixbid.presentation.customer.booking
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.fixbid.domain.model.ServiceCategory
@@ -31,8 +31,18 @@ import com.example.fixbid.ui.theme.TextPrimary
 fun BookingScreen(
     initialCategoryName: String?,
     onBackClick: () -> Unit,
-    onSubmitClick: () -> Unit
+    onSubmitSuccess: () -> Unit,
+    viewModel: BookingViewModel = hiltViewModel()
 ) {
+    val uiState by viewModel.uiState.collectAsState()
+
+    // Handle side effects of UI State
+    LaunchedEffect(uiState) {
+        if (uiState is BookingUiState.Success) {
+            viewModel.resetState()
+            onSubmitSuccess()
+        }
+    }
     var expanded by remember { mutableStateOf(false) }
     var selectedCategory by remember { 
         mutableStateOf(
@@ -42,11 +52,16 @@ fun BookingScreen(
     }
 
     var detailedDescription by remember { mutableStateOf("") }
-    var requiresSurvey by remember { mutableStateOf(false) }
     var address by remember { mutableStateOf("") }
     var phoneNumber by remember { mutableStateOf("") }
     var fullName by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
+
+    fun requiredLabel(label: String) = buildAnnotatedString {
+        append(label)
+        append(" ")
+        withStyle(SpanStyle(color = Color.Red)) { append("*") }
+    }
 
     Scaffold(
         topBar = {
@@ -79,7 +94,7 @@ fun BookingScreen(
             // Nội dung công việc (Dropdown)
             Column {
                 Text(
-                    text = "Nội dung công việc *",
+                    text = requiredLabel("Nội dung công việc"),
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary,
                     modifier = Modifier.padding(bottom = 8.dp)
@@ -126,7 +141,7 @@ fun BookingScreen(
             // Mô tả chi tiết công việc
             Column {
                 Text(
-                    text = "Mô tả chi tiết công việc *",
+                    text = requiredLabel("Mô tả chi tiết công việc"),
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary,
                     modifier = Modifier.padding(bottom = 8.dp)
@@ -151,7 +166,7 @@ fun BookingScreen(
             // Địa chỉ
             Column {
                 Text(
-                    text = "Địa chỉ *",
+                    text = requiredLabel("Địa chỉ"),
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary,
                     modifier = Modifier.padding(bottom = 8.dp)
@@ -174,7 +189,7 @@ fun BookingScreen(
             // Số điện thoại
             Column {
                 Text(
-                    text = "Số điện thoại *",
+                    text = requiredLabel("Số điện thoại"),
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary,
                     modifier = Modifier.padding(bottom = 8.dp)
@@ -211,7 +226,7 @@ fun BookingScreen(
             // Họ và tên
             Column {
                 Text(
-                    text = "Họ và tên *",
+                    text = requiredLabel("Họ và tên"),
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary,
                     modifier = Modifier.padding(bottom = 8.dp)
@@ -242,7 +257,7 @@ fun BookingScreen(
                 OutlinedTextField(
                     value = notes,
                     onValueChange = { notes = it },
-                    placeholder = { Text("Vui lòng nhập ghi chú nếu có\n\nGợi ý:\n- Nhập thêm địa chỉ, số căn hộ, tháp chung cư...\n- Nhập thêm tình trạng thiết bị cần sửa...") },
+                    placeholder = { Text("Vui lòng nhập ghi chú nếu có\nGợi ý:\n- Nhập thêm địa chỉ, số căn hộ, tháp chung cư...\n- Nhập thêm tình trạng thiết bị cần sửa...") },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(120.dp),
@@ -259,15 +274,42 @@ fun BookingScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            if (uiState is BookingUiState.Error) {
+                Text(
+                    text = (uiState as BookingUiState.Error).message,
+                    color = Color.Red,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+            }
+
             Button(
-                onClick = onSubmitClick,
+                onClick = {
+                    // validation could be added here
+                    viewModel.createBooking(
+                        category = selectedCategory,
+                        description = detailedDescription,
+                        address = address,
+                        phoneNumber = phoneNumber,
+                        fullName = fullName,
+                        notes = notes
+                    )
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
-                shape = RoundedCornerShape(8.dp)
+                shape = RoundedCornerShape(8.dp),
+                enabled = uiState !is BookingUiState.Loading &&
+                          detailedDescription.isNotBlank() &&
+                          address.isNotBlank() &&
+                          phoneNumber.isNotBlank() &&
+                          fullName.isNotBlank()
             ) {
-                Text("Đặt lịch ngay", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                if (uiState is BookingUiState.Loading) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                } else {
+                    Text("Đặt lịch ngay", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                }
             }
             
             Spacer(modifier = Modifier.height(32.dp))
