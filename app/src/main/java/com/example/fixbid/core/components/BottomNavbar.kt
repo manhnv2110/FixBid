@@ -1,4 +1,4 @@
-package com.example.fixbid.ui.components
+package com.example.fixbid.core.components
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -17,7 +17,7 @@ fun BottomNavbar(
 ) {
     val items = listOf(
         Triple("Trang chủ", Icons.Filled.Home, Icons.Outlined.Home),
-        Triple("Đặt dịch vụ", Icons.Filled.List, Icons.Outlined.List),
+        Triple("Lịch sử", Icons.Filled.History, Icons.Outlined.History),
         Triple("Hồ sơ", Icons.Filled.Person, Icons.Outlined.Person)
     )
 
