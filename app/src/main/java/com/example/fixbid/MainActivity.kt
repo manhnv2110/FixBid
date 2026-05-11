@@ -6,7 +6,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
-import com.example.fixbid.presentation.customer.home.HomeScreen
+import com.example.fixbid.presentation.auth.AuthApp
+import com.example.fixbid.presentation.auth.WelcomeScreen
 import com.example.fixbid.ui.theme.FixBidTheme
 
 class MainActivity : ComponentActivity() {
@@ -15,7 +16,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             FixBidTheme {
-                HomeScreen()
+                AuthApp()
             }
         }
     }
@@ -25,6 +26,6 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun DefaultPreview() {
     FixBidTheme {
-        HomeScreen()
+        WelcomeScreen(onSignIn = {}, onCreateAccount = {})
     }
 }

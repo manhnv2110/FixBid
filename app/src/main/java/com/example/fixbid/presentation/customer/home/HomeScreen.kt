@@ -32,7 +32,10 @@ import androidx.compose.runtime.getValue
 import com.example.fixbid.data.mapper.toModel
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.tooling.preview.Preview
 
+
+@Preview
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel = viewModel()
