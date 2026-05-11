@@ -1,4 +1,4 @@
-package com.example.fixbid.ui.components
+package com.example.fixbid.core.components
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,7 +12,7 @@ import androidx.compose.ui.unit.dp
 import com.example.fixbid.ui.theme.PrimaryBlue
 
 @Composable
-fun SeachBar(
+fun SearchBar(
     query: String,
     onQueryChange: (String) -> Unit,
     modifier: Modifier = Modifier
