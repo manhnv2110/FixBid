@@ -4,6 +4,7 @@ import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.storage.Storage
+import io.github.jan.supabase.realtime.Realtime
 import com.example.fixbid.BuildConfig
 
 val supabase = createSupabaseClient(
@@ -13,4 +14,5 @@ val supabase = createSupabaseClient(
     install(Postgrest)
     install(Auth)
     install(Storage)
+    install(Realtime)
 }

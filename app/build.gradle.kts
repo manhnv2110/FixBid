@@ -70,6 +70,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation("androidx.compose.material:material-icons-extended:1.7.0")   // nâng nếu có
+    implementation("androidx.navigation:navigation-compose:2.8.7")
 
     // Supabase
     implementation(platform("io.github.jan-tennert.supabase:bom:3.6.0"))
