@@ -18,7 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.fixbid.core.utils.ServiceCategoryMapper
 import com.example.fixbid.domain.model.ServiceCategory
 import com.example.fixbid.core.components.BottomNavbar
@@ -30,19 +30,27 @@ import com.example.fixbid.ui.theme.BackgroundGray
 import com.example.fixbid.ui.theme.PrimaryBlue
 import com.example.fixbid.ui.theme.TextPrimary
 import com.example.fixbid.presentation.customer.history.BookingHistoryScreen
-
+import com.example.fixbid.presentation.customer.profile.ProfileScreen
 import androidx.compose.runtime.saveable.rememberSaveable
 
-@Preview
 @Composable
 fun HomeScreen(
-    onCategoryClick: (ServiceCategory) -> Unit,
-    onNotificationClick: () -> Unit,
-    onBookingClick: (String) -> Unit,
+    onCategoryClick: (ServiceCategory) -> Unit = {},
+    onNotificationClick: () -> Unit = {},
+    onBookingClick: (String) -> Unit = {},
+    onSignOut: () -> Unit = {},
+    showHistoryTab: Boolean = false,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var selectedNavIndex by rememberSaveable { mutableIntStateOf(0) }
+
+    // Switch to history tab when signaled
+    LaunchedEffect(showHistoryTab) {
+        if (showHistoryTab) {
+            selectedNavIndex = 1
+        }
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -58,6 +66,9 @@ fun HomeScreen(
         when (selectedNavIndex) {
             1 -> Box(modifier = Modifier.padding(innerPadding)) {
                 BookingHistoryScreen(onBookingClick = onBookingClick)
+            }
+            2 -> Box(modifier = Modifier.padding(innerPadding)) {
+                ProfileScreen(onSignOut = onSignOut)
             }
             else -> Column(
                 modifier = Modifier.fillMaxSize()
@@ -118,7 +129,7 @@ private fun HomeHeader(
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = "Hà Nội",      // TODO: lấy từ GPS thực tế
+                    text = "Hà Nội",
                     color = Color.White,
                     fontWeight = FontWeight.Medium,
                     fontSize = 16.sp
@@ -169,7 +180,6 @@ private fun NotificationSection(
             )
         }
         is NotificationUiState.Success -> {
-            // Chỉ hiển thị 3 thông báo mới nhất trên HomeScreen
             val recent = state.notifications
                 .filter { !it.isRead }
                 .take(3)

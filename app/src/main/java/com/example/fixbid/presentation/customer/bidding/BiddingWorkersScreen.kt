@@ -10,106 +10,58 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.Work
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.fixbid.core.utils.toRelativeTime
+import com.example.fixbid.domain.model.Bid
+import com.example.fixbid.domain.model.BidStatus
 import com.example.fixbid.ui.theme.BackgroundGray
 import com.example.fixbid.ui.theme.PrimaryBlue
 import com.example.fixbid.ui.theme.TextPrimary
 import com.example.fixbid.ui.theme.TextSecondary
-
-// Stub data models to display workers
-data class BiddingWorkerItem(
-    val workerId: String,
-    val name: String,
-    val category: String,
-    val price: String,
-    val rating: Double,
-    val reviewCount: Int,
-    val experienceText: String,
-    val distanceText: String,
-    val isTopPro: Boolean
-)
-
-private val sampleBids = listOf(
-    BiddingWorkerItem(
-        workerId = "w1",
-        name = "Anh Tuấn",
-        category = "Sửa điện",
-        price = "350.000 đ",
-        rating = 4.8,
-        reviewCount = 120,
-        experienceText = "Đã hoàn thành 85 việc",
-        distanceText = "Cách bạn 2km",
-        isTopPro = true
-    ),
-    BiddingWorkerItem(
-        workerId = "w2",
-        name = "Chú Thanh",
-        category = "Sửa điện",
-        price = "300.000 đ",
-        rating = 4.6,
-        reviewCount = 45,
-        experienceText = "Đã hoàn thành 30 việc",
-        distanceText = "Cách bạn 5km",
-        isTopPro = false
-    ),
-    BiddingWorkerItem(
-        workerId = "w3",
-        name = "Trần Minh",
-        category = "Sửa điện",
-        price = "400.000 đ",
-        rating = 4.9,
-        reviewCount = 210,
-        experienceText = "Đã hoàn thành 150 việc",
-        distanceText = "Cách bạn 1.5km",
-        isTopPro = true
-    )
-)
+import java.text.NumberFormat
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BiddingWorkersScreen(
-    bookingId: String?,
+    bookingId: String,
     onBackClick: () -> Unit,
-    onWorkerClick: (String) -> Unit // workerId
+    onWorkerClick: (String) -> Unit,
+    viewModel: BiddingViewModel = hiltViewModel()
 ) {
+    val uiState by viewModel.uiState.collectAsState()
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { 
+                title = {
                     Text(
-                        text = "Danh sách báo giá", 
-                        fontWeight = FontWeight.Bold, 
+                        text = "Danh sách báo giá",
+                        fontWeight = FontWeight.Bold,
                         color = TextPrimary,
                         modifier = Modifier.fillMaxWidth(),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    ) 
+                        textAlign = TextAlign.Center
+                    )
                 },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(
                             imageVector = Icons.Default.ArrowBack,
                             contentDescription = "Back",
-                            tint = TextPrimary
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { /* TODO Filter */ }) {
-                        Icon(
-                            imageVector = Icons.Default.FilterList,
-                            contentDescription = "Filter",
                             tint = TextPrimary
                         )
                     }
@@ -126,25 +78,73 @@ fun BiddingWorkersScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            Text(
-                text = "Kết quả (${sampleBids.size})",
-                fontSize = 14.sp,
-                color = TextSecondary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            )
+            when (val state = uiState) {
+                is BiddingUiState.Loading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = PrimaryBlue)
+                    }
+                }
+                is BiddingUiState.Error -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(state.message, color = TextSecondary)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            TextButton(onClick = viewModel::loadBids) {
+                                Text("Thử lại", color = PrimaryBlue)
+                            }
+                        }
+                    }
+                }
+                is BiddingUiState.Success -> {
+                    if (state.bids.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "Chưa có báo giá nào",
+                                    color = TextSecondary,
+                                    fontSize = 16.sp
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Các thợ sẽ sớm gửi báo giá cho bạn",
+                                    color = TextSecondary,
+                                    fontSize = 13.sp
+                                )
+                            }
+                        }
+                    } else {
+                        Text(
+                            text = "Kết quả (${state.bids.size})",
+                            fontSize = 14.sp,
+                            color = TextSecondary,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
 
-            LazyColumn(
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                items(
-                    items = sampleBids,
-                    key = { it.workerId }
-                ) { worker ->
-                    WorkerBidCard(
-                        worker = worker,
-                        onClick = { onWorkerClick(worker.workerId) }
-                    )
+                        LazyColumn(
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            items(
+                                items = state.bids,
+                                key = { it.id }
+                            ) { bid ->
+                                WorkerBidCard(
+                                    bid = bid,
+                                    onClick = { onWorkerClick(bid.workerId) },
+                                    onAccept = { viewModel.acceptBid(bid.id) }
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -152,10 +152,14 @@ fun BiddingWorkersScreen(
 }
 
 @Composable
-fun WorkerBidCard(
-    worker: BiddingWorkerItem,
-    onClick: () -> Unit
+private fun WorkerBidCard(
+    bid: Bid,
+    onClick: () -> Unit,
+    onAccept: () -> Unit
 ) {
+    val priceFormatted = NumberFormat.getNumberInstance(Locale("vi", "VN"))
+        .format(bid.proposedPrice.toLong()) + " đ"
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -167,7 +171,7 @@ fun WorkerBidCard(
         Column(
             modifier = Modifier.padding(16.dp)
         ) {
-            // Header: Avatar, Name, Category, Price
+            // Header: Avatar, Name, Price
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
@@ -181,7 +185,7 @@ fun WorkerBidCard(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = worker.name.firstOrNull()?.toString() ?: "",
+                        text = (bid.worker?.fullName?.firstOrNull() ?: "T").toString(),
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = PrimaryBlue
@@ -190,24 +194,22 @@ fun WorkerBidCard(
 
                 Spacer(modifier = Modifier.width(12.dp))
 
-                Column(
-                    modifier = Modifier.weight(1f)
-                ) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = worker.name,
+                        text = bid.worker?.fullName ?: "Thợ #${bid.workerId.take(6)}",
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp,
                         color = TextPrimary
                     )
                     Text(
-                        text = worker.category,
+                        text = bid.createdAt.toRelativeTime(),
                         fontSize = 13.sp,
                         color = TextSecondary
                     )
                 }
 
                 Text(
-                    text = worker.price,
+                    text = priceFormatted,
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
                     color = TextPrimary
@@ -216,86 +218,85 @@ fun WorkerBidCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Rating
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.Star,
-                    contentDescription = "Rating",
-                    tint = Color(0xFF4CAF50), // Green star
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
+            // Message from worker
+            if (bid.message.isNotBlank()) {
                 Text(
-                    text = worker.rating.toString(),
-                    fontWeight = FontWeight.Bold,
+                    text = bid.message,
                     fontSize = 13.sp,
-                    color = TextPrimary
+                    color = TextSecondary,
+                    maxLines = 3
                 )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "(${worker.reviewCount} đánh giá)",
-                    fontSize = 13.sp,
-                    color = TextSecondary
-                )
+                Spacer(modifier = Modifier.height(8.dp))
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // Experience / Jobs done
+            // Duration estimate
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    imageVector = Icons.Default.Work,
-                    contentDescription = "Jobs",
+                    imageVector = Icons.Default.Schedule,
+                    contentDescription = "Duration",
                     tint = TextSecondary,
                     modifier = Modifier.size(16.dp)
                 )
-                Spacer(modifier = Modifier.width(6.dp))
+                Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = worker.experienceText,
+                    text = "Ước tính: ${bid.estimatedDurationHours}h",
                     fontSize = 13.sp,
                     color = TextSecondary
                 )
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // Distance & Top Pro
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.LocationOn,
-                        contentDescription = "Location",
-                        tint = TextSecondary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = worker.distanceText,
-                        fontSize = 13.sp,
-                        color = TextSecondary
-                    )
+            // Status / Accept button
+            when (bid.status) {
+                BidStatus.PENDING -> {
+                    Button(
+                        onClick = onAccept,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Chọn thợ này", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    }
                 }
-
-                if (worker.isTopPro) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                BidStatus.ACCEPTED -> {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
                         Icon(
                             imageVector = Icons.Default.CheckCircle,
-                            contentDescription = "Top Pro",
-                            tint = PrimaryBlue,
-                            modifier = Modifier.size(16.dp)
+                            contentDescription = "Accepted",
+                            tint = Color(0xFF43A047),
+                            modifier = Modifier.size(18.dp)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Thợ uy tín",
-                            fontSize = 13.sp,
+                            text = "Đã chọn",
+                            color = Color(0xFF43A047),
                             fontWeight = FontWeight.Bold,
-                            color = PrimaryBlue
+                            fontSize = 14.sp
                         )
                     }
+                }
+                BidStatus.REJECTED -> {
+                    Text(
+                        text = "Đã từ chối",
+                        color = TextSecondary,
+                        fontSize = 13.sp,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
+                }
+                BidStatus.WITHDRAWN -> {
+                    Text(
+                        text = "Thợ đã rút báo giá",
+                        color = TextSecondary,
+                        fontSize = 13.sp,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
                 }
             }
         }

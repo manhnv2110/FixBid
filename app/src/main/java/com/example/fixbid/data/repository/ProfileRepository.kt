@@ -1,13 +1,16 @@
 package com.example.fixbid.data.repository
 
 import com.example.fixbid.data.dto.ProfileDto
-import com.example.fixbid.data.supabase
 import com.example.fixbid.domain.model.UserRole
+import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import kotlinx.serialization.Serializable
+import javax.inject.Inject
 
-class ProfileRepository {
+class ProfileRepository @Inject constructor(
+    private val client: SupabaseClient
+) {
 
     @Serializable
     private data class PhoneLookupRow(val email: String?)
@@ -32,13 +35,13 @@ class ProfileRepository {
             role = role,
             isActive = true
         )
-        supabase.postgrest["profiles"]
+        client.postgrest["profiles"]
             .upsert(payload) { select() }
             .decodeSingle<ProfileDto>()
     }
 
     suspend fun getProfile(userId: String): Result<ProfileDto> = runCatching {
-        supabase.postgrest["profiles"]
+        client.postgrest["profiles"]
             .select {
                 filter { eq("id", userId) }
                 limit(1)
@@ -48,12 +51,10 @@ class ProfileRepository {
 
     /**
      * Lookup email by phone number so the user can sign in using their phone
-     * while the actual auth record is keyed by email. Requires an appropriate
-     * RLS policy on `profiles` that allows anonymous read of `email` for a
-     * given `phone_number`.
+     * while the actual auth record is keyed by email.
      */
     suspend fun findEmailByPhone(phoneNumber: String): Result<String?> = runCatching {
-        supabase.postgrest["profiles"]
+        client.postgrest["profiles"]
             .select(columns = Columns.list("email")) {
                 filter { eq("phone_number", phoneNumber) }
                 limit(1)

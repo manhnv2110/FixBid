@@ -44,30 +44,33 @@ class BookingViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = BookingUiState.Loading
             val currentUser = authRepository.getCurrentUser()
-            
+
             if (currentUser == null) {
-                // Should normally handle this by redirecting to login, but for now just mock or error
                 _uiState.value = BookingUiState.Error("Vui lòng đăng nhập để tiếp tục")
                 return@launch
             }
 
-            val finalDescription = description
+            val customerNote = buildString {
+                append("SĐT: $phoneNumber")
+                append("\nTên: $fullName")
+                if (notes.isNotBlank()) append("\nGhi chú: $notes")
+            }
 
             val booking = Booking(
                 id = UUID.randomUUID().toString(),
                 customerId = currentUser.id,
-                workerId = "", // Empty for bidding
+                workerId = "",  // empty → toDto() sẽ convert thành null
                 category = category,
-                description = finalDescription,
+                description = description,
                 address = address,
-                latitude = null, // Can integrate Maps later
+                latitude = null,
                 longitude = null,
-                scheduledAt = System.currentTimeMillis(), // Or a date picker value
+                scheduledAt = System.currentTimeMillis(),
                 estimatedDurationHours = 1.0,
                 status = BookingStatus.BIDDING,
                 type = BookingType.BIDDING,
                 agreedPrice = null,
-                customerNote = "SĐT: $phoneNumber, Tên: $fullName\nGhi chú: $notes",
+                customerNote = customerNote,
                 workerNote = null,
                 createdAt = System.currentTimeMillis(),
                 updatedAt = System.currentTimeMillis()
@@ -80,8 +83,7 @@ class BookingViewModel @Inject constructor(
                 is Resource.Error -> {
                     _uiState.value = BookingUiState.Error(result.message)
                 }
-
-                else -> {}
+                is Resource.Loading -> {}
             }
         }
     }

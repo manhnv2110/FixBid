@@ -12,15 +12,11 @@ enum class UserRole {
     CUSTOMER,
 
     @SerialName("worker")
-    WORKER,
-
-    @SerialName("admin")
-    ADMIN;
+    WORKER;
 
     val displayName: String
         get() = when (this) {
             CUSTOMER -> "Khách hàng"
             WORKER -> "Thợ dịch vụ"
-            ADMIN -> "Quản trị"
         }
 }

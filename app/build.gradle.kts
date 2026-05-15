@@ -3,36 +3,32 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.serialization")
     id("com.google.devtools.ksp")
     id("com.google.dagger.hilt.android")
 }
 
 val localProps = Properties().apply {
-    load(rootProject.file("local.properties").inputStream())
+    val file = rootProject.file("local.properties")
+    if (file.exists()) load(file.inputStream())
 }
 
 android {
     namespace = "com.example.fixbid"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.example.fixbid"
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        multiDexEnabled = true
-
-        buildConfigField("String", "SUPABASE_URL", "\"${localProps["SUPABASE_URL"]}\"")
-        buildConfigField("String", "SUPABASE_API_KEY", "\"${localProps["SUPABASE_API_KEY"]}\"")
+        buildConfigField("String", "SUPABASE_URL", "\"${localProps["SUPABASE_URL"] ?: ""}\"")
+        buildConfigField("String", "SUPABASE_API_KEY", "\"${localProps["SUPABASE_API_KEY"] ?: ""}\"")
     }
 
     buildTypes {
@@ -48,6 +44,9 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+    kotlinOptions {
+        jvmTarget = "11"
+    }
     buildFeatures {
         compose = true
         buildConfig = true
@@ -56,11 +55,11 @@ android {
 
 dependencies {
     // Kotlin Core
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")   // nâng lên
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")   // nâng lên phù hợp Kotlin 2.2.x
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
     // Lifecycle + Compose
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")     // nên nâng
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -71,33 +70,26 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
-    implementation("androidx.compose.material:material-icons-extended:1.7.8")   // nâng nếu có
-    implementation("com.google.android.material:material:1.13.0")
+    implementation("androidx.compose.material:material-icons-extended")
+    implementation("com.google.android.material:material:1.12.0")
 
     // Supabase
-    implementation(platform("io.github.jan-tennert.supabase:bom:3.6.0"))
+    implementation(platform("io.github.jan-tennert.supabase:bom:3.1.1"))
     implementation("io.github.jan-tennert.supabase:postgrest-kt")
     implementation("io.github.jan-tennert.supabase:auth-kt")
     implementation("io.github.jan-tennert.supabase:storage-kt")
     implementation("io.github.jan-tennert.supabase:realtime-kt")
 
-    implementation("io.ktor:ktor-client-android:3.4.3")
+    implementation("io.ktor:ktor-client-android:3.0.3")
 
     // Datastore
-    implementation("androidx.datastore:datastore-preferences:1.2.1")
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
 
     // Hilt
-    implementation("com.google.dagger:hilt-android:2.59.2")
-    ksp("com.google.dagger:hilt-android-compiler:2.59.2")
-    implementation("androidx.hilt:hilt-navigation-compose:1.3.0")
-    implementation("androidx.navigation:navigation-compose:2.8.0")
-
-
-    // Retrofit
-    implementation ("com.google.code.gson:gson:2.14.0")
-    implementation ("com.squareup.retrofit2:retrofit:3.0.0")
-    implementation ("com.squareup.retrofit2:converter-gson:3.0.0")
-
+    implementation("com.google.dagger:hilt-android:2.56.2")
+    ksp("com.google.dagger:hilt-android-compiler:2.56.2")
+    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
+    implementation("androidx.navigation:navigation-compose:2.8.5")
 
     // Test
     testImplementation(libs.junit)

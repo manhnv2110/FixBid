@@ -1,30 +1,29 @@
 package com.example.fixbid.presentation.customer.booking
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.fixbid.domain.model.ServiceCategory
 import com.example.fixbid.ui.theme.BackgroundGray
+import com.example.fixbid.ui.theme.LightBlue
 import com.example.fixbid.ui.theme.PrimaryBlue
 import com.example.fixbid.ui.theme.TextPrimary
+import com.example.fixbid.ui.theme.TextSecondary
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,49 +35,43 @@ fun BookingScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    // Handle side effects of UI State
     LaunchedEffect(uiState) {
         if (uiState is BookingUiState.Success) {
             viewModel.resetState()
             onSubmitSuccess()
         }
     }
+
     var expanded by remember { mutableStateOf(false) }
-    var selectedCategory by remember { 
+    var selectedCategory by remember {
         mutableStateOf(
-            ServiceCategory.values().find { it.name == initialCategoryName } 
+            ServiceCategory.values().find { it.name == initialCategoryName }
                 ?: ServiceCategory.OTHER
         )
     }
 
-    var detailedDescription by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
     var address by remember { mutableStateOf("") }
     var phoneNumber by remember { mutableStateOf("") }
     var fullName by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
 
-    fun requiredLabel(label: String) = buildAnnotatedString {
-        append(label)
-        append(" ")
-        withStyle(SpanStyle(color = Color.Red)) { append("*") }
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Đặt lịch nhanh chóng", fontWeight = FontWeight.Bold, color = TextPrimary) },
+                title = {
+                    Text(
+                        "Đặt lịch dịch vụ",
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back",
-                            tint = TextPrimary
-                        )
+                        Icon(Icons.Default.ArrowBack, "Back", tint = TextPrimary)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = BackgroundGray
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
             )
         },
         containerColor = BackgroundGray
@@ -88,206 +81,225 @@ fun BookingScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Nội dung công việc (Dropdown)
-            Column {
-                Text(
-                    text = requiredLabel("Nội dung công việc"),
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-                ExposedDropdownMenuBox(
-                    expanded = expanded,
-                    onExpandedChange = { expanded = !expanded },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    OutlinedTextField(
-                        value = selectedCategory.displayName,
-                        onValueChange = {},
-                        readOnly = true,
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                        modifier = Modifier.menuAnchor().fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color.White,
-                            unfocusedContainerColor = Color.White,
-                            focusedBorderColor = PrimaryBlue,
-                            unfocusedBorderColor = Color.LightGray,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
-                        )
-                    )
-                    ExposedDropdownMenu(
+            // Category selection card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    SectionLabel(icon = Icons.Outlined.Category, text = "Loại dịch vụ")
+                    Spacer(modifier = Modifier.height(10.dp))
+                    ExposedDropdownMenuBox(
                         expanded = expanded,
-                        onDismissRequest = { expanded = false },
-                        modifier = Modifier.background(Color.White)
+                        onExpandedChange = { expanded = !expanded },
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        ServiceCategory.values().forEach { category ->
-                            DropdownMenuItem(
-                                text = { Text(category.displayName, color = TextPrimary) },
-                                onClick = {
-                                    selectedCategory = category
-                                    expanded = false
-                                }
-                            )
+                        OutlinedTextField(
+                            value = selectedCategory.displayName,
+                            onValueChange = {},
+                            readOnly = true,
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+                            modifier = Modifier.menuAnchor().fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = fieldColors()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false },
+                            modifier = Modifier.background(Color.White)
+                        ) {
+                            ServiceCategory.values().forEach { category ->
+                                DropdownMenuItem(
+                                    text = { Text(category.displayName, color = TextPrimary) },
+                                    onClick = {
+                                        selectedCategory = category
+                                        expanded = false
+                                    }
+                                )
+                            }
                         }
                     }
                 }
             }
 
-            // Mô tả chi tiết công việc
-            Column {
-                Text(
-                    text = requiredLabel("Mô tả chi tiết công việc"),
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-                OutlinedTextField(
-                    value = detailedDescription,
-                    onValueChange = { detailedDescription = it },
-                    placeholder = { Text("Nhập mô tả chi tiết công việc...") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White,
-                        focusedBorderColor = PrimaryBlue,
-                        unfocusedBorderColor = Color.LightGray,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary
-                    )
-                )
-            }
-
-            // Địa chỉ
-            Column {
-                Text(
-                    text = requiredLabel("Địa chỉ"),
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-                OutlinedTextField(
-                    value = address,
-                    onValueChange = { address = it },
-                    placeholder = { Text("Vui lòng nhập địa chỉ cụ thể") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White,
-                        focusedBorderColor = PrimaryBlue,
-                        unfocusedBorderColor = Color.LightGray
-                    )
-                )
-            }
-
-            // Số điện thoại
-            Column {
-                Text(
-                    text = requiredLabel("Số điện thoại"),
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp))
-                            .background(Color.White)
-                            .border(1.dp, Color.LightGray, RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp))
-                            .padding(horizontal = 12.dp, vertical = 16.dp)
-                    ) {
-                        Text(text = "🇻🇳 +84", fontWeight = FontWeight.Bold)
-                    }
+            // Description card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    SectionLabel(icon = Icons.Outlined.Description, text = "Mô tả công việc")
+                    Spacer(modifier = Modifier.height(10.dp))
                     OutlinedTextField(
-                        value = phoneNumber,
-                        onValueChange = { phoneNumber = it },
-                        placeholder = { Text("Số điện thoại của Quý Khách") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(topEnd = 8.dp, bottomEnd = 8.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color.White,
-                            unfocusedContainerColor = Color.White,
-                            focusedBorderColor = PrimaryBlue,
-                            unfocusedBorderColor = Color.LightGray
-                        )
+                        value = description,
+                        onValueChange = { description = it },
+                        placeholder = { Text("Mô tả chi tiết vấn đề cần sửa chữa...", color = TextSecondary) },
+                        modifier = Modifier.fillMaxWidth().height(100.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = fieldColors(),
+                        maxLines = 4
                     )
                 }
             }
 
-            // Họ và tên
-            Column {
-                Text(
-                    text = requiredLabel("Họ và tên"),
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-                OutlinedTextField(
-                    value = fullName,
-                    onValueChange = { fullName = it },
-                    placeholder = { Text("Vui lòng nhập họ và tên") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White,
-                        focusedBorderColor = PrimaryBlue,
-                        unfocusedBorderColor = Color.LightGray
+            // Address card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    SectionLabel(icon = Icons.Outlined.LocationOn, text = "Địa chỉ")
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = address,
+                        onValueChange = { address = it },
+                        placeholder = { Text("Số nhà, đường, phường/xã, quận/huyện", color = TextSecondary) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = fieldColors(),
+                        singleLine = true,
+                        leadingIcon = {
+                            Icon(Icons.Outlined.LocationOn, null, tint = PrimaryBlue, modifier = Modifier.size(20.dp))
+                        }
                     )
-                )
+                }
             }
 
-            // Ghi chú
-            Column {
-                Text(
-                    text = "Ghi chú",
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-                OutlinedTextField(
-                    value = notes,
-                    onValueChange = { notes = it },
-                    placeholder = { Text("Vui lòng nhập ghi chú nếu có\nGợi ý:\n- Nhập thêm địa chỉ, số căn hộ, tháp chung cư...\n- Nhập thêm tình trạng thiết bị cần sửa...") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(120.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White,
-                        focusedBorderColor = PrimaryBlue,
-                        unfocusedBorderColor = Color.LightGray
-                    ),
-                    maxLines = 5
-                )
+            // Contact info card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    SectionLabel(icon = Icons.Outlined.ContactPhone, text = "Thông tin liên hệ")
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    OutlinedTextField(
+                        value = fullName,
+                        onValueChange = { fullName = it },
+                        label = { Text("Họ và tên") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = fieldColors(),
+                        singleLine = true,
+                        leadingIcon = {
+                            Icon(Icons.Outlined.Person, null, tint = PrimaryBlue, modifier = Modifier.size(20.dp))
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = phoneNumber,
+                        onValueChange = { phoneNumber = it },
+                        label = { Text("Số điện thoại") },
+                        placeholder = { Text("0xxx xxx xxx") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = fieldColors(),
+                        singleLine = true,
+                        leadingIcon = {
+                            Icon(Icons.Outlined.Phone, null, tint = PrimaryBlue, modifier = Modifier.size(20.dp))
+                        }
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            // Notes card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    SectionLabel(icon = Icons.Outlined.Notes, text = "Ghi chú thêm (tuỳ chọn)")
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = notes,
+                        onValueChange = { notes = it },
+                        placeholder = {
+                            Text(
+                                "Ví dụ: Số căn hộ, tầng, tình trạng thiết bị...",
+                                color = TextSecondary
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth().height(90.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = fieldColors(),
+                        maxLines = 3
+                    )
+                }
+            }
 
+            // Info banner
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = LightBlue)
+            ) {
+                Row(
+                    modifier = Modifier.padding(14.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Icon(
+                        Icons.Outlined.Info,
+                        contentDescription = null,
+                        tint = PrimaryBlue,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "Sau khi đặt lịch, các thợ sẽ gửi báo giá cho bạn. Bạn có thể so sánh và chọn thợ phù hợp nhất.",
+                        fontSize = 13.sp,
+                        color = PrimaryBlue,
+                        lineHeight = 18.sp
+                    )
+                }
+            }
+
+            // Error message
             if (uiState is BookingUiState.Error) {
-                Text(
-                    text = (uiState as BookingUiState.Error).message,
-                    color = Color.Red,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEBEE))
+                ) {
+                    Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.ErrorOutline, null, tint = Color(0xFFD32F2F), modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = (uiState as BookingUiState.Error).message,
+                            color = Color(0xFFD32F2F),
+                            fontSize = 13.sp
+                        )
+                    }
+                }
             }
+
+            // Submit button
+            val canSubmit = uiState !is BookingUiState.Loading &&
+                    description.isNotBlank() &&
+                    address.isNotBlank() &&
+                    phoneNumber.isNotBlank() &&
+                    fullName.isNotBlank()
 
             Button(
                 onClick = {
-                    // validation could be added here
                     viewModel.createBooking(
                         category = selectedCategory,
-                        description = detailedDescription,
+                        description = description,
                         address = address,
                         phoneNumber = phoneNumber,
                         fullName = fullName,
@@ -296,23 +308,60 @@ fun BookingScreen(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(50.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
-                shape = RoundedCornerShape(8.dp),
-                enabled = uiState !is BookingUiState.Loading &&
-                          detailedDescription.isNotBlank() &&
-                          address.isNotBlank() &&
-                          phoneNumber.isNotBlank() &&
-                          fullName.isNotBlank()
+                    .height(52.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = PrimaryBlue,
+                    disabledContainerColor = Color(0xFFB0BEC5)
+                ),
+                shape = RoundedCornerShape(12.dp),
+                enabled = canSubmit
             ) {
                 if (uiState is BookingUiState.Loading) {
-                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        modifier = Modifier.size(22.dp),
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text("Đang xử lý...", color = Color.White, fontWeight = FontWeight.SemiBold)
                 } else {
-                    Text("Đặt lịch ngay", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Icon(Icons.Outlined.Send, null, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Đặt lịch ngay", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
             }
-            
-            Spacer(modifier = Modifier.height(32.dp))
+
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
+
+@Composable
+private fun SectionLabel(icon: ImageVector, text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = PrimaryBlue,
+            modifier = Modifier.size(18.dp)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = text,
+            fontWeight = FontWeight.Bold,
+            fontSize = 14.sp,
+            color = TextPrimary
+        )
+    }
+}
+
+@Composable
+private fun fieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedContainerColor = Color.White,
+    unfocusedContainerColor = BackgroundGray.copy(alpha = 0.5f),
+    focusedBorderColor = PrimaryBlue,
+    unfocusedBorderColor = Color(0xFFE0E0E0),
+    focusedTextColor = TextPrimary,
+    unfocusedTextColor = TextPrimary,
+    cursorColor = PrimaryBlue
+)

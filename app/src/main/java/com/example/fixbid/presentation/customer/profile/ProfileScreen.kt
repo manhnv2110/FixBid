@@ -1,0 +1,505 @@
+package com.example.fixbid.presentation.customer.profile
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.fixbid.domain.model.UserRole
+import com.example.fixbid.ui.theme.BackgroundGray
+import com.example.fixbid.ui.theme.LightBlue
+import com.example.fixbid.ui.theme.PrimaryBlue
+import com.example.fixbid.ui.theme.TextPrimary
+import com.example.fixbid.ui.theme.TextSecondary
+
+@Composable
+fun ProfileScreen(
+    onSignOut: () -> Unit,
+    viewModel: ProfileViewModel = hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsState()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(BackgroundGray)
+    ) {
+        // Header
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(PrimaryBlue)
+                .statusBarsPadding()
+                .padding(horizontal = 20.dp, vertical = 16.dp)
+        ) {
+            Text(
+                text = "Hồ sơ cá nhân",
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp,
+                modifier = Modifier.align(Alignment.Center)
+            )
+        }
+
+        when {
+            uiState.isLoading -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = PrimaryBlue)
+                }
+            }
+            uiState.user == null -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Không thể tải thông tin", color = TextSecondary)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        TextButton(onClick = viewModel::loadProfile) {
+                            Text("Thử lại", color = PrimaryBlue)
+                        }
+                    }
+                }
+            }
+            else -> {
+                val user = uiState.user!!
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Avatar + Name card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            // Avatar
+                            Box(
+                                modifier = Modifier
+                                    .size(80.dp)
+                                    .clip(CircleShape)
+                                    .background(LightBlue)
+                                    .border(2.dp, PrimaryBlue, CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = user.fullName.firstOrNull()?.uppercase() ?: "?",
+                                    fontSize = 32.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = PrimaryBlue
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Text(
+                                text = user.fullName,
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            // Role badge
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(LightBlue)
+                                    .padding(horizontal = 12.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = user.role.displayName,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = PrimaryBlue
+                                )
+                            }
+                        }
+                    }
+
+                    // Info card (view mode)
+                    if (!uiState.isEditing) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(20.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                Text(
+                                    text = "Thông tin cá nhân",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextPrimary
+                                )
+
+                                ProfileInfoRow(
+                                    icon = Icons.Outlined.Email,
+                                    label = "Email",
+                                    value = user.email
+                                )
+
+                                ProfileInfoRow(
+                                    icon = Icons.Outlined.Phone,
+                                    label = "Số điện thoại",
+                                    value = user.phoneNumber ?: "Chưa cập nhật"
+                                )
+
+                                ProfileInfoRow(
+                                    icon = Icons.Outlined.Person,
+                                    label = "Họ và tên",
+                                    value = user.fullName
+                                )
+
+                                ProfileInfoRow(
+                                    icon = Icons.Outlined.Badge,
+                                    label = "Vai trò",
+                                    value = user.role.displayName
+                                )
+
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                Button(
+                                    onClick = viewModel::startEditing,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.Edit,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Chỉnh sửa hồ sơ", fontWeight = FontWeight.SemiBold)
+                                }
+                            }
+                        }
+                    }
+
+                    // Edit mode
+                    if (uiState.isEditing) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(20.dp),
+                                verticalArrangement = Arrangement.spacedBy(14.dp)
+                            ) {
+                                Text(
+                                    text = "Chỉnh sửa thông tin",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextPrimary
+                                )
+
+                                OutlinedTextField(
+                                    value = uiState.editFullName,
+                                    onValueChange = viewModel::onFullNameChange,
+                                    label = { Text("Họ và tên") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = PrimaryBlue,
+                                        unfocusedBorderColor = Color.LightGray,
+                                        focusedContainerColor = Color.White,
+                                        unfocusedContainerColor = Color.White
+                                    ),
+                                    singleLine = true,
+                                    enabled = !uiState.isSaving
+                                )
+
+                                OutlinedTextField(
+                                    value = uiState.editPhone,
+                                    onValueChange = viewModel::onPhoneChange,
+                                    label = { Text("Số điện thoại") },
+                                    placeholder = { Text("+84...") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = PrimaryBlue,
+                                        unfocusedBorderColor = Color.LightGray,
+                                        focusedContainerColor = Color.White,
+                                        unfocusedContainerColor = Color.White
+                                    ),
+                                    singleLine = true,
+                                    enabled = !uiState.isSaving
+                                )
+
+                                // Email (read-only)
+                                OutlinedTextField(
+                                    value = user.email,
+                                    onValueChange = {},
+                                    label = { Text("Email") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(10.dp),
+                                    enabled = false,
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        disabledBorderColor = Color.LightGray,
+                                        disabledContainerColor = BackgroundGray,
+                                        disabledTextColor = TextSecondary
+                                    )
+                                )
+
+                                if (uiState.errorMessage != null) {
+                                    Text(
+                                        text = uiState.errorMessage!!,
+                                        color = Color.Red,
+                                        fontSize = 13.sp
+                                    )
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    OutlinedButton(
+                                        onClick = viewModel::cancelEditing,
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(10.dp),
+                                        enabled = !uiState.isSaving
+                                    ) {
+                                        Text("Huỷ", color = TextSecondary)
+                                    }
+
+                                    Button(
+                                        onClick = viewModel::saveProfile,
+                                        modifier = Modifier.weight(1f),
+                                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                                        shape = RoundedCornerShape(10.dp),
+                                        enabled = !uiState.isSaving
+                                    ) {
+                                        if (uiState.isSaving) {
+                                            CircularProgressIndicator(
+                                                color = Color.White,
+                                                modifier = Modifier.size(18.dp),
+                                                strokeWidth = 2.dp
+                                            )
+                                        } else {
+                                            Text("Lưu", fontWeight = FontWeight.SemiBold)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Success message
+                    if (uiState.successMessage != null) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color(0xFFE8F5E9)
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = Color(0xFF43A047),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = uiState.successMessage!!,
+                                    color = Color(0xFF2E7D32),
+                                    fontSize = 14.sp
+                                )
+                            }
+                        }
+                    }
+
+                    // Menu items
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                            ProfileMenuItem(
+                                icon = Icons.Outlined.History,
+                                title = "Lịch sử đặt lịch",
+                                subtitle = "Xem các dịch vụ đã đặt"
+                            )
+                            HorizontalDivider(
+                                modifier = Modifier.padding(horizontal = 20.dp),
+                                color = Color(0xFFF0F0F0)
+                            )
+                            ProfileMenuItem(
+                                icon = Icons.Outlined.Payment,
+                                title = "Thanh toán",
+                                subtitle = "Quản lý phương thức thanh toán"
+                            )
+                            HorizontalDivider(
+                                modifier = Modifier.padding(horizontal = 20.dp),
+                                color = Color(0xFFF0F0F0)
+                            )
+                            ProfileMenuItem(
+                                icon = Icons.Outlined.Notifications,
+                                title = "Thông báo",
+                                subtitle = "Cài đặt thông báo"
+                            )
+                            HorizontalDivider(
+                                modifier = Modifier.padding(horizontal = 20.dp),
+                                color = Color(0xFFF0F0F0)
+                            )
+                            ProfileMenuItem(
+                                icon = Icons.Outlined.HelpOutline,
+                                title = "Trợ giúp & Hỗ trợ",
+                                subtitle = "FAQ, liên hệ hỗ trợ"
+                            )
+                            HorizontalDivider(
+                                modifier = Modifier.padding(horizontal = 20.dp),
+                                color = Color(0xFFF0F0F0)
+                            )
+                            ProfileMenuItem(
+                                icon = Icons.Outlined.Info,
+                                title = "Về FixBid",
+                                subtitle = "Phiên bản 1.0.0"
+                            )
+                        }
+                    }
+
+                    // Sign out button
+                    Button(
+                        onClick = { viewModel.signOut(onSignOut) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFFFEBEE)
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ExitToApp,
+                            contentDescription = null,
+                            tint = Color(0xFFD32F2F),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Đăng xuất",
+                            color = Color(0xFFD32F2F),
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 15.sp
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileInfoRow(
+    icon: ImageVector,
+    label: String,
+    value: String
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = PrimaryBlue,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Column {
+            Text(
+                text = label,
+                fontSize = 12.sp,
+                color = TextSecondary
+            )
+            Text(
+                text = value,
+                fontSize = 15.sp,
+                color = TextPrimary,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProfileMenuItem(
+    icon: ImageVector,
+    title: String,
+    subtitle: String
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = PrimaryBlue,
+            modifier = Modifier.size(22.dp)
+        )
+        Spacer(modifier = Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium,
+                color = TextPrimary
+            )
+            Text(
+                text = subtitle,
+                fontSize = 12.sp,
+                color = TextSecondary
+            )
+        }
+        Icon(
+            imageVector = Icons.Default.ChevronRight,
+            contentDescription = null,
+            tint = Color.LightGray,
+            modifier = Modifier.size(20.dp)
+        )
+    }
+}

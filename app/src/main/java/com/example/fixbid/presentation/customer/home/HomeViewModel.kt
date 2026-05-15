@@ -14,14 +14,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-// UI State cho notifications
 sealed class NotificationUiState {
     object Loading : NotificationUiState()
     data class Success(val notifications: List<Notification>) : NotificationUiState()
     data class Error(val message: String) : NotificationUiState()
 }
 
-// UI State tổng của HomeScreen
 data class HomeUiState(
     val categories: List<ServiceCategory> = ServiceCategoryMapper.homeCategories,
     val searchQuery: String = "",
@@ -49,20 +47,19 @@ class HomeViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(
                 notificationState = NotificationUiState.Loading
             )
-            _uiState.value = when (val result = getNotificationsUseCase()) {
-                is Resource.Success -> _uiState.value.copy(
-                    notificationState = NotificationUiState.Success(result.data)
-                )
-                is Resource.Error -> _uiState.value.copy(
-                    notificationState = NotificationUiState.Error(result.message)
-                )
-                is Resource.Loading -> _uiState.value   // không xảy ra với suspend fun
+            when (val result = getNotificationsUseCase()) {
+                is Resource.Success -> {
+                    _uiState.value = _uiState.value.copy(
+                        notificationState = NotificationUiState.Success(result.data)
+                    )
+                }
+                is Resource.Error -> {
+                    _uiState.value = _uiState.value.copy(
+                        notificationState = NotificationUiState.Error(result.message)
+                    )
+                }
+                is Resource.Loading -> { /* no-op */ }
             }
         }
-    }
-
-    fun onCategoryClick(category: ServiceCategory) {
-        // TODO: Navigate sang SearchScreen với filter category
-        // Sẽ xử lý qua NavController ở HomeScreen
     }
 }
