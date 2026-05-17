@@ -33,6 +33,21 @@ class BookingViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<BookingUiState>(BookingUiState.Idle)
     val uiState: StateFlow<BookingUiState> = _uiState.asStateFlow()
 
+    private val _initialFullName = MutableStateFlow("")
+    val initialFullName: StateFlow<String> = _initialFullName.asStateFlow()
+
+    private val _initialPhone = MutableStateFlow("")
+    val initialPhone: StateFlow<String> = _initialPhone.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            authRepository.getCurrentUser()?.let { user ->
+                _initialFullName.value = user.fullName
+                _initialPhone.value = user.phoneNumber ?: ""
+            }
+        }
+    }
+
     fun createBooking(
         category: ServiceCategory,
         description: String,

@@ -18,7 +18,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Button
@@ -385,4 +387,51 @@ fun AuthResendRow(
             .fillMaxWidth()
             .clickable(enabled = !isDisabled) { onResend() }
     )
+}
+
+@Composable
+fun PasswordRequirementsList(password: String, modifier: Modifier = Modifier) {
+    if (password.isEmpty()) return
+
+    val hasMinLength = password.length >= 8
+    val hasLowercase = password.any { it.isLowerCase() }
+    val hasUppercase = password.any { it.isUpperCase() }
+    val hasDigit = password.any { it.isDigit() }
+    val hasSpecialChar = password.any { !it.isLetterOrDigit() }
+
+    Column(modifier = modifier.fillMaxWidth().padding(top = 8.dp)) {
+        PasswordRequirementRow(text = "Ít nhất 8 ký tự", isMet = hasMinLength)
+        PasswordRequirementRow(text = "Ít nhất 1 chữ thường (a-z)", isMet = hasLowercase)
+        PasswordRequirementRow(text = "Ít nhất 1 chữ hoa (A-Z)", isMet = hasUppercase)
+        PasswordRequirementRow(text = "Ít nhất 1 số (0-9)", isMet = hasDigit)
+        PasswordRequirementRow(text = "Ít nhất 1 ký tự đặc biệt", isMet = hasSpecialChar)
+    }
+}
+
+@Composable
+fun ConfirmPasswordRequirement(isMatched: Boolean, modifier: Modifier = Modifier) {
+    Column(modifier = modifier.fillMaxWidth().padding(top = 8.dp)) {
+        PasswordRequirementRow(text = "Mật khẩu trùng khớp", isMet = isMatched)
+    }
+}
+
+@Composable
+fun PasswordRequirementRow(text: String, isMet: Boolean) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(vertical = 2.dp)
+    ) {
+        Icon(
+            imageVector = if (isMet) Icons.Outlined.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
+            contentDescription = null,
+            tint = if (isMet) AccentGreen else AuthMuted,
+            modifier = Modifier.size(16.dp)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = text,
+            color = if (isMet) TextPrimary else TextSecondary,
+            fontSize = 12.sp
+        )
+    }
 }

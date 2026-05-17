@@ -52,8 +52,12 @@ fun BookingScreen(
 
     var description by remember { mutableStateOf("") }
     var address by remember { mutableStateOf("") }
-    var phoneNumber by remember { mutableStateOf("") }
-    var fullName by remember { mutableStateOf("") }
+    
+    val initialFullName by viewModel.initialFullName.collectAsState()
+    val initialPhone by viewModel.initialPhone.collectAsState()
+    
+    var fullName by remember(initialFullName) { mutableStateOf(initialFullName) }
+    var phoneNumber by remember(initialPhone) { mutableStateOf(initialPhone) }
     var notes by remember { mutableStateOf("") }
 
     Scaffold(

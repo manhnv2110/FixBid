@@ -13,9 +13,11 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -179,13 +181,14 @@ fun LoginScreen(
 ) {
     Scaffold(
         containerColor = AuthBackground,
-        contentWindowInsets = WindowInsets.safeDrawing
+        contentWindowInsets = WindowInsets.systemBars
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
+                .imePadding()
                 .padding(horizontal = 24.dp, vertical = 16.dp)
         ) {
             IconButton(onClick = onBack) {
@@ -302,13 +305,14 @@ fun RegisterScreen(
 ) {
     Scaffold(
         containerColor = AuthBackground,
-        contentWindowInsets = WindowInsets.safeDrawing
+        contentWindowInsets = WindowInsets.systemBars
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
+                .imePadding()
                 .padding(horizontal = 24.dp, vertical = 16.dp)
         ) {
             IconButton(onClick = onBack) {
@@ -384,11 +388,15 @@ fun RegisterScreen(
                 value = state.password,
                 onValueChange = onPasswordChange,
                 label = "Mật khẩu",
-                placeholder = "Tối thiểu 6 ký tự",
+                placeholder = "Tối thiểu 8 ký tự",
                 leadingIcon = Icons.Outlined.Lock,
                 isPassword = true,
                 enabled = !state.isSubmitting
             )
+
+            if (state.password.isNotEmpty()) {
+                PasswordRequirementsList(password = state.password)
+            }
 
             Spacer(modifier = Modifier.height(14.dp))
 
@@ -403,7 +411,16 @@ fun RegisterScreen(
                 enabled = !state.isSubmitting
             )
 
-            AuthErrorText(message = state.errorMessage)
+            if (state.confirmPassword.isNotEmpty()) {
+                ConfirmPasswordRequirement(isMatched = state.password == state.confirmPassword)
+            }
+
+            val displayError = if (state.errorMessage?.contains("weak_password", ignoreCase = true) == true) {
+                "Mật khẩu chưa đủ mạnh. Vui lòng kiểm tra các yêu cầu bên trên."
+            } else {
+                state.errorMessage
+            }
+            AuthErrorText(message = displayError)
 
             Spacer(modifier = Modifier.height(14.dp))
 

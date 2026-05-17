@@ -23,6 +23,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.fixbid.presentation.auth.*
@@ -38,9 +39,7 @@ import dagger.hilt.android.AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.dark(scrim = Color.TRANSPARENT)
-        )
+        enableEdgeToEdge()
         setContent {
             FixBidTheme {
                 Surface(
@@ -69,6 +68,11 @@ fun FixBidNavHost() {
 
     val navController = rememberNavController()
     val context = LocalContext.current
+
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+    val needsLightIcons = currentRoute == "home"
+    com.example.fixbid.ui.theme.SetStatusBarColor(darkIcons = !needsLightIcons)
 
     // Listen to auth events for navigation
     LaunchedEffect(Unit) {
