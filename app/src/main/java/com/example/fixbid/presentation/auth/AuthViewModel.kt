@@ -52,10 +52,18 @@ class AuthViewModel @Inject constructor(
             // Đợi session load xong từ storage (không dùng currentSessionOrNull vì có thể chưa sẵn sàng)
             val status = supabase.auth.sessionStatus.first { it !is io.github.jan.supabase.auth.status.SessionStatus.Initializing }
             val isLoggedIn = status is io.github.jan.supabase.auth.status.SessionStatus.Authenticated
+            var role: UserRole? = null
+            if (isLoggedIn) {
+                val userId = supabase.auth.currentSessionOrNull()?.user?.id
+                if (userId != null) {
+                    role = profileRepository.getProfile(userId).getOrNull()?.role
+                }
+            }
             _uiState.update {
                 it.copy(
                     isAuthenticated = isLoggedIn,
-                    isBootstrapping = false
+                    isBootstrapping = false,
+                    userRole = role
                 )
             }
             if (isLoggedIn) {
@@ -129,10 +137,15 @@ class AuthViewModel @Inject constructor(
                     }
                 }
             }.onSuccess {
+                val userId = supabase.auth.currentSessionOrNull()?.user?.id
+                val role = if (userId != null) {
+                    profileRepository.getProfile(userId).getOrNull()?.role
+                } else null
                 _uiState.update {
                     it.copy(
                         login = it.login.copy(isSubmitting = false, password = ""),
-                        isAuthenticated = true
+                        isAuthenticated = true,
+                        userRole = role
                     )
                 }
                 _events.tryEmit(AuthEvent.NavigateToHome)
@@ -234,7 +247,7 @@ class AuthViewModel @Inject constructor(
 
                 if (session != null) {
                     finalizeProfile(session.user?.id)
-                    _uiState.update { it.copy(isAuthenticated = true) }
+                    _uiState.update { it.copy(isAuthenticated = true, userRole = form.role) }
                     _events.tryEmit(AuthEvent.NavigateToHome)
                 } else {
                     startResendCountdown()
@@ -278,10 +291,12 @@ class AuthViewModel @Inject constructor(
             }.onSuccess {
                 val userId = supabase.auth.currentSessionOrNull()?.user?.id
                 finalizeProfile(userId)
+                val role = _uiState.value.pendingRegistration?.role
                 _uiState.update {
                     it.copy(
                         otp = it.otp.copy(isVerifying = false, otp = ""),
                         isAuthenticated = true,
+                        userRole = role,
                         pendingRegistration = null
                     )
                 }

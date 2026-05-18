@@ -21,6 +21,10 @@ interface BookingRepository {
         workerId: String,
         status: BookingStatus? = null
     ): Resource<List<Booking>>
+    suspend fun getOpenJobRequests(
+        categories: List<com.example.fixbid.domain.model.ServiceCategory>? = null,
+        excludeBookingIds: List<String> = emptyList()
+    ): Resource<List<Booking>>
     suspend fun confirmBooking(bookingId: String): Resource<Booking>
     suspend fun startJob(bookingId: String): Resource<Booking>
     suspend fun completeJob(bookingId: String, workerNote: String?): Resource<Booking>

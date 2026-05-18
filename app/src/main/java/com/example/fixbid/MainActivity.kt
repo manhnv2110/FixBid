@@ -26,11 +26,13 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.fixbid.domain.model.UserRole
 import com.example.fixbid.presentation.auth.*
 import com.example.fixbid.presentation.customer.bidding.BiddingWorkersScreen
 import com.example.fixbid.presentation.customer.booking.BookingScreen
 import com.example.fixbid.presentation.customer.booking.BookingSuccessScreen
 import com.example.fixbid.presentation.customer.home.HomeScreen
+import com.example.fixbid.presentation.worker.home.WorkerHomeScreen
 import com.example.fixbid.ui.theme.FixBidTheme
 import com.example.fixbid.ui.theme.PrimaryBlue
 import dagger.hilt.android.AndroidEntryPoint
@@ -71,7 +73,7 @@ fun FixBidNavHost() {
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
-    val needsLightIcons = currentRoute == "home"
+    val needsLightIcons = currentRoute == "home" || currentRoute == "worker_home"
     com.example.fixbid.ui.theme.SetStatusBarColor(darkIcons = !needsLightIcons)
 
     // Listen to auth events for navigation
@@ -84,7 +86,8 @@ fun FixBidNavHost() {
                     }
                 }
                 AuthEvent.NavigateToHome -> {
-                    navController.navigate("home") {
+                    val destination = if (uiState.userRole == UserRole.WORKER) "worker_home" else "home"
+                    navController.navigate(destination) {
                         popUpTo(0) { inclusive = true }
                         launchSingleTop = true
                     }
@@ -100,7 +103,11 @@ fun FixBidNavHost() {
     }
 
     // Determine start destination based on auth state
-    val startDestination = if (uiState.isAuthenticated) "home" else AuthRoutes.Welcome
+    val startDestination = when {
+        !uiState.isAuthenticated -> AuthRoutes.Welcome
+        uiState.userRole == UserRole.WORKER -> "worker_home"
+        else -> "home"
+    }
 
     NavHost(
         navController = navController,
@@ -200,6 +207,33 @@ fun FixBidNavHost() {
                     }
                 },
                 showHistoryTab = showHistory
+            )
+        }
+
+        // ─── Worker screens ───────────────────────────────────────────────
+        composable("worker_home") {
+            WorkerHomeScreen(
+                onNotificationClick = { /* TODO: notification list screen */ },
+                onJobClick = { bookingId ->
+                    navController.navigate("worker_job_detail/$bookingId")
+                },
+                onJobRequestClick = { bookingId ->
+                    navController.navigate("worker_job_detail/$bookingId")
+                },
+                onSignOut = {
+                    navController.navigate(AuthRoutes.Welcome) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(
+            route = "worker_job_detail/{bookingId}",
+            arguments = listOf(navArgument("bookingId") { type = NavType.StringType })
+        ) {
+            com.example.fixbid.presentation.worker.jobdetail.JobDetailScreen(
+                onBackClick = { navController.popBackStack() }
             )
         }
 

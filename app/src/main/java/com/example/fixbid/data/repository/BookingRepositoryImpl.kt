@@ -75,6 +75,27 @@ class BookingRepositoryImpl @Inject constructor(
         Resource.Success(result.map { it.toDomain() })
     }.getOrElse { Resource.Error(it.message ?: "Lỗi tải danh sách công việc") }
 
+    override suspend fun getOpenJobRequests(
+        categories: List<com.example.fixbid.domain.model.ServiceCategory>?,
+        excludeBookingIds: List<String>
+    ): Resource<List<Booking>> = runCatching {
+        val result = client.postgrest[Tables.BOOKINGS].select(Columns.ALL) {
+            filter {
+                eq("type", "bidding")
+                eq("status", "bidding")
+                filter("worker_id", FilterOperator.IS, "null")
+                if (!categories.isNullOrEmpty()) {
+                    val csv = categories.joinToString(",") { it.name.lowercase() }
+                    filter("category", FilterOperator.IN, "($csv)")
+                }
+            }
+            order("created_at", Order.DESCENDING)
+            limit(50)
+        }.decodeList<BookingDto>()
+        val excludeSet = excludeBookingIds.toSet()
+        Resource.Success(result.map { it.toDomain() }.filter { it.id !in excludeSet })
+    }.getOrElse { Resource.Error(it.message ?: "Lỗi tải danh sách yêu cầu") }
+
     override suspend fun confirmBooking(bookingId: String): Resource<Booking> =
         updateStatus(bookingId, BookingStatus.CONFIRMED)
 

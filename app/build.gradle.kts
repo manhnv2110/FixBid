@@ -14,6 +14,15 @@ val localProps = Properties().apply {
     if (file.exists()) load(file.inputStream())
 }
 
+// Fallback: nếu không có trong local.properties thì lấy từ gradle.properties / env
+fun resolveProp(key: String): String {
+    val fromLocal = localProps[key]?.toString()
+    if (!fromLocal.isNullOrBlank()) return fromLocal
+    val fromGradle = project.findProperty(key)?.toString()
+    if (!fromGradle.isNullOrBlank()) return fromGradle
+    return System.getenv(key) ?: ""
+}
+
 android {
     namespace = "com.example.fixbid"
     compileSdk = 35
@@ -27,8 +36,8 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "SUPABASE_URL", "\"${localProps["SUPABASE_URL"] ?: ""}\"")
-        buildConfigField("String", "SUPABASE_API_KEY", "\"${localProps["SUPABASE_API_KEY"] ?: ""}\"")
+        buildConfigField("String", "SUPABASE_URL", "\"${resolveProp("SUPABASE_URL")}\"")
+        buildConfigField("String", "SUPABASE_API_KEY", "\"${resolveProp("SUPABASE_API_KEY")}\"")
     }
 
     buildTypes {
