@@ -191,11 +191,7 @@ private fun WorkerDashboardHeader(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(PrimaryBlue, Color(0xFF003D61))
-                )
-            )
+            .background(PrimaryBlue)
             .statusBarsPadding()
             .padding(horizontal = 20.dp)
             .padding(top = 16.dp, bottom = 24.dp)
@@ -205,17 +201,19 @@ private fun WorkerDashboardHeader(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
-                Text(
-                    text = "Xin chào,",
-                    color = Color.White.copy(alpha = 0.8f),
-                    fontSize = 14.sp
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Outlined.Person,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp)
                 )
+                Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = userName.ifEmpty { "Thợ dịch vụ" },
+                    text = "Xin chào, ${userName.ifEmpty { "Thợ dịch vụ" }}",
                     color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 16.sp
                 )
             }
             IconButton(onClick = onNotificationClick) {
@@ -227,12 +225,21 @@ private fun WorkerDashboardHeader(
             }
         }
 
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Text(
+            text = "Sẵn sàng cho công việc hôm nay?",
+            color = Color.White,
+            fontWeight = FontWeight.Bold,
+            fontSize = 22.sp
+        )
+
         Spacer(modifier = Modifier.height(16.dp))
 
         // Availability toggle
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(
                 containerColor = Color.White.copy(alpha = 0.15f)
             )
@@ -240,7 +247,7 @@ private fun WorkerDashboardHeader(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -255,8 +262,8 @@ private fun WorkerDashboardHeader(
                     Text(
                         text = if (isAvailable) "Đang sẵn sàng nhận việc" else "Đang tạm nghỉ",
                         color = Color.White,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
                 Switch(
@@ -266,9 +273,12 @@ private fun WorkerDashboardHeader(
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = Color.White,
                         checkedTrackColor = AccentGreen,
+                        checkedBorderColor = Color.Transparent,
                         uncheckedThumbColor = Color.White,
-                        uncheckedTrackColor = Color.Gray
-                    )
+                        uncheckedTrackColor = Color.Gray.copy(alpha = 0.5f),
+                        uncheckedBorderColor = Color.Transparent
+                    ),
+                    modifier = Modifier.height(24.dp)
                 )
             }
         }
@@ -472,59 +482,68 @@ private fun JobCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(18.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                // Status Pill
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .background(statusColor.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                ) {
                     Box(
                         modifier = Modifier
-                            .size(8.dp)
+                            .size(6.dp)
                             .clip(CircleShape)
                             .background(statusColor)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = statusLabel,
                         fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
+                        fontWeight = FontWeight.Bold,
                         color = statusColor
                     )
                 }
                 Text(
-                    text = booking.agreedPrice?.let { formatCurrency(it) } ?: "Chưa có giá",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
+                    text = booking.agreedPrice?.let { formatCurrency(it) } ?: "Đang chờ giá",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = PrimaryBlue
                 )
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             Text(
                 text = booking.category.displayName,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
                 color = TextPrimary
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             Text(
                 text = booking.description,
-                fontSize = 13.sp,
+                fontSize = 14.sp,
                 color = TextSecondary,
                 maxLines = 2,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
+                lineHeight = 20.sp
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(14.dp))
+            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.4f))
+            Spacer(modifier = Modifier.height(14.dp))
 
             Row(
                 verticalAlignment = Alignment.CenterVertically
@@ -532,46 +551,51 @@ private fun JobCard(
                 Icon(
                     Icons.Outlined.LocationOn,
                     contentDescription = null,
-                    tint = TextSecondary,
-                    modifier = Modifier.size(14.dp)
+                    tint = PrimaryBlue,
+                    modifier = Modifier.size(16.dp)
                 )
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = booking.address,
-                    fontSize = 12.sp,
-                    color = TextSecondary,
+                    fontSize = 13.sp,
+                    color = TextPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Icon(
                     Icons.Outlined.Schedule,
                     contentDescription = null,
-                    tint = TextSecondary,
-                    modifier = Modifier.size(14.dp)
+                    tint = PrimaryBlue,
+                    modifier = Modifier.size(16.dp)
                 )
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = formatTime(booking.scheduledAt),
-                    fontSize = 12.sp,
-                    color = TextSecondary
+                    fontSize = 13.sp,
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Medium
                 )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             Button(
                 onClick = onActionClick,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(10.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = actionColor),
-                contentPadding = PaddingValues(vertical = 10.dp)
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = actionColor)
             ) {
                 Text(
                     text = actionLabel,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = Color.White
                 )
             }
         }
@@ -797,9 +821,10 @@ private fun BrowseRequestsCard(onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = LightBlue),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = LightBlue.copy(alpha = 0.5f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryBlue.copy(alpha = 0.2f))
     ) {
         Row(
             modifier = Modifier
@@ -809,30 +834,32 @@ private fun BrowseRequestsCard(onClick: () -> Unit) {
         ) {
             Box(
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(48.dp)
                     .clip(CircleShape)
-                    .background(PrimaryBlue),
+                    .background(PrimaryBlue.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    Icons.Outlined.Inbox,
+                    Icons.Outlined.Search,
                     contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(22.dp)
+                    tint = PrimaryBlue,
+                    modifier = Modifier.size(24.dp)
                 )
             }
-            Spacer(modifier = Modifier.width(14.dp))
+            Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    "Tìm việc mới",
-                    fontSize = 15.sp,
+                    "Tìm việc ngay",
+                    fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
-                    color = TextPrimary
+                    color = PrimaryBlue
                 )
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    "Duyệt yêu cầu từ khách và đặt giá thầu",
-                    fontSize = 12.sp,
-                    color = TextSecondary
+                    "Xem yêu cầu mới và đặt mức giá của bạn",
+                    fontSize = 13.sp,
+                    color = TextSecondary,
+                    lineHeight = 18.sp
                 )
             }
             Icon(
