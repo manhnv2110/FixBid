@@ -17,6 +17,7 @@ class UpdateJobStatusUseCase @Inject constructor(
         BookingStatus.CONFIRMED    -> bookingRepository.confirmBooking(bookingId)
         BookingStatus.IN_PROGRESS  -> bookingRepository.startJob(bookingId)
         BookingStatus.COMPLETED    -> bookingRepository.completeJob(bookingId, workerNote)
+        BookingStatus.PENDING_COMPLETION -> bookingRepository.completeJob(bookingId, workerNote)
         else -> Resource.Error("Trạng thái không hợp lệ")
     }
 }
