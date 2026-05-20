@@ -1,9 +1,12 @@
 package com.example.fixbid.presentation.worker.jobdetail
 
+import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.fixbid.domain.model.BookingStatus
 import com.example.fixbid.domain.model.Resource
+import com.example.fixbid.domain.repository.BookingRepository
 import com.example.fixbid.domain.usecase.worker.GetJobDetailUseCase
 import com.example.fixbid.domain.usecase.worker.JobDetailData
 import com.example.fixbid.domain.usecase.worker.PlaceBidUseCase
@@ -25,24 +28,35 @@ data class BidFormState(
     val errorMessage: String? = null
 )
 
+data class CompletionFormState(
+    val note: String = "",
+    val selectedImageUris: List<Uri> = emptyList(),
+    val isSubmitting: Boolean = false,
+    val errorMessage: String? = null
+)
+
 data class JobDetailUiState(
     val isLoading: Boolean = true,
     val data: JobDetailData? = null,
     val errorMessage: String? = null,
     val showBidDialog: Boolean = false,
-    val bidForm: BidFormState = BidFormState()
+    val bidForm: BidFormState = BidFormState(),
+    val showCompletionDialog: Boolean = false,
+    val completionForm: CompletionFormState = CompletionFormState()
 )
 
 sealed interface JobDetailEvent {
     data class Toast(val message: String) : JobDetailEvent
     data object BidPlaced : JobDetailEvent
+    data object CompletionSubmitted : JobDetailEvent
 }
 
 @HiltViewModel
 class JobDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val getJobDetailUseCase: GetJobDetailUseCase,
-    private val placeBidUseCase: PlaceBidUseCase
+    private val placeBidUseCase: PlaceBidUseCase,
+    private val bookingRepository: BookingRepository
 ) : ViewModel() {
 
     private val bookingId: String = savedStateHandle.get<String>("bookingId") ?: ""
@@ -160,5 +174,105 @@ class JobDetailViewModel @Inject constructor(
 
     private fun setBidError(msg: String) = _uiState.update {
         it.copy(bidForm = it.bidForm.copy(errorMessage = msg))
+    }
+
+    // ─── Completion flow ──────────────────────────────────────────────────────
+
+    fun openCompletionDialog() {
+        _uiState.update {
+            it.copy(
+                showCompletionDialog = true,
+                completionForm = CompletionFormState()
+            )
+        }
+    }
+
+    fun closeCompletionDialog() {
+        _uiState.update {
+            it.copy(showCompletionDialog = false, completionForm = CompletionFormState())
+        }
+    }
+
+    fun onCompletionNoteChange(value: String) = _uiState.update {
+        it.copy(completionForm = it.completionForm.copy(note = value, errorMessage = null))
+    }
+
+    fun onCompletionImagesSelected(uris: List<Uri>) = _uiState.update {
+        it.copy(completionForm = it.completionForm.copy(
+            selectedImageUris = it.completionForm.selectedImageUris + uris,
+            errorMessage = null
+        ))
+    }
+
+    fun removeCompletionImage(uri: Uri) = _uiState.update {
+        it.copy(completionForm = it.completionForm.copy(
+            selectedImageUris = it.completionForm.selectedImageUris - uri
+        ))
+    }
+
+    /**
+     * Called from the screen with image bytes already resolved from URIs.
+     */
+    fun submitCompletion(imageBytesList: List<Pair<String, ByteArray>>) {
+        val form = _uiState.value.completionForm
+        if (form.isSubmitting) return
+
+        if (form.selectedImageUris.isEmpty()) {
+            _uiState.update {
+                it.copy(completionForm = it.completionForm.copy(
+                    errorMessage = "Vui lòng chụp ít nhất 1 ảnh thực tế"
+                ))
+            }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(completionForm = it.completionForm.copy(isSubmitting = true, errorMessage = null))
+            }
+
+            // 1. Upload all images
+            val uploadedUrls = mutableListOf<String>()
+            for ((fileName, bytes) in imageBytesList) {
+                when (val uploadResult = bookingRepository.uploadCompletionImage(bookingId, bytes, fileName)) {
+                    is Resource.Success -> uploadedUrls.add(uploadResult.data)
+                    is Resource.Error -> {
+                        _uiState.update {
+                            it.copy(completionForm = it.completionForm.copy(
+                                isSubmitting = false,
+                                errorMessage = "Upload ảnh thất bại: ${uploadResult.message}"
+                            ))
+                        }
+                        return@launch
+                    }
+                    is Resource.Loading -> {}
+                }
+            }
+
+            // 2. Submit completion with image URLs
+            val note = form.note.trim().ifBlank { null }
+            when (val result = bookingRepository.submitJobCompletion(bookingId, note, uploadedUrls)) {
+                is Resource.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            showCompletionDialog = false,
+                            completionForm = CompletionFormState()
+                        )
+                    }
+                    _events.trySend(JobDetailEvent.Toast("Đã gửi báo cáo hoàn thành cho khách"))
+                    _events.trySend(JobDetailEvent.CompletionSubmitted)
+                    load()
+                }
+                is Resource.Error -> {
+                    _uiState.update {
+                        it.copy(completionForm = it.completionForm.copy(
+                            isSubmitting = false,
+                            errorMessage = result.message
+                        ))
+                    }
+                }
+                is Resource.Loading -> {}
+            }
+        }
     }
 }

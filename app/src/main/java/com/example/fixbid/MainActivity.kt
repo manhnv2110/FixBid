@@ -201,6 +201,9 @@ fun FixBidNavHost() {
                 onBookingClick = { bookingId ->
                     navController.navigate("bidding_workers/$bookingId")
                 },
+                onCompletionConfirmClick = { bookingId ->
+                    navController.navigate("completion_confirm/$bookingId")
+                },
                 onSignOut = {
                     navController.navigate(AuthRoutes.Welcome) {
                         popUpTo(0) { inclusive = true }
@@ -274,6 +277,18 @@ fun FixBidNavHost() {
                 onBackClick = { navController.popBackStack() },
                 onWorkerClick = { workerId ->
                     /* TODO: Navigate to worker profile */
+                }
+            )
+        }
+
+        composable(
+            route = "completion_confirm/{bookingId}",
+            arguments = listOf(navArgument("bookingId") { type = NavType.StringType })
+        ) {
+            com.example.fixbid.presentation.customer.completion.CompletionConfirmScreen(
+                onBackClick = { navController.popBackStack() },
+                onCompleted = {
+                    navController.popBackStack("home", inclusive = false)
                 }
             )
         }
