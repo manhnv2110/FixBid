@@ -38,6 +38,7 @@ fun HomeScreen(
     onCategoryClick: (ServiceCategory) -> Unit = {},
     onNotificationClick: () -> Unit = {},
     onBookingClick: (String) -> Unit = {},
+    onCompletionConfirmClick: (String) -> Unit = {},
     onSignOut: () -> Unit = {},
     showHistoryTab: Boolean = false,
     viewModel: HomeViewModel = hiltViewModel()
@@ -66,7 +67,10 @@ fun HomeScreen(
     ) { innerPadding ->
         when (selectedNavIndex) {
             1 -> Box(modifier = Modifier.padding(innerPadding)) {
-                BookingHistoryScreen(onBookingClick = onBookingClick)
+                BookingHistoryScreen(
+                    onBookingClick = onBookingClick,
+                    onCompletionConfirmClick = onCompletionConfirmClick
+                )
             }
             2 -> Box(modifier = Modifier.padding(innerPadding)) {
                 ProfileScreen(onSignOut = onSignOut)

@@ -28,6 +28,22 @@ interface BookingRepository {
     suspend fun confirmBooking(bookingId: String): Resource<Booking>
     suspend fun startJob(bookingId: String): Resource<Booking>
     suspend fun completeJob(bookingId: String, workerNote: String?): Resource<Booking>
+    suspend fun submitJobCompletion(
+        bookingId: String,
+        completionNote: String?,
+        completionImageUrls: List<String>
+    ): Resource<Booking>
+
+    // Storage - upload completion images
+    suspend fun uploadCompletionImage(
+        bookingId: String,
+        imageBytes: ByteArray,
+        fileName: String
+    ): Resource<String>
+
+    // Customer – completion confirmation
+    suspend fun confirmCompletion(bookingId: String): Resource<Booking>
+    suspend fun rejectCompletion(bookingId: String, reason: String): Resource<Booking>
 
     // Shared
     suspend fun getBookingById(bookingId: String): Resource<Booking>

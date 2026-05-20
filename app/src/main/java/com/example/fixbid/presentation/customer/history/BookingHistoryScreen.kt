@@ -41,6 +41,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 @Composable
 fun BookingHistoryScreen(
     onBookingClick: (String) -> Unit,
+    onCompletionConfirmClick: (String) -> Unit = {},
     viewModel: BookingHistoryViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -198,8 +199,10 @@ fun BookingHistoryScreen(
                                     booking = booking,
                                     isDone = selectedTab == 1,
                                     onClick = {
-                                        if (booking.status == BookingStatus.BIDDING) {
-                                            onBookingClick(booking.id)
+                                        when (booking.status) {
+                                            BookingStatus.BIDDING -> onBookingClick(booking.id)
+                                            BookingStatus.PENDING_COMPLETION -> onCompletionConfirmClick(booking.id)
+                                            else -> { /* no action for other statuses */ }
                                         }
                                     }
                                 )
@@ -254,7 +257,8 @@ private fun BookingCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(
-                enabled = booking.status == BookingStatus.BIDDING,
+                enabled = booking.status == BookingStatus.BIDDING ||
+                        booking.status == BookingStatus.PENDING_COMPLETION,
                 onClick = onClick
             ),
         shape = RoundedCornerShape(14.dp),
@@ -381,6 +385,39 @@ private fun BookingCard(
                 }
             }
 
+            if (booking.status == BookingStatus.PENDING_COMPLETION) {
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = Color(0xFFF5F5F5))
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Outlined.CheckCircle,
+                            contentDescription = null,
+                            tint = Color(0xFFE65100),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Thợ đã báo xong, bấm để xác nhận",
+                            fontSize = 12.sp,
+                            color = Color(0xFFE65100),
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    Icon(
+                        Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = Color(0xFFE65100),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
             if (isDone && booking.agreedPrice != null) {
                 Spacer(modifier = Modifier.height(12.dp))
                 HorizontalDivider(color = Color(0xFFF5F5F5))
@@ -434,6 +471,7 @@ private fun getStatusInfo(status: BookingStatus): StatusInfo = when (status) {
     BookingStatus.PENDING -> StatusInfo("Chờ xác nhận", Color(0xFFFFA000))
     BookingStatus.CONFIRMED -> StatusInfo("Đã xác nhận", Color(0xFF1565C0))
     BookingStatus.IN_PROGRESS -> StatusInfo("Đang làm", Color(0xFF6A1B9A))
+    BookingStatus.PENDING_COMPLETION -> StatusInfo("Chờ xác nhận hoàn thành", Color(0xFFE65100))
     BookingStatus.COMPLETED -> StatusInfo("Hoàn thành", Color(0xFF43A047))
     BookingStatus.CANCELLED -> StatusInfo("Đã huỷ", Color(0xFFB0BEC5))
     BookingStatus.DISPUTED -> StatusInfo("Tranh chấp", Color(0xFFD32F2F))

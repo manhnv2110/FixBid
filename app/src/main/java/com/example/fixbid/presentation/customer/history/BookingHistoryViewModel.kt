@@ -73,7 +73,8 @@ class BookingHistoryViewModel @Inject constructor(
                         BookingStatus.BIDDING,
                         BookingStatus.PENDING,
                         BookingStatus.CONFIRMED,
-                        BookingStatus.IN_PROGRESS
+                        BookingStatus.IN_PROGRESS,
+                        BookingStatus.PENDING_COMPLETION
                     )
                 }.sortedByDescending { it.createdAt }
 
