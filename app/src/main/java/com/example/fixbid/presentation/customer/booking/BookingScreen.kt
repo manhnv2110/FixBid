@@ -19,11 +19,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.fixbid.domain.model.ServiceCategory
-import com.example.fixbid.ui.theme.BackgroundGray
-import com.example.fixbid.ui.theme.LightBlue
-import com.example.fixbid.ui.theme.PrimaryBlue
-import com.example.fixbid.ui.theme.TextPrimary
-import com.example.fixbid.ui.theme.TextSecondary
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,18 +62,18 @@ fun BookingScreen(
                     Text(
                         "Đặt lịch dịch vụ",
                         fontWeight = FontWeight.Bold,
-                        color = TextPrimary
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(Icons.Default.ArrowBack, "Back", tint = TextPrimary)
+                        Icon(Icons.Default.ArrowBack, "Back", tint = MaterialTheme.colorScheme.onSurface)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         },
-        containerColor = BackgroundGray
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -92,7 +87,7 @@ fun BookingScreen(
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -115,11 +110,11 @@ fun BookingScreen(
                         ExposedDropdownMenu(
                             expanded = expanded,
                             onDismissRequest = { expanded = false },
-                            modifier = Modifier.background(Color.White)
+                            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
                         ) {
                             ServiceCategory.values().forEach { category ->
                                 DropdownMenuItem(
-                                    text = { Text(category.displayName, color = TextPrimary) },
+                                    text = { Text(category.displayName, color = MaterialTheme.colorScheme.onSurface) },
                                     onClick = {
                                         selectedCategory = category
                                         expanded = false
@@ -135,7 +130,7 @@ fun BookingScreen(
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -144,7 +139,7 @@ fun BookingScreen(
                     OutlinedTextField(
                         value = description,
                         onValueChange = { description = it },
-                        placeholder = { Text("Mô tả chi tiết vấn đề cần sửa chữa...", color = TextSecondary) },
+                        placeholder = { Text("Mô tả chi tiết vấn đề cần sửa chữa...", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)) },
                         modifier = Modifier.fillMaxWidth().height(100.dp),
                         shape = RoundedCornerShape(10.dp),
                         colors = fieldColors(),
@@ -157,7 +152,7 @@ fun BookingScreen(
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -166,13 +161,13 @@ fun BookingScreen(
                     OutlinedTextField(
                         value = address,
                         onValueChange = { address = it },
-                        placeholder = { Text("Số nhà, đường, phường/xã, quận/huyện", color = TextSecondary) },
+                        placeholder = { Text("Số nhà, đường, phường/xã, quận/huyện", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)) },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp),
                         colors = fieldColors(),
                         singleLine = true,
                         leadingIcon = {
-                            Icon(Icons.Outlined.LocationOn, null, tint = PrimaryBlue, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Outlined.LocationOn, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                         }
                     )
                 }
@@ -182,7 +177,7 @@ fun BookingScreen(
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -198,7 +193,7 @@ fun BookingScreen(
                         colors = fieldColors(),
                         singleLine = true,
                         leadingIcon = {
-                            Icon(Icons.Outlined.Person, null, tint = PrimaryBlue, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Outlined.Person, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                         }
                     )
 
@@ -214,7 +209,7 @@ fun BookingScreen(
                         colors = fieldColors(),
                         singleLine = true,
                         leadingIcon = {
-                            Icon(Icons.Outlined.Phone, null, tint = PrimaryBlue, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Outlined.Phone, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                         }
                     )
                 }
@@ -224,7 +219,7 @@ fun BookingScreen(
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -236,7 +231,7 @@ fun BookingScreen(
                         placeholder = {
                             Text(
                                 "Ví dụ: Số căn hộ, tầng, tình trạng thiết bị...",
-                                color = TextSecondary
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                             )
                         },
                         modifier = Modifier.fillMaxWidth().height(90.dp),
@@ -251,7 +246,7 @@ fun BookingScreen(
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = LightBlue)
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
             ) {
                 Row(
                     modifier = Modifier.padding(14.dp),
@@ -260,14 +255,14 @@ fun BookingScreen(
                     Icon(
                         Icons.Outlined.Info,
                         contentDescription = null,
-                        tint = PrimaryBlue,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = "Sau khi đặt lịch, các thợ sẽ gửi báo giá cho bạn. Bạn có thể so sánh và chọn thợ phù hợp nhất.",
                         fontSize = 13.sp,
-                        color = PrimaryBlue,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                         lineHeight = 18.sp
                     )
                 }
@@ -278,14 +273,14 @@ fun BookingScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEBEE))
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
                 ) {
                     Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.ErrorOutline, null, tint = Color(0xFFD32F2F), modifier = Modifier.size(18.dp))
+                        Icon(Icons.Outlined.ErrorOutline, null, tint = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
                             text = (uiState as BookingUiState.Error).message,
-                            color = Color(0xFFD32F2F),
+                            color = MaterialTheme.colorScheme.onErrorContainer,
                             fontSize = 13.sp
                         )
                     }
@@ -314,20 +309,20 @@ fun BookingScreen(
                     .fillMaxWidth()
                     .height(52.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = PrimaryBlue,
-                    disabledContainerColor = Color(0xFFB0BEC5)
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
                 ),
                 shape = RoundedCornerShape(12.dp),
                 enabled = canSubmit
             ) {
                 if (uiState is BookingUiState.Loading) {
                     CircularProgressIndicator(
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(22.dp),
                         strokeWidth = 2.dp
                     )
                     Spacer(modifier = Modifier.width(10.dp))
-                    Text("Đang xử lý...", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text("Đang xử lý...", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.SemiBold)
                 } else {
                     Icon(Icons.Outlined.Send, null, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
@@ -346,7 +341,7 @@ private fun SectionLabel(icon: ImageVector, text: String) {
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = PrimaryBlue,
+            tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(18.dp)
         )
         Spacer(modifier = Modifier.width(8.dp))
@@ -354,18 +349,18 @@ private fun SectionLabel(icon: ImageVector, text: String) {
             text = text,
             fontWeight = FontWeight.Bold,
             fontSize = 14.sp,
-            color = TextPrimary
+            color = MaterialTheme.colorScheme.onSurface
         )
     }
 }
 
 @Composable
 private fun fieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedContainerColor = Color.White,
-    unfocusedContainerColor = BackgroundGray.copy(alpha = 0.5f),
-    focusedBorderColor = PrimaryBlue,
-    unfocusedBorderColor = Color(0xFFE0E0E0),
-    focusedTextColor = TextPrimary,
-    unfocusedTextColor = TextPrimary,
-    cursorColor = PrimaryBlue
+    focusedContainerColor = MaterialTheme.colorScheme.surface,
+    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+    focusedBorderColor = MaterialTheme.colorScheme.primary,
+    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+    cursorColor = MaterialTheme.colorScheme.primary
 )

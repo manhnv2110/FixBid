@@ -18,11 +18,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.fixbid.ui.theme.BackgroundGray
-import com.example.fixbid.ui.theme.LightBlue
-import com.example.fixbid.ui.theme.PrimaryBlue
-import com.example.fixbid.ui.theme.TextPrimary
-import com.example.fixbid.ui.theme.TextSecondary
 
 @Composable
 fun BookingSuccessScreen(
@@ -32,7 +27,7 @@ fun BookingSuccessScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundGray)
+            .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -45,20 +40,20 @@ fun BookingSuccessScreen(
             modifier = Modifier
                 .size(100.dp)
                 .clip(CircleShape)
-                .background(LightBlue),
+                .background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center
         ) {
             Box(
                 modifier = Modifier
                     .size(70.dp)
                     .clip(CircleShape)
-                    .background(PrimaryBlue),
+                    .background(MaterialTheme.colorScheme.primary),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.Check,
                     contentDescription = "Success",
-                    tint = Color.White,
+                    tint = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(40.dp)
                 )
             }
@@ -70,7 +65,7 @@ fun BookingSuccessScreen(
             text = "Đặt lịch thành công!",
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold,
-            color = TextPrimary
+            color = MaterialTheme.colorScheme.onSurface
         )
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -78,7 +73,7 @@ fun BookingSuccessScreen(
         Text(
             text = "Yêu cầu của bạn đã được đăng. Các thợ sẽ sớm gửi báo giá. Bạn có thể theo dõi và chọn thợ phù hợp trong mục Đơn dịch vụ.",
             fontSize = 14.sp,
-            color = TextSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
             lineHeight = 22.sp,
             modifier = Modifier.padding(horizontal = 16.dp)
@@ -92,7 +87,7 @@ fun BookingSuccessScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
             shape = RoundedCornerShape(12.dp)
         ) {
             Icon(Icons.Outlined.History, null, modifier = Modifier.size(20.dp))
@@ -113,18 +108,18 @@ fun BookingSuccessScreen(
                 .fillMaxWidth()
                 .height(52.dp),
             shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White)
+            colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.Transparent)
         ) {
             Icon(
                 Icons.Outlined.Search,
                 null,
-                tint = PrimaryBlue,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(20.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 "Tham khảo dịch vụ khác",
-                color = PrimaryBlue,
+                color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 15.sp
             )

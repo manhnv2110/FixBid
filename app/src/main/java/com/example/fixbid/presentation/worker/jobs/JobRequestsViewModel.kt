@@ -14,12 +14,20 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+enum class JobRequestSortBy(val displayName: String) {
+    NEWEST("Mới nhất"),
+    BUDGET_HIGH("Ngân sách cao"),
+    BUDGET_LOW("Ngân sách thấp"),
+    SOONEST("Hẹn sớm nhất")
+}
+
 data class JobRequestsUiState(
     val isLoading: Boolean = true,
     val isRefreshing: Boolean = false,
     val jobs: List<Booking> = emptyList(),
     val selectedCategory: ServiceCategory? = null,
     val onlyMySkills: Boolean = true,
+    val sortBy: JobRequestSortBy = JobRequestSortBy.NEWEST,
     val errorMessage: String? = null
 )
 
@@ -45,6 +53,16 @@ class JobRequestsViewModel @Inject constructor(
         load()
     }
 
+    fun setSortBy(sort: JobRequestSortBy) {
+        val current = _uiState.value
+        _uiState.update {
+            it.copy(
+                sortBy = sort,
+                jobs = applySort(current.jobs, sort)
+            )
+        }
+    }
+
     fun refresh() = load(refresh = true)
 
     private fun load(initial: Boolean = false, refresh: Boolean = false) {
@@ -65,7 +83,7 @@ class JobRequestsViewModel @Inject constructor(
                     it.copy(
                         isLoading = false,
                         isRefreshing = false,
-                        jobs = result.data
+                        jobs = applySort(result.data, state.sortBy)
                     )
                 }
                 is Resource.Error -> _uiState.update {
@@ -78,5 +96,12 @@ class JobRequestsViewModel @Inject constructor(
                 is Resource.Loading -> { /* no-op */ }
             }
         }
+    }
+
+    private fun applySort(jobs: List<Booking>, sortBy: JobRequestSortBy): List<Booking> = when (sortBy) {
+        JobRequestSortBy.NEWEST -> jobs.sortedByDescending { it.createdAt }
+        JobRequestSortBy.BUDGET_HIGH -> jobs.sortedByDescending { it.agreedPrice ?: 0.0 }
+        JobRequestSortBy.BUDGET_LOW -> jobs.sortedBy { it.agreedPrice ?: Double.MAX_VALUE }
+        JobRequestSortBy.SOONEST -> jobs.sortedBy { it.scheduledAt }
     }
 }

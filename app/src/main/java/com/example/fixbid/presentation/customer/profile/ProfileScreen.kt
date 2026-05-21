@@ -2,6 +2,7 @@ package com.example.fixbid.presentation.customer.profile
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -24,11 +25,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.fixbid.domain.model.UserRole
-import com.example.fixbid.ui.theme.BackgroundGray
-import com.example.fixbid.ui.theme.LightBlue
-import com.example.fixbid.ui.theme.PrimaryBlue
-import com.example.fixbid.ui.theme.TextPrimary
-import com.example.fixbid.ui.theme.TextSecondary
 
 @Composable
 fun ProfileScreen(
@@ -36,23 +32,24 @@ fun ProfileScreen(
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val isDark = isSystemInDarkTheme()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundGray)
+            .background(MaterialTheme.colorScheme.background)
     ) {
         // Header
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(PrimaryBlue)
+                .background(MaterialTheme.colorScheme.primary)
                 .statusBarsPadding()
                 .padding(horizontal = 20.dp, vertical = 16.dp)
         ) {
             Text(
                 text = "Hồ sơ cá nhân",
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onPrimary,
                 fontWeight = FontWeight.Bold,
                 fontSize = 20.sp,
                 modifier = Modifier.align(Alignment.Center)
@@ -62,16 +59,16 @@ fun ProfileScreen(
         when {
             uiState.isLoading -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = PrimaryBlue)
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             }
             uiState.user == null -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Không thể tải thông tin", color = TextSecondary)
+                        Text("Không thể tải thông tin", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(modifier = Modifier.height(8.dp))
                         TextButton(onClick = viewModel::loadProfile) {
-                            Text("Thử lại", color = PrimaryBlue)
+                            Text("Thử lại", color = MaterialTheme.colorScheme.primary)
                         }
                     }
                 }
@@ -89,8 +86,8 @@ fun ProfileScreen(
                     // Avatar + Name card
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        shape = MaterialTheme.shapes.large,
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                     ) {
                         Column(
@@ -104,15 +101,15 @@ fun ProfileScreen(
                                 modifier = Modifier
                                     .size(80.dp)
                                     .clip(CircleShape)
-                                    .background(LightBlue)
-                                    .border(2.dp, PrimaryBlue, CircleShape),
+                                    .background(MaterialTheme.colorScheme.primaryContainer)
+                                    .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = user.fullName.firstOrNull()?.uppercase() ?: "?",
                                     fontSize = 32.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = PrimaryBlue
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
                             }
 
@@ -122,7 +119,7 @@ fun ProfileScreen(
                                 text = user.fullName,
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = TextPrimary
+                                color = MaterialTheme.colorScheme.onSurface
                             )
 
                             Spacer(modifier = Modifier.height(4.dp))
@@ -131,14 +128,14 @@ fun ProfileScreen(
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(20.dp))
-                                    .background(LightBlue)
+                                    .background(MaterialTheme.colorScheme.secondaryContainer)
                                     .padding(horizontal = 12.dp, vertical = 4.dp)
                             ) {
                                 Text(
                                     text = user.role.displayName,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = PrimaryBlue
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
                                 )
                             }
                         }
@@ -148,8 +145,8 @@ fun ProfileScreen(
                     if (!uiState.isEditing) {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            shape = MaterialTheme.shapes.large,
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                         ) {
                             Column(
@@ -160,7 +157,7 @@ fun ProfileScreen(
                                     text = "Thông tin cá nhân",
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = TextPrimary
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
 
                                 ProfileInfoRow(
@@ -192,8 +189,7 @@ fun ProfileScreen(
                                 Button(
                                     onClick = viewModel::startEditing,
                                     modifier = Modifier.fillMaxWidth(),
-                                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
-                                    shape = RoundedCornerShape(10.dp)
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                                 ) {
                                     Icon(
                                         Icons.Outlined.Edit,
@@ -211,8 +207,8 @@ fun ProfileScreen(
                     if (uiState.isEditing) {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            shape = MaterialTheme.shapes.large,
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                         ) {
                             Column(
@@ -223,7 +219,7 @@ fun ProfileScreen(
                                     text = "Chỉnh sửa thông tin",
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = TextPrimary
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
 
                                 OutlinedTextField(
@@ -231,12 +227,12 @@ fun ProfileScreen(
                                     onValueChange = viewModel::onFullNameChange,
                                     label = { Text("Họ và tên") },
                                     modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(10.dp),
+                                    shape = MaterialTheme.shapes.medium,
                                     colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = PrimaryBlue,
-                                        unfocusedBorderColor = Color.LightGray,
-                                        focusedContainerColor = Color.White,
-                                        unfocusedContainerColor = Color.White
+                                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
                                     ),
                                     singleLine = true,
                                     enabled = !uiState.isSaving
@@ -248,12 +244,12 @@ fun ProfileScreen(
                                     label = { Text("Số điện thoại") },
                                     placeholder = { Text("+84...") },
                                     modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(10.dp),
+                                    shape = MaterialTheme.shapes.medium,
                                     colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = PrimaryBlue,
-                                        unfocusedBorderColor = Color.LightGray,
-                                        focusedContainerColor = Color.White,
-                                        unfocusedContainerColor = Color.White
+                                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
                                     ),
                                     singleLine = true,
                                     enabled = !uiState.isSaving
@@ -265,19 +261,19 @@ fun ProfileScreen(
                                     onValueChange = {},
                                     label = { Text("Email") },
                                     modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(10.dp),
+                                    shape = MaterialTheme.shapes.medium,
                                     enabled = false,
                                     colors = OutlinedTextFieldDefaults.colors(
-                                        disabledBorderColor = Color.LightGray,
-                                        disabledContainerColor = BackgroundGray,
-                                        disabledTextColor = TextSecondary
+                                        disabledBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                        disabledTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                                     )
                                 )
 
                                 if (uiState.errorMessage != null) {
                                     Text(
                                         text = uiState.errorMessage!!,
-                                        color = Color.Red,
+                                        color = MaterialTheme.colorScheme.error,
                                         fontSize = 13.sp
                                     )
                                 }
@@ -289,22 +285,20 @@ fun ProfileScreen(
                                     OutlinedButton(
                                         onClick = viewModel::cancelEditing,
                                         modifier = Modifier.weight(1f),
-                                        shape = RoundedCornerShape(10.dp),
                                         enabled = !uiState.isSaving
                                     ) {
-                                        Text("Huỷ", color = TextSecondary)
+                                        Text("Huỷ", color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
 
                                     Button(
                                         onClick = viewModel::saveProfile,
                                         modifier = Modifier.weight(1f),
-                                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
-                                        shape = RoundedCornerShape(10.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                                         enabled = !uiState.isSaving
                                     ) {
                                         if (uiState.isSaving) {
                                             CircularProgressIndicator(
-                                                color = Color.White,
+                                                color = MaterialTheme.colorScheme.onPrimary,
                                                 modifier = Modifier.size(18.dp),
                                                 strokeWidth = 2.dp
                                             )
@@ -321,25 +315,25 @@ fun ProfileScreen(
                     if (uiState.successMessage != null) {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = MaterialTheme.shapes.medium,
                             colors = CardDefaults.cardColors(
-                                containerColor = Color(0xFFE8F5E9)
+                                containerColor = if (isDark) Color(0xFF1B5E20) else Color(0xFFE8F5E9)
                             )
                         ) {
                             Row(
                                 modifier = Modifier.padding(16.dp),
                                 verticalAlignment = Alignment.CenterVertically
-                            ) {
+                              ) {
                                 Icon(
                                     Icons.Default.CheckCircle,
                                     contentDescription = null,
-                                    tint = Color(0xFF43A047),
+                                    tint = if (isDark) Color(0xFF81C784) else Color(0xFF43A047),
                                     modifier = Modifier.size(20.dp)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = uiState.successMessage!!,
-                                    color = Color(0xFF2E7D32),
+                                    color = if (isDark) Color(0xFFC8E6C9) else Color(0xFF2E7D32),
                                     fontSize = 14.sp
                                 )
                             }
@@ -349,8 +343,8 @@ fun ProfileScreen(
                     // Menu items
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        shape = MaterialTheme.shapes.large,
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                     ) {
                         Column(modifier = Modifier.padding(vertical = 8.dp)) {
@@ -361,7 +355,7 @@ fun ProfileScreen(
                             )
                             HorizontalDivider(
                                 modifier = Modifier.padding(horizontal = 20.dp),
-                                color = Color(0xFFF0F0F0)
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
                             )
                             ProfileMenuItem(
                                 icon = Icons.Outlined.Payment,
@@ -370,7 +364,7 @@ fun ProfileScreen(
                             )
                             HorizontalDivider(
                                 modifier = Modifier.padding(horizontal = 20.dp),
-                                color = Color(0xFFF0F0F0)
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
                             )
                             ProfileMenuItem(
                                 icon = Icons.Outlined.Notifications,
@@ -379,7 +373,7 @@ fun ProfileScreen(
                             )
                             HorizontalDivider(
                                 modifier = Modifier.padding(horizontal = 20.dp),
-                                color = Color(0xFFF0F0F0)
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
                             )
                             ProfileMenuItem(
                                 icon = Icons.Outlined.HelpOutline,
@@ -388,7 +382,7 @@ fun ProfileScreen(
                             )
                             HorizontalDivider(
                                 modifier = Modifier.padding(horizontal = 20.dp),
-                                color = Color(0xFFF0F0F0)
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
                             )
                             ProfileMenuItem(
                                 icon = Icons.Outlined.Info,
@@ -403,21 +397,21 @@ fun ProfileScreen(
                         onClick = { viewModel.signOut(onSignOut) },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFFFEBEE)
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer
                         ),
-                        shape = RoundedCornerShape(12.dp),
                         elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
                     ) {
                         Icon(
                             Icons.AutoMirrored.Filled.ExitToApp,
                             contentDescription = null,
-                            tint = Color(0xFFD32F2F),
+                            tint = MaterialTheme.colorScheme.error,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "Đăng xuất",
-                            color = Color(0xFFD32F2F),
+                            color = MaterialTheme.colorScheme.error,
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 15.sp
                         )
@@ -443,7 +437,7 @@ private fun ProfileInfoRow(
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = PrimaryBlue,
+            tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(20.dp)
         )
         Spacer(modifier = Modifier.width(12.dp))
@@ -451,12 +445,12 @@ private fun ProfileInfoRow(
             Text(
                 text = label,
                 fontSize = 12.sp,
-                color = TextSecondary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
                 text = value,
                 fontSize = 15.sp,
-                color = TextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Medium
             )
         }
@@ -478,7 +472,7 @@ private fun ProfileMenuItem(
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = PrimaryBlue,
+            tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(22.dp)
         )
         Spacer(modifier = Modifier.width(14.dp))
@@ -487,18 +481,18 @@ private fun ProfileMenuItem(
                 text = title,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Medium,
-                color = TextPrimary
+                color = MaterialTheme.colorScheme.onSurface
             )
             Text(
                 text = subtitle,
                 fontSize = 12.sp,
-                color = TextSecondary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         Icon(
             imageVector = Icons.Default.ChevronRight,
             contentDescription = null,
-            tint = Color.LightGray,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
             modifier = Modifier.size(20.dp)
         )
     }

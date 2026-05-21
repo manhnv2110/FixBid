@@ -26,9 +26,6 @@ import com.example.fixbid.core.components.CategoryGrid
 import com.example.fixbid.core.components.NotificationCard
 import com.example.fixbid.core.components.PromoBanner
 import com.example.fixbid.core.components.SearchBar
-import com.example.fixbid.ui.theme.BackgroundGray
-import com.example.fixbid.ui.theme.PrimaryBlue
-import com.example.fixbid.ui.theme.TextPrimary
 import com.example.fixbid.presentation.customer.history.BookingHistoryScreen
 import com.example.fixbid.presentation.customer.profile.ProfileScreen
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -62,7 +59,7 @@ fun HomeScreen(
                 onItemSelected = { selectedNavIndex = it }
             )
         },
-        containerColor = BackgroundGray,
+        containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { innerPadding ->
         when (selectedNavIndex) {
@@ -115,7 +112,7 @@ private fun HomeHeader(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(PrimaryBlue)
+            .background(MaterialTheme.colorScheme.primary)
             .statusBarsPadding()
             .padding(horizontal = 20.dp)
             .padding(top = 16.dp, bottom = 24.dp)
@@ -129,13 +126,13 @@ private fun HomeHeader(
                 Icon(
                     imageVector = Icons.Outlined.LocationOn,
                     contentDescription = "Vị trí",
-                    tint = Color.White,
+                    tint = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = "Hà Nội",
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onPrimary,
                     fontWeight = FontWeight.Medium,
                     fontSize = 16.sp
                 )
@@ -144,7 +141,7 @@ private fun HomeHeader(
                 Icon(
                     imageVector = Icons.Outlined.Notifications,
                     contentDescription = "Thông báo",
-                    tint = Color.White
+                    tint = MaterialTheme.colorScheme.onPrimary
                 )
             }
         }
@@ -153,7 +150,7 @@ private fun HomeHeader(
 
         Text(
             text = "Bạn cần giúp gì nào?",
-            color = Color.White,
+            color = MaterialTheme.colorScheme.onPrimary,
             fontWeight = FontWeight.Bold,
             fontSize = 22.sp
         )
@@ -224,7 +221,7 @@ private fun CategorySection(
             text = "Danh mục dịch vụ",
             fontWeight = FontWeight.Bold,
             fontSize = 18.sp,
-            color = TextPrimary
+            color = MaterialTheme.colorScheme.onSurface
         )
 
         Spacer(modifier = Modifier.height(12.dp))

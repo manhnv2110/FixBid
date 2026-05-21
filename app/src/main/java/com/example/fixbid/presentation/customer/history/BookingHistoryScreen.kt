@@ -3,6 +3,7 @@ package com.example.fixbid.presentation.customer.history
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -30,11 +31,7 @@ import com.example.fixbid.core.utils.toRelativeTime
 import com.example.fixbid.domain.model.Booking
 import com.example.fixbid.domain.model.BookingStatus
 import com.example.fixbid.domain.model.ServiceCategory
-import com.example.fixbid.ui.theme.BackgroundGray
-import com.example.fixbid.ui.theme.LightBlue
-import com.example.fixbid.ui.theme.PrimaryBlue
-import com.example.fixbid.ui.theme.TextPrimary
-import com.example.fixbid.ui.theme.TextSecondary
+import com.example.fixbid.core.components.StatusPill
 import androidx.compose.runtime.saveable.rememberSaveable
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -57,19 +54,19 @@ fun BookingHistoryScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundGray)
+            .background(MaterialTheme.colorScheme.background)
     ) {
         // Header
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(PrimaryBlue)
+                .background(MaterialTheme.colorScheme.primary)
                 .statusBarsPadding()
                 .padding(horizontal = 20.dp, vertical = 16.dp)
         ) {
             Text(
                 text = "Đơn dịch vụ",
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onPrimary,
                 fontWeight = FontWeight.Bold,
                 fontSize = 20.sp,
                 modifier = Modifier.align(Alignment.Center)
@@ -79,16 +76,18 @@ fun BookingHistoryScreen(
         // Tab Row
         TabRow(
             selectedTabIndex = selectedTab,
-            containerColor = Color.White,
-            contentColor = PrimaryBlue,
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.primary,
             indicator = { tabPositions ->
                 TabRowDefaults.SecondaryIndicator(
                     Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
                     height = 3.dp,
-                    color = PrimaryBlue
+                    color = MaterialTheme.colorScheme.primary
                 )
             },
-            divider = {}
+            divider = {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+            }
         ) {
             tabs.forEachIndexed { index, title ->
                 val count = when (val state = uiState) {
@@ -105,7 +104,7 @@ fun BookingHistoryScreen(
                             Text(
                                 text = title,
                                 fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
-                                color = if (selectedTab == index) PrimaryBlue else TextSecondary,
+                                color = if (selectedTab == index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 14.sp
                             )
                             if (count > 0) {
@@ -115,7 +114,7 @@ fun BookingHistoryScreen(
                                         .size(20.dp)
                                         .clip(CircleShape)
                                         .background(
-                                            if (selectedTab == index) PrimaryBlue else Color(0xFFE0E0E0)
+                                            if (selectedTab == index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
                                         ),
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -123,7 +122,7 @@ fun BookingHistoryScreen(
                                         text = count.toString(),
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (selectedTab == index) Color.White else TextSecondary
+                                        color = if (selectedTab == index) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
@@ -138,9 +137,9 @@ fun BookingHistoryScreen(
             is HistoryUiState.Loading -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator(color = PrimaryBlue, strokeWidth = 3.dp)
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, strokeWidth = 3.dp)
                         Spacer(modifier = Modifier.height(12.dp))
-                        Text("Đang tải...", color = TextSecondary, fontSize = 14.sp)
+                        Text("Đang tải...", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
                     }
                 }
             }
@@ -153,19 +152,19 @@ fun BookingHistoryScreen(
                         Icon(
                             Icons.Outlined.CloudOff,
                             contentDescription = null,
-                            tint = Color(0xFFB0BEC5),
+                            tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
                             modifier = Modifier.size(48.dp)
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
                             state.message,
-                            color = TextSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 14.sp
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         OutlinedButton(
                             onClick = viewModel::loadBookings,
-                            shape = RoundedCornerShape(10.dp)
+                            shape = MaterialTheme.shapes.medium
                         ) {
                             Icon(Icons.Outlined.Refresh, null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
@@ -226,7 +225,7 @@ private fun EmptyState(isActive: Boolean) {
         Icon(
             imageVector = if (isActive) Icons.Outlined.Assignment else Icons.Outlined.CheckCircleOutline,
             contentDescription = null,
-            tint = Color(0xFFB0BEC5),
+            tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
             modifier = Modifier.size(56.dp)
         )
         Spacer(modifier = Modifier.height(16.dp))
@@ -234,13 +233,13 @@ private fun EmptyState(isActive: Boolean) {
             text = if (isActive) "Chưa có đơn nào đang xử lý" else "Chưa có đơn hoàn thành",
             fontSize = 16.sp,
             fontWeight = FontWeight.Medium,
-            color = TextSecondary
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = if (isActive) "Đặt dịch vụ ngay để bắt đầu!" else "Các đơn hoàn thành sẽ hiển thị ở đây",
             fontSize = 13.sp,
-            color = Color(0xFFB0BEC5)
+            color = MaterialTheme.colorScheme.outline
         )
     }
 }
@@ -261,8 +260,8 @@ private fun BookingCard(
                         booking.status == BookingStatus.PENDING_COMPLETION,
                 onClick = onClick
             ),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -275,14 +274,14 @@ private fun BookingCard(
                 Box(
                     modifier = Modifier
                         .size(40.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(LightBlue),
+                        .clip(MaterialTheme.shapes.medium)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = getCategoryIcon(booking.category),
                         contentDescription = null,
-                        tint = PrimaryBlue,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.size(22.dp)
                     )
                 }
@@ -294,29 +293,20 @@ private fun BookingCard(
                         text = booking.category.displayName,
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp,
-                        color = TextPrimary
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = booking.createdAt.toRelativeTime(),
                         fontSize = 12.sp,
-                        color = TextSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
                 // Status badge
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(statusInfo.color.copy(alpha = 0.1f))
-                        .padding(horizontal = 10.dp, vertical = 5.dp)
-                ) {
-                    Text(
-                        text = statusInfo.label,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = statusInfo.color
-                    )
-                }
+                StatusPill(
+                    text = statusInfo.label,
+                    color = statusInfo.color
+                )
             }
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -325,7 +315,7 @@ private fun BookingCard(
             Text(
                 text = booking.description,
                 fontSize = 13.sp,
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 lineHeight = 18.sp
@@ -338,14 +328,14 @@ private fun BookingCard(
                 Icon(
                     Icons.Outlined.LocationOn,
                     contentDescription = null,
-                    tint = TextSecondary,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(14.dp)
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = booking.address,
                     fontSize = 12.sp,
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -354,7 +344,7 @@ private fun BookingCard(
             // Bottom section based on status
             if (booking.status == BookingStatus.BIDDING) {
                 Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = Color(0xFFF5F5F5))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -365,21 +355,21 @@ private fun BookingCard(
                         Icon(
                             Icons.Outlined.Gavel,
                             contentDescription = null,
-                            tint = PrimaryBlue,
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = "Đang chờ báo giá từ thợ",
                             fontSize = 12.sp,
-                            color = PrimaryBlue,
+                            color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Medium
                         )
                     }
                     Icon(
                         Icons.Default.ChevronRight,
                         contentDescription = null,
-                        tint = PrimaryBlue,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -387,7 +377,7 @@ private fun BookingCard(
 
             if (booking.status == BookingStatus.PENDING_COMPLETION) {
                 Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = Color(0xFFF5F5F5))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -398,21 +388,21 @@ private fun BookingCard(
                         Icon(
                             Icons.Outlined.CheckCircle,
                             contentDescription = null,
-                            tint = Color(0xFFE65100),
+                            tint = statusInfo.color,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = "Thợ đã báo xong, bấm để xác nhận",
                             fontSize = 12.sp,
-                            color = Color(0xFFE65100),
+                            color = statusInfo.color,
                             fontWeight = FontWeight.Medium
                         )
                     }
                     Icon(
                         Icons.Default.ChevronRight,
                         contentDescription = null,
-                        tint = Color(0xFFE65100),
+                        tint = statusInfo.color,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -420,7 +410,7 @@ private fun BookingCard(
 
             if (isDone && booking.agreedPrice != null) {
                 Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = Color(0xFFF5F5F5))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -433,21 +423,21 @@ private fun BookingCard(
                                 modifier = Modifier
                                     .size(24.dp)
                                     .clip(CircleShape)
-                                    .background(Color(0xFFE8F5E9)),
+                                    .background(MaterialTheme.colorScheme.tertiaryContainer),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = booking.worker.fullName.first().toString(),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF43A047)
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer
                                 )
                             }
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = booking.worker.fullName,
                                 fontSize = 13.sp,
-                                color = TextPrimary,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 fontWeight = FontWeight.Medium
                             )
                         }
@@ -456,7 +446,7 @@ private fun BookingCard(
                         text = "${java.text.NumberFormat.getNumberInstance(java.util.Locale("vi", "VN")).format(booking.agreedPrice.toLong())} đ",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
-                        color = PrimaryBlue
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }
@@ -466,15 +456,19 @@ private fun BookingCard(
 
 private data class StatusInfo(val label: String, val color: Color)
 
-private fun getStatusInfo(status: BookingStatus): StatusInfo = when (status) {
-    BookingStatus.BIDDING -> StatusInfo("Chờ báo giá", Color(0xFF00897B))
-    BookingStatus.PENDING -> StatusInfo("Chờ xác nhận", Color(0xFFFFA000))
-    BookingStatus.CONFIRMED -> StatusInfo("Đã xác nhận", Color(0xFF1565C0))
-    BookingStatus.IN_PROGRESS -> StatusInfo("Đang làm", Color(0xFF6A1B9A))
-    BookingStatus.PENDING_COMPLETION -> StatusInfo("Chờ xác nhận hoàn thành", Color(0xFFE65100))
-    BookingStatus.COMPLETED -> StatusInfo("Hoàn thành", Color(0xFF43A047))
-    BookingStatus.CANCELLED -> StatusInfo("Đã huỷ", Color(0xFFB0BEC5))
-    BookingStatus.DISPUTED -> StatusInfo("Tranh chấp", Color(0xFFD32F2F))
+@Composable
+private fun getStatusInfo(status: BookingStatus): StatusInfo {
+    val isDark = isSystemInDarkTheme()
+    return when (status) {
+        BookingStatus.BIDDING -> StatusInfo("Chờ báo giá", if (isDark) Color(0xFF4DB6AC) else Color(0xFF00897B))
+        BookingStatus.PENDING -> StatusInfo("Chờ xác nhận", if (isDark) Color(0xFFFFD54F) else Color(0xFFFFA000))
+        BookingStatus.CONFIRMED -> StatusInfo("Đã xác nhận", if (isDark) Color(0xFF64B5F6) else Color(0xFF1565C0))
+        BookingStatus.IN_PROGRESS -> StatusInfo("Đang làm", if (isDark) Color(0xFFBA68C8) else Color(0xFF6A1B9A))
+        BookingStatus.PENDING_COMPLETION -> StatusInfo("Chờ xác nhận hoàn thành", if (isDark) Color(0xFFFF8A65) else Color(0xFFE65100))
+        BookingStatus.COMPLETED -> StatusInfo("Hoàn thành", if (isDark) Color(0xFF81C784) else Color(0xFF43A047))
+        BookingStatus.CANCELLED -> StatusInfo("Đã huỷ", if (isDark) Color(0xFFCFD8DC) else Color(0xFFB0BEC5))
+        BookingStatus.DISPUTED -> StatusInfo("Tranh chấp", if (isDark) Color(0xFFE57373) else Color(0xFFD32F2F))
+    }
 }
 
 private fun getCategoryIcon(category: ServiceCategory): ImageVector = when (category) {

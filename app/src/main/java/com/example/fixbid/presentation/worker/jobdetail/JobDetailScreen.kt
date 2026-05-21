@@ -16,8 +16,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,13 +26,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
-import coil.request.ImageRequest
+import com.example.fixbid.core.components.AppHeader
+import com.example.fixbid.core.components.StatusPill
 import com.example.fixbid.core.utils.formatCurrencyVnd
 import com.example.fixbid.core.utils.formatDateTimeVi
 import com.example.fixbid.core.utils.formatRelativeTime
@@ -44,6 +44,7 @@ import com.example.fixbid.domain.model.Booking
 import com.example.fixbid.domain.model.BookingStatus
 import com.example.fixbid.ui.theme.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun JobDetailScreen(
     onBackClick: () -> Unit,
@@ -51,14 +52,15 @@ fun JobDetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
                 is JobDetailEvent.Toast ->
                     Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show()
-                JobDetailEvent.BidPlaced -> { /* handled via state */ }
-                JobDetailEvent.CompletionSubmitted -> onBackClick()
+                JobDetailEvent.BidPlaced -> { /* state đã update */ }
+                JobDetailEvent.CompletionSubmitted -> { /* state đã update */ }
             }
         }
     }
@@ -66,28 +68,19 @@ fun JobDetailScreen(
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
-            JobDetailTopBar(onBackClick = onBackClick)
+            AppHeader(title = "Chi tiết yêu cầu", onBackClick = onBackClick)
         },
         bottomBar = {
             uiState.data?.let { data ->
-                val booking = data.booking
-                when (booking.status) {
-                    BookingStatus.IN_PROGRESS -> {
-                        CompletionBottomBar(onCompleteClick = viewModel::openCompletionDialog)
-                    }
-                    BookingStatus.PENDING_COMPLETION -> {
-                        PendingCompletionBottomBar()
-                    }
-                    else -> {
-                        JobDetailBottomBar(
-                            myBid = data.myBid,
-                            onPlaceBid = viewModel::openBidDialog
-                        )
-                    }
-                }
+                JobDetailBottomBar(
+                    booking = data.booking,
+                    myBid = data.myBid,
+                    onPlaceBid = viewModel::openBidDialog,
+                    onReportCompletion = viewModel::openCompletionDialog
+                )
             }
         },
-        containerColor = BackgroundGray,
+        containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { innerPadding ->
         when {
@@ -98,7 +91,7 @@ fun JobDetailScreen(
                         .padding(innerPadding),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(color = PrimaryBlue)
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             }
             uiState.errorMessage != null -> {
@@ -111,12 +104,12 @@ fun JobDetailScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             uiState.errorMessage!!,
-                            color = TextSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 14.sp
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         TextButton(onClick = viewModel::load) {
-                            Text("Thử lại", color = PrimaryBlue)
+                            Text("Thử lại", color = MaterialTheme.colorScheme.primary)
                         }
                     }
                 }
@@ -129,9 +122,14 @@ fun JobDetailScreen(
             }
         }
 
-        if (uiState.showBidDialog) {
-            PlaceBidDialog(
+        // Bottom sheet đặt thầu
+        if (uiState.showBidDialog && uiState.data != null) {
+            PlaceBidBottomSheet(
                 form = uiState.bidForm,
+                competitorBidsCount = uiState.data!!.competitorBidsCount,
+                lowestBid = uiState.data!!.lowestBid,
+                averageBid = uiState.data!!.averageBid,
+                suggestedBudget = uiState.data!!.booking.agreedPrice,
                 onDismiss = viewModel::closeBidDialog,
                 onPriceChange = viewModel::onPriceChange,
                 onDurationChange = viewModel::onDurationChange,
@@ -140,46 +138,21 @@ fun JobDetailScreen(
             )
         }
 
+        // Bottom sheet báo hoàn thành (ảnh + ghi chú)
         if (uiState.showCompletionDialog) {
-            CompletionDialog(
+            ReportCompletionBottomSheet(
                 form = uiState.completionForm,
                 onDismiss = viewModel::closeCompletionDialog,
                 onNoteChange = viewModel::onCompletionNoteChange,
-                onImagesSelected = viewModel::onCompletionImagesSelected,
+                onImagesPicked = viewModel::onCompletionImagesSelected,
                 onRemoveImage = viewModel::removeCompletionImage,
-                onSubmit = { imageBytesList ->
-                    viewModel.submitCompletion(imageBytesList)
-                }
+                onSubmit = { imageBytes -> viewModel.submitCompletion(imageBytes) }
             )
         }
     }
 }
 
-@Composable
-private fun JobDetailTopBar(onBackClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(PrimaryBlue)
-            .statusBarsPadding()
-            .padding(horizontal = 8.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconButton(onClick = onBackClick) {
-            Icon(
-                Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Quay lại",
-                tint = Color.White
-            )
-        }
-        Text(
-            text = "Chi tiết yêu cầu",
-            color = Color.White,
-            fontWeight = FontWeight.Bold,
-            fontSize = 18.sp
-        )
-    }
-}
+// ─── Content ──────────────────────────────────────────────────────────────────
 
 @Composable
 private fun JobDetailContent(
@@ -198,157 +171,85 @@ private fun JobDetailContent(
             .padding(top = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // Hero card with category + budget
-        HeroCard(booking = data.booking)
+        SummaryCard(booking = data.booking)
 
-        // Description
-        SectionCard(title = "Mô tả công việc") {
-            Text(
-                text = data.booking.description,
-                fontSize = 14.sp,
-                color = TextPrimary,
-                lineHeight = 22.sp
-            )
-            data.booking.customerNote?.takeIf { it.isNotBlank() }?.let { note ->
-                Spacer(modifier = Modifier.height(10.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(LightBlue.copy(alpha = 0.5f))
-                        .padding(12.dp)
-                ) {
-                    Row {
-                        Icon(
-                            Icons.Outlined.StickyNote2,
-                            contentDescription = null,
-                            tint = PrimaryBlue,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = note,
-                            fontSize = 13.sp,
-                            color = TextPrimary
-                        )
-                    }
-                }
-            }
-        }
+        BiddingStatsCard(
+            competitorCount = data.competitorBidsCount,
+            lowest = data.lowestBid,
+            average = data.averageBid,
+            highest = data.highestBid
+        )
 
-        // Location & schedule
-        SectionCard(title = "Thông tin") {
-            DetailRow(
-                icon = Icons.Outlined.LocationOn,
-                label = "Địa chỉ",
-                value = data.booking.address
-            )
-            HorizontalDivider(color = Color(0xFFF0F0F0), modifier = Modifier.padding(vertical = 10.dp))
-            DetailRow(
-                icon = Icons.Outlined.Schedule,
-                label = "Thời gian hẹn",
-                value = formatDateTimeVi(data.booking.scheduledAt)
-            )
-            HorizontalDivider(color = Color(0xFFF0F0F0), modifier = Modifier.padding(vertical = 10.dp))
-            DetailRow(
-                icon = Icons.Outlined.Timer,
-                label = "Thời gian dự kiến",
-                value = "${data.booking.estimatedDurationHours} giờ"
-            )
-            HorizontalDivider(color = Color(0xFFF0F0F0), modifier = Modifier.padding(vertical = 10.dp))
-            DetailRow(
-                icon = Icons.Outlined.AccessTime,
-                label = "Đã đăng",
-                value = formatRelativeTime(data.booking.createdAt)
-            )
-        }
+        DescriptionCard(booking = data.booking)
 
-        // Bidding stats
-        SectionCard(title = "Tình hình đấu thầu") {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                BidStatCell(
-                    modifier = Modifier.weight(1f),
-                    label = "Đối thủ",
-                    value = "${data.competitorBidsCount}",
-                    iconTint = PrimaryBlue
-                )
-                BidStatCell(
-                    modifier = Modifier.weight(1f),
-                    label = "Giá thấp",
-                    value = data.lowestBid?.let { formatCurrencyVnd(it) } ?: "—",
-                    iconTint = AccentGreen
-                )
-                BidStatCell(
-                    modifier = Modifier.weight(1f),
-                    label = "Trung bình",
-                    value = data.averageBid?.let { formatCurrencyVnd(it) } ?: "—",
-                    iconTint = Color(0xFFFFA726)
-                )
-            }
-        }
+        InfoCard(booking = data.booking)
 
-        // My bid (if exists)
-        data.myBid?.let { bid ->
-            MyBidCard(bid = bid)
-        }
+        data.myBid?.let { bid -> MyBidCard(bid = bid) }
     }
 }
 
+// ─── Summary (gộp Hero + Budget) ──────────────────────────────────────────────
+
 @Composable
-private fun HeroCard(booking: Booking) {
+private fun SummaryCard(booking: Booking) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(LightBlue)
-                    .padding(horizontal = 10.dp, vertical = 4.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                StatusPill(text = booking.category.displayName, color = MaterialTheme.colorScheme.primary)
                 Text(
-                    text = booking.category.displayName,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = PrimaryBlue
+                    text = formatRelativeTime(booking.createdAt),
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Spacer(modifier = Modifier.height(10.dp))
             Text(
-                text = "Yêu cầu ${booking.category.displayName.lowercase()}",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextPrimary
+                text = booking.description,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                lineHeight = 22.sp
             )
-            Spacer(modifier = Modifier.height(12.dp))
-            HorizontalDivider(color = Color(0xFFF0F0F0))
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(14.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(modifier = Modifier.height(14.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Outlined.Payments,
-                    contentDescription = null,
-                    tint = AccentGreen,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(AccentGreen.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Outlined.Payments,
+                        contentDescription = null,
+                        tint = AccentGreen,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
                         text = "Ngân sách đề xuất",
                         fontSize = 11.sp,
-                        color = TextSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = booking.agreedPrice?.let { formatCurrencyVnd(it) }
                             ?: "Thoả thuận với khách",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
-                        color = AccentGreen
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
@@ -356,23 +257,181 @@ private fun HeroCard(booking: Booking) {
     }
 }
 
+// ─── Bidding stats ────────────────────────────────────────────────────────────
+
 @Composable
-private fun SectionCard(title: String, content: @Composable () -> Unit) {
+private fun BiddingStatsCard(
+    competitorCount: Int,
+    lowest: Double?,
+    average: Double?,
+    highest: Double?
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Outlined.QueryStats,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Tình hình đấu thầu",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+
+            if (competitorCount == 0) {
+                Text(
+                    text = "Chưa có thợ nào đặt giá. Bạn là người đầu tiên!",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                return@Column
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                StatCell(
+                    modifier = Modifier.weight(1f),
+                    label = "Đối thủ",
+                    value = "$competitorCount",
+                    color = MaterialTheme.colorScheme.primary
+                )
+                StatCell(
+                    modifier = Modifier.weight(1f),
+                    label = "Thấp nhất",
+                    value = lowest?.let { formatCurrencyVnd(it) } ?: "—",
+                    color = AccentGreen
+                )
+                StatCell(
+                    modifier = Modifier.weight(1f),
+                    label = "Trung bình",
+                    value = average?.let { formatCurrencyVnd(it) } ?: "—",
+                    color = StatusGold
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatCell(
+    modifier: Modifier = Modifier,
+    label: String,
+    value: String,
+    color: Color
+) {
+    Column(
+        modifier = modifier
+            .clip(MaterialTheme.shapes.small)
+            .background(color.copy(alpha = 0.08f))
+            .padding(vertical = 12.dp, horizontal = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = value,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = color
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+// ─── Description ──────────────────────────────────────────────────────────────
+
+@Composable
+private fun DescriptionCard(booking: Booking) {
+    val note = booking.customerNote?.takeIf { it.isNotBlank() }
+    if (note == null) return
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Outlined.StickyNote2,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Ghi chú từ khách",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = note,
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurface,
+                lineHeight = 20.sp
+            )
+        }
+    }
+}
+
+// ─── Info ─────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun InfoCard(booking: Booking) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                text = title,
+                text = "Thông tin",
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
-                color = TextPrimary
+                color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.height(12.dp))
-            content()
+            DetailRow(
+                icon = Icons.Outlined.LocationOn,
+                label = "Địa chỉ",
+                value = booking.address
+            )
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant,
+                modifier = Modifier.padding(vertical = 10.dp)
+            )
+            DetailRow(
+                icon = Icons.Outlined.Schedule,
+                label = "Thời gian hẹn",
+                value = formatDateTimeVi(booking.scheduledAt)
+            )
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant,
+                modifier = Modifier.padding(vertical = 10.dp)
+            )
+            DetailRow(
+                icon = Icons.Outlined.Timer,
+                label = "Thời gian dự kiến",
+                value = "${booking.estimatedDurationHours} giờ"
+            )
         }
     }
 }
@@ -387,66 +446,37 @@ private fun DetailRow(
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = PrimaryBlue,
+            tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(18.dp)
         )
         Spacer(modifier = Modifier.width(10.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(label, fontSize = 11.sp, color = TextSecondary)
+            Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
                 text = value,
                 fontSize = 14.sp,
-                color = TextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Medium
             )
         }
     }
 }
 
-@Composable
-private fun BidStatCell(
-    modifier: Modifier = Modifier,
-    label: String,
-    value: String,
-    iconTint: Color
-) {
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(BackgroundGray)
-            .padding(vertical = 12.dp, horizontal = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = value,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            color = iconTint
-        )
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(label, fontSize = 11.sp, color = TextSecondary)
-    }
-}
+// ─── My bid ───────────────────────────────────────────────────────────────────
 
 @Composable
 private fun MyBidCard(bid: Bid) {
-    val statusColor = when (bid.status) {
-        BidStatus.PENDING -> Color(0xFFF57C00)
-        BidStatus.ACCEPTED -> AccentGreen
-        BidStatus.REJECTED -> Color(0xFFD32F2F)
-        BidStatus.WITHDRAWN -> TextSecondary
-    }
-    val statusLabel = when (bid.status) {
-        BidStatus.PENDING -> "Đang chờ khách xét"
-        BidStatus.ACCEPTED -> "Đã được chọn"
-        BidStatus.REJECTED -> "Bị từ chối"
-        BidStatus.WITHDRAWN -> "Đã rút"
+    val (statusColor, statusLabel) = when (bid.status) {
+        BidStatus.PENDING -> StatusOrange to "Đang chờ khách xét"
+        BidStatus.ACCEPTED -> AccentGreen to "Đã được chọn"
+        BidStatus.REJECTED -> StatusRed to "Bị từ chối"
+        BidStatus.WITHDRAWN -> MaterialTheme.colorScheme.onSurfaceVariant to "Đã rút"
     }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = LightBlue.copy(alpha = 0.4f)),
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -459,76 +489,65 @@ private fun MyBidCard(bid: Bid) {
                     Icon(
                         Icons.Outlined.AssignmentTurnedIn,
                         contentDescription = null,
-                        tint = PrimaryBlue,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        "Báo giá của bạn",
+                        text = "Báo giá của bạn",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
-                        color = TextPrimary
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(statusColor.copy(alpha = 0.15f))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                ) {
-                    Text(
-                        statusLabel,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = statusColor
-                    )
-                }
+                StatusPill(text = statusLabel, color = statusColor)
             }
-
             Spacer(modifier = Modifier.height(12.dp))
-
             Row(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Giá đề xuất", fontSize = 11.sp, color = TextSecondary)
+                    Text("Giá đề xuất", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(
                         text = formatCurrencyVnd(bid.proposedPrice),
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
-                        color = PrimaryBlue
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Thời gian", fontSize = 11.sp, color = TextSecondary)
+                    Text("Thời gian", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(
                         text = "${bid.estimatedDurationHours}h",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
-                        color = TextPrimary
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
-
             if (bid.message.isNotBlank()) {
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(
-                    text = "\"${bid.message}\"",
+                    text = "“${bid.message}”",
                     fontSize = 13.sp,
-                    color = TextSecondary,
-                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontStyle = FontStyle.Italic
                 )
             }
         }
     }
 }
 
+// ─── Bottom bar ───────────────────────────────────────────────────────────────
+
 @Composable
 private fun JobDetailBottomBar(
+    booking: Booking,
     myBid: Bid?,
-    onPlaceBid: () -> Unit
+    onPlaceBid: () -> Unit,
+    onReportCompletion: () -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = Color.White,
+        color = MaterialTheme.colorScheme.surface,
         shadowElevation = 8.dp
     ) {
         Box(
@@ -537,46 +556,62 @@ private fun JobDetailBottomBar(
                 .navigationBarsPadding()
                 .padding(16.dp)
         ) {
-            if (myBid == null || myBid.status == BidStatus.WITHDRAWN
-                || myBid.status == BidStatus.REJECTED) {
-                Button(
-                    onClick = onPlaceBid,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
-                    shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(vertical = 14.dp)
-                ) {
-                    Icon(
-                        Icons.Outlined.Gavel,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        if (myBid == null) "Đặt giá thầu" else "Đặt lại giá",
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 15.sp
+            when (booking.status) {
+                // Bidding stage — worker đặt giá
+                BookingStatus.BIDDING, BookingStatus.PENDING -> {
+                    if (myBid == null || myBid.status == BidStatus.WITHDRAWN
+                        || myBid.status == BidStatus.REJECTED) {
+                        PrimaryActionButton(
+                            label = if (myBid == null) "Đặt giá thầu" else "Đặt lại giá",
+                            icon = Icons.Outlined.Gavel,
+                            onClick = onPlaceBid
+                        )
+                    } else {
+                        StatusInfoRow(
+                            isPositive = myBid.status == BidStatus.ACCEPTED,
+                            text = if (myBid.status == BidStatus.ACCEPTED)
+                                "Khách đã chọn bạn cho công việc này"
+                            else "Bạn đã đặt giá. Chờ khách phản hồi."
+                        )
+                    }
+                }
+
+                // Thợ đã được chọn → vào làm việc
+                BookingStatus.CONFIRMED -> {
+                    StatusInfoRow(
+                        isPositive = true,
+                        text = "Bạn đã được chọn. Hãy đến đúng giờ và bắt đầu làm việc."
                     )
                 }
-            } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Outlined.Info,
-                        contentDescription = null,
-                        tint = PrimaryBlue
+
+                // Đang làm → báo hoàn thành
+                BookingStatus.IN_PROGRESS -> {
+                    PrimaryActionButton(
+                        label = "Báo hoàn thành",
+                        icon = Icons.Outlined.AssignmentTurnedIn,
+                        onClick = onReportCompletion,
+                        backgroundColor = AccentGreen
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = when (myBid.status) {
-                            BidStatus.ACCEPTED -> "Khách đã chọn bạn cho công việc này"
-                            else -> "Bạn đã đặt giá. Chờ khách phản hồi"
-                        },
-                        fontSize = 13.sp,
-                        color = TextSecondary,
-                        modifier = Modifier.weight(1f)
+                }
+
+                BookingStatus.PENDING_COMPLETION -> {
+                    StatusInfoRow(
+                        isPositive = true,
+                        text = "Đã gửi báo cáo. Chờ khách xác nhận hoàn thành."
+                    )
+                }
+
+                BookingStatus.COMPLETED -> {
+                    StatusInfoRow(
+                        isPositive = true,
+                        text = "Công việc đã hoàn thành. Cảm ơn bạn!"
+                    )
+                }
+
+                BookingStatus.CANCELLED, BookingStatus.DISPUTED -> {
+                    StatusInfoRow(
+                        isPositive = false,
+                        text = "Công việc không còn hoạt động."
                     )
                 }
             }
@@ -585,69 +620,199 @@ private fun JobDetailBottomBar(
 }
 
 @Composable
-private fun PlaceBidDialog(
+private fun PrimaryActionButton(
+    label: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    backgroundColor: Color = MaterialTheme.colorScheme.primary
+) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(52.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = backgroundColor),
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(label, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+    }
+}
+
+@Composable
+private fun StatusInfoRow(isPositive: Boolean, text: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = if (isPositive) Icons.Outlined.CheckCircle else Icons.Outlined.Info,
+            contentDescription = null,
+            tint = if (isPositive) AccentGreen else MaterialTheme.colorScheme.primary
+        )
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(
+            text = text,
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+// ─── Place bid bottom sheet ───────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PlaceBidBottomSheet(
     form: BidFormState,
+    competitorBidsCount: Int,
+    lowestBid: Double?,
+    averageBid: Double?,
+    suggestedBudget: Double?,
     onDismiss: () -> Unit,
     onPriceChange: (String) -> Unit,
     onDurationChange: (String) -> Unit,
     onMessageChange: (String) -> Unit,
     onSubmit: () -> Unit
 ) {
-    AlertDialog(
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
         onDismissRequest = { if (!form.isSubmitting) onDismiss() },
-        shape = RoundedCornerShape(16.dp),
-        containerColor = Color.White,
-        title = {
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+        dragHandle = { BottomSheetDefaults.DragHandle() }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // Title
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(40.dp)
                         .clip(CircleShape)
-                        .background(LightBlue),
+                        .background(MaterialTheme.colorScheme.primaryContainer),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         Icons.Outlined.Gavel,
                         contentDescription = null,
-                        tint = PrimaryBlue,
-                        modifier = Modifier.size(20.dp)
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp)
                     )
                 }
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    "Đặt giá thầu",
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
-                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = "Đặt giá thầu",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Thuyết phục khách hàng chọn bạn",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = form.price,
-                    onValueChange = onPriceChange,
-                    label = { Text("Giá đề xuất (VND)") },
-                    placeholder = { Text("vd: 500000") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp),
-                    enabled = !form.isSubmitting,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = PrimaryBlue,
-                        unfocusedBorderColor = Color.LightGray
-                    ),
-                    supportingText = {
-                        form.price.toDoubleOrNull()?.let {
+
+            // Market hint
+            if (competitorBidsCount > 0 || suggestedBudget != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(MaterialTheme.shapes.medium)
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f))
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Outlined.QueryStats,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        if (competitorBidsCount > 0) {
                             Text(
-                                text = formatCurrencyVnd(it),
-                                color = PrimaryBlue,
-                                fontSize = 12.sp
+                                text = "$competitorBidsCount thợ khác đã đặt giá",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = buildString {
+                                    lowestBid?.let { append("Thấp ${formatCurrencyVnd(it)}") }
+                                    if (lowestBid != null && averageBid != null) append(" • ")
+                                    averageBid?.let { append("TB ${formatCurrencyVnd(it)}") }
+                                },
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } else if (suggestedBudget != null) {
+                            Text(
+                                text = "Khách đề xuất ${formatCurrencyVnd(suggestedBudget)}",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Hãy đặt giá hợp lý để tăng cơ hội",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
-                )
+                }
+            }
 
+            // Price field
+            OutlinedTextField(
+                value = form.price,
+                onValueChange = onPriceChange,
+                label = { Text("Giá đề xuất (VND)") },
+                placeholder = { Text("vd: 500000") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.small,
+                enabled = !form.isSubmitting,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                    focusedLabelColor = MaterialTheme.colorScheme.primary,
+                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                ),
+                supportingText = {
+                    form.price.toDoubleOrNull()?.let {
+                        Text(
+                            text = formatCurrencyVnd(it),
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            )
+
+            // Duration field with quick chips
+            Column {
                 OutlinedTextField(
                     value = form.durationHours,
                     onValueChange = onDurationChange,
@@ -656,330 +821,406 @@ private fun PlaceBidDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp),
+                    shape = MaterialTheme.shapes.small,
                     enabled = !form.isSubmitting,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = PrimaryBlue,
-                        unfocusedBorderColor = Color.LightGray
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("1", "2", "4", "8").forEach { hours ->
+                        Box(
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .background(
+                                    if (form.durationHours == hours) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.surfaceVariant
+                                )
+                                .clickable(enabled = !form.isSubmitting) {
+                                    onDurationChange(hours)
+                                }
+                                .padding(horizontal = 14.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = "${hours}h",
+                                fontSize = 12.sp,
+                                color = if (form.durationHours == hours) MaterialTheme.colorScheme.onPrimary
+                                else MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
 
-                OutlinedTextField(
-                    value = form.message,
-                    onValueChange = onMessageChange,
-                    label = { Text("Lời giới thiệu") },
-                    placeholder = {
-                        Text("Giới thiệu kinh nghiệm và cam kết với khách hàng…")
-                    },
-                    minLines = 3,
-                    maxLines = 5,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp),
-                    enabled = !form.isSubmitting,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = PrimaryBlue,
-                        unfocusedBorderColor = Color.LightGray
-                    )
-                )
-
-                if (form.errorMessage != null) {
+            // Message
+            OutlinedTextField(
+                value = form.message,
+                onValueChange = onMessageChange,
+                label = { Text("Lời giới thiệu") },
+                placeholder = {
+                    Text("Giới thiệu kinh nghiệm và cam kết với khách hàng…")
+                },
+                minLines = 3,
+                maxLines = 5,
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.small,
+                enabled = !form.isSubmitting,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                    focusedLabelColor = MaterialTheme.colorScheme.primary,
+                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                ),
+                supportingText = {
                     Text(
-                        form.errorMessage,
-                        color = Color(0xFFD32F2F),
+                        text = "${form.message.length} ký tự (tối thiểu 10)",
+                        fontSize = 11.sp,
+                        color = if (form.message.length >= 10) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error
+                    )
+                }
+            )
+
+            // Error
+            if (form.errorMessage != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(MaterialTheme.shapes.small)
+                        .background(MaterialTheme.colorScheme.errorContainer)
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Outlined.ErrorOutline,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = form.errorMessage,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
                         fontSize = 13.sp
                     )
                 }
             }
-        },
-        confirmButton = {
+
+            // Submit
             Button(
                 onClick = onSubmit,
                 enabled = !form.isSubmitting,
-                colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
-                shape = RoundedCornerShape(10.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                shape = MaterialTheme.shapes.medium
             ) {
                 if (form.isSubmitting) {
                     CircularProgressIndicator(
-                        color = Color.White,
-                        modifier = Modifier.size(18.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(20.dp),
                         strokeWidth = 2.dp
                     )
                 } else {
-                    Text("Gửi báo giá", fontWeight = FontWeight.SemiBold)
+                    Icon(
+                        Icons.Outlined.Send,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Gửi báo giá", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 }
             }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                enabled = !form.isSubmitting
-            ) {
-                Text("Hủy", color = TextSecondary)
-            }
-        }
-    )
-}
-
-
-@Composable
-private fun CompletionBottomBar(onCompleteClick: () -> Unit) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = Color.White,
-        shadowElevation = 8.dp
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(16.dp)
-        ) {
-            Button(
-                onClick = onCompleteClick,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = AccentGreen),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(
-                    Icons.Outlined.CheckCircle,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    "Báo cáo hoàn thành",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp
-                )
-            }
         }
     }
 }
 
-@Composable
-private fun PendingCompletionBottomBar() {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = Color.White,
-        shadowElevation = 8.dp
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                Icons.Outlined.HourglassTop,
-                contentDescription = null,
-                tint = Color(0xFFE65100),
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "Đang chờ khách hàng xác nhận hoàn thành",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                color = Color(0xFFE65100)
-            )
-        }
-    }
-}
+// ─── Report completion bottom sheet ───────────────────────────────────────────
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CompletionDialog(
+private fun ReportCompletionBottomSheet(
     form: CompletionFormState,
     onDismiss: () -> Unit,
     onNoteChange: (String) -> Unit,
-    onImagesSelected: (List<Uri>) -> Unit,
+    onImagesPicked: (List<Uri>) -> Unit,
     onRemoveImage: (Uri) -> Unit,
     onSubmit: (List<Pair<String, ByteArray>>) -> Unit
 ) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val context = LocalContext.current
 
-    val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetMultipleContents()
+    val pickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 5)
     ) { uris: List<Uri> ->
-        if (uris.isNotEmpty()) {
-            onImagesSelected(uris)
-        }
+        if (uris.isNotEmpty()) onImagesPicked(uris)
     }
 
-    AlertDialog(
+    ModalBottomSheet(
         onDismissRequest = { if (!form.isSubmitting) onDismiss() },
-        shape = RoundedCornerShape(16.dp),
-        containerColor = Color.White,
-        title = {
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+        dragHandle = { BottomSheetDefaults.DragHandle() }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // Title
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(40.dp)
                         .clip(CircleShape)
                         .background(AccentGreen.copy(alpha = 0.15f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        Icons.Outlined.CheckCircle,
+                        Icons.Outlined.AssignmentTurnedIn,
                         contentDescription = null,
                         tint = AccentGreen,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
-                Spacer(modifier = Modifier.width(10.dp))
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = "Báo hoàn thành",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Gửi ảnh và ghi chú để khách xác nhận",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // Hint
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(MaterialTheme.shapes.small)
+                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f))
+                    .padding(12.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                Icon(
+                    Icons.Outlined.Info,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    "Báo cáo hoàn thành",
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
+                    text = "Chụp ảnh kết quả thực tế giúp khách an tâm và xác nhận nhanh hơn.",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    lineHeight = 18.sp
                 )
             }
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+
+            // Image picker
+            Column {
                 Text(
-                    text = "Chụp ảnh thực tế sau khi hoàn thành để gửi cho khách xác nhận:",
+                    text = "Ảnh thực tế (1-5 ảnh)",
                     fontSize = 13.sp,
-                    color = TextSecondary,
-                    lineHeight = 19.sp
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
+                Spacer(modifier = Modifier.height(8.dp))
 
-                // Image picker button
-                OutlinedButton(
-                    onClick = { imagePickerLauncher.launch("image/*") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp),
-                    enabled = !form.isSubmitting
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Icon(
-                        Icons.Outlined.AddAPhoto,
-                        contentDescription = null,
-                        tint = PrimaryBlue,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        "Chọn ảnh (${form.selectedImageUris.size}/5)",
-                        color = PrimaryBlue,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-
-                // Selected images preview
-                if (form.selectedImageUris.isNotEmpty()) {
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(form.selectedImageUris) { uri ->
-                            Box(modifier = Modifier.size(80.dp)) {
-                                AsyncImage(
-                                    model = ImageRequest.Builder(context)
-                                        .data(uri)
-                                        .crossfade(true)
-                                        .build(),
-                                    contentDescription = "Ảnh đã chọn",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .border(
-                                            1.dp,
-                                            Color(0xFFE0E0E0),
-                                            RoundedCornerShape(10.dp)
+                    // Add tile
+                    if (form.selectedImageUris.size < 5) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .size(96.dp)
+                                    .clip(MaterialTheme.shapes.medium)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    .border(
+                                        width = 1.dp,
+                                        color = MaterialTheme.colorScheme.outlineVariant,
+                                        shape = MaterialTheme.shapes.medium
+                                    )
+                                    .clickable(enabled = !form.isSubmitting) {
+                                        pickerLauncher.launch(
+                                            androidx.activity.result.PickVisualMediaRequest(
+                                                ActivityResultContracts.PickVisualMedia.ImageOnly
+                                            )
                                         )
-                                )
-                                // Remove button
-                                Box(
-                                    modifier = Modifier
-                                        .align(Alignment.TopEnd)
-                                        .offset(x = 4.dp, y = (-4).dp)
-                                        .size(22.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0xFFD32F2F))
-                                        .clickable(enabled = !form.isSubmitting) {
-                                            onRemoveImage(uri)
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Icon(
-                                        Icons.Filled.Close,
-                                        contentDescription = "Xóa ảnh",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(14.dp)
+                                        Icons.Outlined.AddAPhoto,
+                                        contentDescription = "Thêm ảnh",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        "Thêm ảnh",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.SemiBold
                                     )
                                 }
                             }
                         }
                     }
+                    items(form.selectedImageUris, key = { it.toString() }) { uri ->
+                        Box {
+                            AsyncImage(
+                                model = uri,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .size(96.dp)
+                                    .clip(MaterialTheme.shapes.medium)
+                                    .border(
+                                        width = 1.dp,
+                                        color = MaterialTheme.colorScheme.outlineVariant,
+                                        shape = MaterialTheme.shapes.medium
+                                    )
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(4.dp)
+                                    .size(22.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.Black.copy(alpha = 0.6f))
+                                    .clickable(enabled = !form.isSubmitting) { onRemoveImage(uri) },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Close,
+                                    contentDescription = "Xoá",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        }
+                    }
                 }
-
-                // Note input
-                OutlinedTextField(
-                    value = form.note,
-                    onValueChange = onNoteChange,
-                    label = { Text("Ghi chú cho khách (tuỳ chọn)") },
-                    placeholder = {
-                        Text("Mô tả công việc đã thực hiện, lưu ý cho khách...")
-                    },
-                    minLines = 3,
-                    maxLines = 5,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp),
-                    enabled = !form.isSubmitting,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = PrimaryBlue,
-                        unfocusedBorderColor = Color.LightGray
-                    )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "${form.selectedImageUris.size}/5 ảnh",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
 
-                if (form.errorMessage != null) {
+            // Note field
+            OutlinedTextField(
+                value = form.note,
+                onValueChange = onNoteChange,
+                label = { Text("Ghi chú cho khách (tuỳ chọn)") },
+                placeholder = {
+                    Text("Mô tả công việc đã làm, những lưu ý sau sửa chữa...")
+                },
+                minLines = 3,
+                maxLines = 5,
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.small,
+                enabled = !form.isSubmitting,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                    focusedLabelColor = MaterialTheme.colorScheme.primary,
+                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            )
+
+            // Error
+            if (form.errorMessage != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(MaterialTheme.shapes.small)
+                        .background(MaterialTheme.colorScheme.errorContainer)
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Outlined.ErrorOutline,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        form.errorMessage,
-                        color = Color(0xFFD32F2F),
+                        text = form.errorMessage,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
                         fontSize = 13.sp
                     )
                 }
             }
-        },
-        confirmButton = {
+
+            // Submit
             Button(
                 onClick = {
-                    // Read image bytes from URIs
-                    val imageBytesList = form.selectedImageUris.mapIndexed { index, uri ->
-                        val bytes = context.contentResolver.openInputStream(uri)
-                            ?.use { it.readBytes() } ?: ByteArray(0)
-                        val extension = context.contentResolver.getType(uri)
-                            ?.substringAfter("/") ?: "jpg"
-                        val fileName = "img_${System.currentTimeMillis()}_$index.$extension"
-                        fileName to bytes
-                    }.filter { it.second.isNotEmpty() }
-
-                    onSubmit(imageBytesList)
+                    val resolved = resolveImageBytes(context, form.selectedImageUris)
+                    onSubmit(resolved)
                 },
                 enabled = !form.isSubmitting && form.selectedImageUris.isNotEmpty(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = AccentGreen),
-                shape = RoundedCornerShape(10.dp)
+                shape = MaterialTheme.shapes.medium
             ) {
                 if (form.isSubmitting) {
                     CircularProgressIndicator(
                         color = Color.White,
-                        modifier = Modifier.size(18.dp),
+                        modifier = Modifier.size(20.dp),
                         strokeWidth = 2.dp
                     )
                 } else {
-                    Text("Gửi cho khách", fontWeight = FontWeight.SemiBold)
+                    Icon(
+                        Icons.Outlined.Send,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        "Gửi báo cáo hoàn thành",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp
+                    )
                 }
             }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                enabled = !form.isSubmitting
-            ) {
-                Text("Hủy", color = TextSecondary)
-            }
         }
-    )
+    }
+}
+
+private fun resolveImageBytes(
+    context: android.content.Context,
+    uris: List<Uri>
+): List<Pair<String, ByteArray>> {
+    return uris.mapIndexedNotNull { index, uri ->
+        runCatching {
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                val bytes = stream.readBytes()
+                val name = "completion_${System.currentTimeMillis()}_$index.jpg"
+                name to bytes
+            }
+        }.getOrNull()
+    }
 }

@@ -33,6 +33,7 @@ import com.example.fixbid.presentation.customer.booking.BookingScreen
 import com.example.fixbid.presentation.customer.booking.BookingSuccessScreen
 import com.example.fixbid.presentation.customer.home.HomeScreen
 import com.example.fixbid.presentation.worker.home.WorkerHomeScreen
+import com.example.fixbid.presentation.notification.NotificationListScreen
 import com.example.fixbid.ui.theme.FixBidTheme
 import com.example.fixbid.ui.theme.PrimaryBlue
 import dagger.hilt.android.AndroidEntryPoint
@@ -197,7 +198,7 @@ fun FixBidNavHost() {
                 onCategoryClick = { category ->
                     navController.navigate("booking/${category.name}")
                 },
-                onNotificationClick = { /* TODO: notification list screen */ },
+                onNotificationClick = { navController.navigate("notification_list") },
                 onBookingClick = { bookingId ->
                     navController.navigate("bidding_workers/$bookingId")
                 },
@@ -215,18 +216,35 @@ fun FixBidNavHost() {
 
         // ─── Worker screens ───────────────────────────────────────────────
         composable("worker_home") {
+            val showWork = it.savedStateHandle.get<Boolean>("show_work") == true
+            LaunchedEffect(showWork) {
+                if (showWork) it.savedStateHandle.remove<Boolean>("show_work")
+            }
             WorkerHomeScreen(
-                onNotificationClick = { /* TODO: notification list screen */ },
+                onNotificationClick = { navController.navigate("notification_list") },
                 onJobClick = { bookingId ->
                     navController.navigate("worker_job_detail/$bookingId")
                 },
                 onJobRequestClick = { bookingId ->
                     navController.navigate("worker_job_detail/$bookingId")
                 },
+                onBrowseAllRequestsClick = {
+                    navController.navigate("worker_requests")
+                },
                 onSignOut = {
                     navController.navigate(AuthRoutes.Welcome) {
                         popUpTo(0) { inclusive = true }
                     }
+                },
+                showWorkTab = showWork
+            )
+        }
+
+        composable("worker_requests") {
+            com.example.fixbid.presentation.worker.jobs.JobRequestsScreen(
+                onBackClick = { navController.popBackStack() },
+                onJobClick = { bookingId ->
+                    navController.navigate("worker_job_detail/$bookingId")
                 }
             )
         }
@@ -290,6 +308,12 @@ fun FixBidNavHost() {
                 onCompleted = {
                     navController.popBackStack("home", inclusive = false)
                 }
+            )
+        }
+
+        composable("notification_list") {
+            NotificationListScreen(
+                onBackClick = { navController.popBackStack() }
             )
         }
     }

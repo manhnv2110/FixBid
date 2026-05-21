@@ -5,25 +5,25 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.example.fixbid.ui.theme.LightBlue
-import com.example.fixbid.ui.theme.PrimaryBlue
 
+/**
+ * Bottom navbar cho worker — 3 tabs đồng nhất với customer.
+ * Trang chủ (dashboard + yêu cầu mở) / Việc làm / Hồ sơ.
+ */
 @Composable
 fun WorkerBottomNavbar(
     selectedIndex: Int,
     onItemSelected: (Int) -> Unit
 ) {
     val items = listOf(
-        Triple("Tổng quan", Icons.Filled.Dashboard, Icons.Outlined.Dashboard),
-        Triple("Yêu cầu", Icons.Filled.Inbox, Icons.Outlined.Inbox),
+        Triple("Trang chủ", Icons.Filled.Home, Icons.Outlined.Home),
         Triple("Việc làm", Icons.Filled.Work, Icons.Outlined.Work),
         Triple("Hồ sơ", Icons.Filled.Person, Icons.Outlined.Person)
     )
 
     NavigationBar(
-        containerColor = Color.White,
+        containerColor = MaterialTheme.colorScheme.surface,
         tonalElevation = 8.dp
     ) {
         items.forEachIndexed { index, (label, activeIcon, inactiveIcon) ->
@@ -38,11 +38,11 @@ fun WorkerBottomNavbar(
                 },
                 label = { Text(label) },
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = PrimaryBlue,
-                    selectedTextColor = PrimaryBlue,
-                    indicatorColor = LightBlue,
-                    unselectedIconColor = Color.Gray,
-                    unselectedTextColor = Color.Gray
+                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             )
         }

@@ -8,6 +8,7 @@ import com.example.fixbid.domain.model.Resource
 import com.example.fixbid.domain.model.WorkerProfile
 import com.example.fixbid.domain.repository.AuthRepository
 import com.example.fixbid.domain.repository.WorkerRepository
+import com.example.fixbid.domain.usecase.worker.GetOpenJobRequestsUseCase
 import com.example.fixbid.domain.usecase.worker.GetWorkerDashboardUseCase
 import com.example.fixbid.domain.usecase.worker.UpdateJobStatusUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -23,9 +24,10 @@ data class WorkerHomeUiState(
     val userName: String = "",
     val isAvailable: Boolean = true,
     val profile: WorkerProfile? = null,
-    val activeJobs: List<Booking> = emptyList(),
-    val pendingJobs: List<Booking> = emptyList(),
+    val activeJobs: List<Booking> = emptyList(),       // IN_PROGRESS + PENDING_COMPLETION
+    val pendingJobs: List<Booking> = emptyList(),      // CONFIRMED
     val completedJobs: List<Booking> = emptyList(),
+    val openRequests: List<Booking> = emptyList(),     // BIDDING — preview ở dashboard
     val completedCount: Int = 0,
     val totalEarnings: Double = 0.0,
     val monthlyEarnings: Double = 0.0,
@@ -36,6 +38,7 @@ data class WorkerHomeUiState(
 @HiltViewModel
 class WorkerHomeViewModel @Inject constructor(
     private val getDashboardUseCase: GetWorkerDashboardUseCase,
+    private val getOpenJobRequestsUseCase: GetOpenJobRequestsUseCase,
     private val updateJobStatusUseCase: UpdateJobStatusUseCase,
     private val workerRepository: WorkerRepository,
     private val authRepository: AuthRepository
@@ -58,6 +61,11 @@ class WorkerHomeViewModel @Inject constructor(
             when (val result = getDashboardUseCase()) {
                 is Resource.Success -> {
                     val data = result.data
+
+                    // Lấy thêm preview của open requests cho dashboard
+                    val openRequests = (getOpenJobRequestsUseCase(applySkillsFilter = true) as? Resource.Success)
+                        ?.data?.take(5) ?: emptyList()
+
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -67,6 +75,7 @@ class WorkerHomeViewModel @Inject constructor(
                             activeJobs = data.activeJobs,
                             pendingJobs = data.pendingJobs,
                             completedJobs = data.completedJobs,
+                            openRequests = openRequests,
                             completedCount = data.completedCount,
                             totalEarnings = data.totalEarnings,
                             monthlyEarnings = data.monthlyEarnings
@@ -112,7 +121,7 @@ class WorkerHomeViewModel @Inject constructor(
         viewModelScope.launch {
             when (updateJobStatusUseCase(bookingId, BookingStatus.IN_PROGRESS)) {
                 is Resource.Success -> loadDashboard()
-                else -> { /* TODO: show error */ }
+                else -> { /* TODO: surface error via event */ }
             }
         }
     }
@@ -121,7 +130,7 @@ class WorkerHomeViewModel @Inject constructor(
         viewModelScope.launch {
             when (updateJobStatusUseCase(bookingId, BookingStatus.PENDING_COMPLETION)) {
                 is Resource.Success -> loadDashboard()
-                else -> { /* TODO: show error */ }
+                else -> { /* TODO: surface error via event */ }
             }
         }
     }

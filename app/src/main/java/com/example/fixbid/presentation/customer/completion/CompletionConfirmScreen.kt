@@ -1,8 +1,10 @@
 package com.example.fixbid.presentation.customer.completion
 
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -31,7 +33,6 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.fixbid.core.utils.formatCurrencyVnd
 import com.example.fixbid.domain.model.Booking
-import com.example.fixbid.ui.theme.*
 
 @Composable
 fun CompletionConfirmScreen(
@@ -65,7 +66,7 @@ fun CompletionConfirmScreen(
                 )
             }
         },
-        containerColor = BackgroundGray,
+        containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { innerPadding ->
         when {
@@ -77,9 +78,9 @@ fun CompletionConfirmScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator(color = PrimaryBlue, strokeWidth = 3.dp)
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, strokeWidth = 3.dp)
                         Spacer(modifier = Modifier.height(12.dp))
-                        Text("Đang tải...", color = TextSecondary, fontSize = 14.sp)
+                        Text("Đang tải...", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
                     }
                 }
             }
@@ -94,19 +95,19 @@ fun CompletionConfirmScreen(
                         Icon(
                             Icons.Outlined.CloudOff,
                             contentDescription = null,
-                            tint = Color(0xFFB0BEC5),
+                            tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
                             modifier = Modifier.size(48.dp)
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
                             uiState.errorMessage!!,
-                            color = TextSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 14.sp
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         OutlinedButton(
                             onClick = viewModel::loadBooking,
-                            shape = RoundedCornerShape(10.dp)
+                            shape = MaterialTheme.shapes.medium
                         ) {
                             Icon(Icons.Outlined.Refresh, null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
@@ -141,7 +142,7 @@ private fun CompletionTopBar(onBackClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(PrimaryBlue)
+            .background(MaterialTheme.colorScheme.primary)
             .statusBarsPadding()
             .padding(horizontal = 8.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -150,12 +151,12 @@ private fun CompletionTopBar(onBackClick: () -> Unit) {
             Icon(
                 Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = "Quay lại",
-                tint = Color.White
+                tint = MaterialTheme.colorScheme.onPrimary
             )
         }
         Text(
             text = "Xác nhận hoàn thành",
-            color = Color.White,
+            color = MaterialTheme.colorScheme.onPrimary,
             fontWeight = FontWeight.Bold,
             fontSize = 18.sp
         )
@@ -204,10 +205,15 @@ private fun CompletionContent(
 
 @Composable
 private fun StatusBanner() {
+    val isDark = isSystemInDarkTheme()
+    val containerBg = if (isDark) Color(0xFF2D1B00) else Color(0xFFFFF3E0)
+    val brandOrange = if (isDark) Color(0xFFFFB74D) else Color(0xFFE65100)
+    val textSub = if (isDark) Color(0xFFFFCC80) else Color(0xFFBF360C)
+
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3E0))
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = containerBg)
     ) {
         Row(
             modifier = Modifier
@@ -219,13 +225,13 @@ private fun StatusBanner() {
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFFFF9800).copy(alpha = 0.2f)),
+                    .background(brandOrange.copy(alpha = 0.2f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     Icons.Outlined.HourglassTop,
                     contentDescription = null,
-                    tint = Color(0xFFE65100),
+                    tint = brandOrange,
                     modifier = Modifier.size(22.dp)
                 )
             }
@@ -235,13 +241,13 @@ private fun StatusBanner() {
                     text = "Thợ đã báo hoàn thành",
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
-                    color = Color(0xFFE65100)
+                    color = brandOrange
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = "Vui lòng kiểm tra kết quả và xác nhận hoàn thành công việc",
                     fontSize = 12.sp,
-                    color = Color(0xFFBF360C),
+                    color = textSub,
                     lineHeight = 17.sp
                 )
             }
@@ -253,8 +259,8 @@ private fun StatusBanner() {
 private fun JobSummaryCard(booking: Booking) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -262,7 +268,7 @@ private fun JobSummaryCard(booking: Booking) {
                 text = "Thông tin công việc",
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
-                color = TextPrimary
+                color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -273,7 +279,7 @@ private fun JobSummaryCard(booking: Booking) {
                 value = booking.category.displayName
             )
             HorizontalDivider(
-                color = Color(0xFFF0F0F0),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
                 modifier = Modifier.padding(vertical = 10.dp)
             )
 
@@ -284,7 +290,7 @@ private fun JobSummaryCard(booking: Booking) {
                 value = booking.description
             )
             HorizontalDivider(
-                color = Color(0xFFF0F0F0),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
                 modifier = Modifier.padding(vertical = 10.dp)
             )
 
@@ -298,7 +304,7 @@ private fun JobSummaryCard(booking: Booking) {
             // Worker info
             booking.worker?.let { worker ->
                 HorizontalDivider(
-                    color = Color(0xFFF0F0F0),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
                     modifier = Modifier.padding(vertical = 10.dp)
                 )
                 DetailRow(
@@ -315,8 +321,8 @@ private fun JobSummaryCard(booking: Booking) {
 private fun CompletionImagesCard(images: List<String>) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -324,7 +330,7 @@ private fun CompletionImagesCard(images: List<String>) {
                 Icon(
                     Icons.Outlined.PhotoLibrary,
                     contentDescription = null,
-                    tint = PrimaryBlue,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -332,14 +338,14 @@ private fun CompletionImagesCard(images: List<String>) {
                     text = "Ảnh thực tế sau khi hoàn thành",
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
-                    color = TextPrimary
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "${images.size} ảnh",
                 fontSize = 12.sp,
-                color = TextSecondary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -359,7 +365,7 @@ private fun CompletionImagesCard(images: List<String>) {
                             .clip(RoundedCornerShape(12.dp))
                             .border(
                                 width = 1.dp,
-                                color = Color(0xFFE0E0E0),
+                                color = MaterialTheme.colorScheme.outlineVariant,
                                 shape = RoundedCornerShape(12.dp)
                             )
                     )
@@ -373,8 +379,8 @@ private fun CompletionImagesCard(images: List<String>) {
 private fun WorkerNoteCard(note: String) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -382,7 +388,7 @@ private fun WorkerNoteCard(note: String) {
                 Icon(
                     Icons.Outlined.StickyNote2,
                     contentDescription = null,
-                    tint = PrimaryBlue,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -390,7 +396,7 @@ private fun WorkerNoteCard(note: String) {
                     text = "Ghi chú từ thợ",
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
-                    color = TextPrimary
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
             Spacer(modifier = Modifier.height(12.dp))
@@ -398,13 +404,13 @@ private fun WorkerNoteCard(note: String) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(10.dp))
-                    .background(BackgroundGray)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                     .padding(12.dp)
             ) {
                 Text(
                     text = note,
                     fontSize = 14.sp,
-                    color = TextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     lineHeight = 22.sp
                 )
             }
@@ -416,8 +422,8 @@ private fun WorkerNoteCard(note: String) {
 private fun PriceCard(price: Double) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = LightBlue.copy(alpha = 0.5f)),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
@@ -431,14 +437,14 @@ private fun PriceCard(price: Double) {
                 Icon(
                     Icons.Outlined.Payments,
                     contentDescription = null,
-                    tint = PrimaryBlue,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(22.dp)
                 )
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
                     text = "Tổng chi phí",
                     fontSize = 14.sp,
-                    color = TextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Medium
                 )
             }
@@ -446,7 +452,7 @@ private fun PriceCard(price: Double) {
                 text = formatCurrencyVnd(price),
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
-                color = PrimaryBlue
+                color = MaterialTheme.colorScheme.primary
             )
         }
     }
@@ -462,17 +468,17 @@ private fun DetailRow(
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = PrimaryBlue,
+            tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(18.dp)
         )
         Spacer(modifier = Modifier.width(10.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(label, fontSize = 11.sp, color = TextSecondary)
+            Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = value,
                 fontSize = 14.sp,
-                color = TextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Medium,
                 lineHeight = 20.sp
             )
@@ -486,9 +492,13 @@ private fun CompletionBottomBar(
     onConfirm: () -> Unit,
     onReject: () -> Unit
 ) {
+    val isDark = isSystemInDarkTheme()
+    val greenColor = if (isDark) Color(0xFF388E3C) else Color(0xFF4CAF50)
+    val redColor = if (isDark) MaterialTheme.colorScheme.error else Color(0xFFD32F2F)
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = Color.White,
+        color = MaterialTheme.colorScheme.surface,
         shadowElevation = 8.dp
     ) {
         Column(
@@ -505,8 +515,7 @@ private fun CompletionBottomBar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = AccentGreen),
-                shape = RoundedCornerShape(12.dp)
+                colors = ButtonDefaults.buttonColors(containerColor = greenColor)
             ) {
                 if (isSubmitting) {
                     CircularProgressIndicator(
@@ -536,24 +545,21 @@ private fun CompletionBottomBar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
-                shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = Color.White
+                    containerColor = Color.Transparent
                 ),
-                border = ButtonDefaults.outlinedButtonBorder.copy(
-                    brush = androidx.compose.ui.graphics.SolidColor(Color(0xFFD32F2F))
-                )
+                border = BorderStroke(1.dp, redColor)
             ) {
                 Icon(
                     Icons.Outlined.Close,
                     contentDescription = null,
-                    tint = Color(0xFFD32F2F),
+                    tint = redColor,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     "Chưa hài lòng, yêu cầu làm lại",
-                    color = Color(0xFFD32F2F),
+                    color = redColor,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 14.sp
                 )
@@ -570,23 +576,28 @@ private fun RejectDialog(
     onDismiss: () -> Unit,
     onSubmit: () -> Unit
 ) {
+    val isDark = isSystemInDarkTheme()
+    val dialogBg = MaterialTheme.colorScheme.surface
+    val boxBg = if (isDark) Color(0xFF400A0A) else Color(0xFFFFEBEE)
+    val redColor = if (isDark) Color(0xFFFF8A80) else Color(0xFFD32F2F)
+
     AlertDialog(
         onDismissRequest = { if (!isSubmitting) onDismiss() },
-        shape = RoundedCornerShape(16.dp),
-        containerColor = Color.White,
+        shape = MaterialTheme.shapes.large,
+        containerColor = dialogBg,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
                         .size(36.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFFFFEBEE)),
+                        .background(boxBg),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         Icons.Outlined.ReportProblem,
                         contentDescription = null,
-                        tint = Color(0xFFD32F2F),
+                        tint = redColor,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -594,7 +605,7 @@ private fun RejectDialog(
                 Text(
                     "Từ chối hoàn thành",
                     fontWeight = FontWeight.Bold,
-                    color = TextPrimary
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
         },
@@ -603,7 +614,7 @@ private fun RejectDialog(
                 Text(
                     text = "Vui lòng cho biết lý do bạn chưa hài lòng để thợ có thể khắc phục:",
                     fontSize = 13.sp,
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 19.sp
                 )
                 Spacer(modifier = Modifier.height(12.dp))
@@ -616,11 +627,11 @@ private fun RejectDialog(
                     minLines = 3,
                     maxLines = 5,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp),
+                    shape = MaterialTheme.shapes.medium,
                     enabled = !isSubmitting,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = PrimaryBlue,
-                        unfocusedBorderColor = Color.LightGray
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline
                     )
                 )
             }
@@ -629,12 +640,14 @@ private fun RejectDialog(
             Button(
                 onClick = onSubmit,
                 enabled = !isSubmitting && reason.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
-                shape = RoundedCornerShape(10.dp)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isDark) MaterialTheme.colorScheme.errorContainer else Color(0xFFD32F2F),
+                    contentColor = if (isDark) MaterialTheme.colorScheme.onErrorContainer else Color.White
+                )
             ) {
                 if (isSubmitting) {
                     CircularProgressIndicator(
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(18.dp),
                         strokeWidth = 2.dp
                     )
@@ -648,7 +661,7 @@ private fun RejectDialog(
                 onClick = onDismiss,
                 enabled = !isSubmitting
             ) {
-                Text("Hủy", color = TextSecondary)
+                Text("Hủy", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     )

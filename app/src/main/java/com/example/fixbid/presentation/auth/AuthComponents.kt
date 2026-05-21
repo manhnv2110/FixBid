@@ -1,5 +1,6 @@
 package com.example.fixbid.presentation.auth
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -29,6 +30,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -55,22 +57,17 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.fixbid.ui.theme.AccentGreen
-import com.example.fixbid.ui.theme.AuthBorder
-import com.example.fixbid.ui.theme.AuthMuted
-import com.example.fixbid.ui.theme.AuthSurface
-import com.example.fixbid.ui.theme.PrimaryBlue
-import com.example.fixbid.ui.theme.TextPrimary
-import com.example.fixbid.ui.theme.TextSecondary
-import com.example.fixbid.ui.theme.White
 
 /** Brand word-mark shown at the top of every auth screen. */
 @Composable
 fun AuthLogo(modifier: Modifier = Modifier) {
-    val logo = buildAnnotatedString {
-        append("FI")
-        withStyle(SpanStyle(color = PrimaryBlue)) { append("X") }
-        append("BID")
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val logo = remember(primaryColor) {
+        buildAnnotatedString {
+            append("FI")
+            withStyle(SpanStyle(color = primaryColor)) { append("X") }
+            append("BID")
+        }
     }
     Text(
         text = logo,
@@ -80,7 +77,7 @@ fun AuthLogo(modifier: Modifier = Modifier) {
             fontWeight = FontWeight.ExtraBold,
             letterSpacing = 2.sp
         ),
-        color = TextPrimary,
+        color = MaterialTheme.colorScheme.onSurface,
         textAlign = TextAlign.Center
     )
 }
@@ -101,22 +98,22 @@ fun PrimaryButton(
             .height(52.dp),
         shape = RoundedCornerShape(14.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = PrimaryBlue,
-            disabledContainerColor = Color(0xFFE5E7EB),
-            disabledContentColor = AuthMuted
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+            disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
         )
     ) {
         if (isLoading) {
             CircularProgressIndicator(
                 strokeWidth = 2.dp,
                 modifier = Modifier.size(18.dp),
-                color = White
+                color = MaterialTheme.colorScheme.onPrimary
             )
             Spacer(modifier = Modifier.width(10.dp))
         }
         Text(
             text = text,
-            color = if (enabled) White else AuthMuted,
             fontSize = 15.sp,
             fontWeight = FontWeight.SemiBold
         )
@@ -138,11 +135,12 @@ fun SecondaryButton(
             .height(52.dp),
         shape = RoundedCornerShape(14.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = White,
-            contentColor = PrimaryBlue,
-            disabledContainerColor = Color(0xFFF3F4F6),
-            disabledContentColor = AuthMuted
-        )
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+            disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {
         Text(
             text = text,
@@ -176,7 +174,7 @@ fun AuthTextField(
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
             text = label,
-            color = TextSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium
         )
@@ -188,9 +186,9 @@ fun AuthTextField(
             shape = RoundedCornerShape(12.dp),
             singleLine = singleLine,
             enabled = enabled,
-            placeholder = placeholder?.let { { Text(it, color = AuthMuted) } },
+            placeholder = placeholder?.let { { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)) } },
             leadingIcon = leadingIcon?.let {
-                { Icon(it, contentDescription = null, tint = AuthMuted) }
+                { Icon(it, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)) }
             },
             trailingIcon = when {
                 isPassword -> {
@@ -200,7 +198,7 @@ fun AuthTextField(
                                 imageVector = if (passwordVisible) Icons.Outlined.VisibilityOff
                                               else Icons.Outlined.Visibility,
                                 contentDescription = if (passwordVisible) "Ẩn mật khẩu" else "Hiện mật khẩu",
-                                tint = AuthMuted
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                             )
                         }
                     }
@@ -214,13 +212,13 @@ fun AuthTextField(
                 imeAction = imeAction
             ),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = PrimaryBlue,
-                unfocusedBorderColor = AuthBorder,
-                focusedContainerColor = White,
-                unfocusedContainerColor = White,
-                focusedTextColor = TextPrimary,
-                unfocusedTextColor = TextPrimary,
-                cursorColor = PrimaryBlue
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                cursorColor = MaterialTheme.colorScheme.primary
             )
         )
     }
@@ -231,7 +229,7 @@ fun AuthTextField(
 fun PasswordLeadingIcon() = Icon(
     imageVector = Icons.Outlined.Lock,
     contentDescription = null,
-    tint = AuthMuted
+    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
 )
 
 @Composable
@@ -239,7 +237,7 @@ fun AuthErrorText(message: String?, modifier: Modifier = Modifier) {
     if (!message.isNullOrBlank()) {
         Text(
             text = message,
-            color = Color(0xFFB42318),
+            color = MaterialTheme.colorScheme.error,
             fontSize = 12.sp,
             modifier = modifier.padding(top = 6.dp)
         )
@@ -251,7 +249,7 @@ fun AuthSuccessText(message: String?, modifier: Modifier = Modifier) {
     if (!message.isNullOrBlank()) {
         Text(
             text = message,
-            color = AccentGreen,
+            color = Color(0xFF4CAF50), // standard success green
             fontSize = 12.sp,
             modifier = modifier.padding(top = 6.dp)
         )
@@ -264,34 +262,35 @@ fun AuthDividerRow(label: String = "hoặc") {
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        HorizontalDivider(modifier = Modifier.weight(1f), color = AuthBorder)
+        HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
         Text(
             text = label,
-            color = AuthMuted,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
             fontSize = 12.sp,
             modifier = Modifier.padding(horizontal = 10.dp)
         )
-        HorizontalDivider(modifier = Modifier.weight(1f), color = AuthBorder)
+        HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 
 @Composable
 fun AuthSocialIcon(
     label: String,
-    background: Color = AuthSurface,
-    contentColor: Color = TextPrimary
+    background: Color = Color.Transparent,
+    contentColor: Color? = null
 ) {
+    val realContentColor = contentColor ?: MaterialTheme.colorScheme.onSurface
     Box(
         modifier = Modifier
-            .size(24.dp)
+            .size(44.dp)
             .background(background, CircleShape)
-            .border(1.dp, AuthBorder, CircleShape),
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = label,
-            color = contentColor,
-            fontSize = 12.sp,
+            color = realContentColor,
+            fontSize = 14.sp,
             fontWeight = FontWeight.Bold
         )
     }
@@ -318,7 +317,7 @@ fun OtpInputRow(
         },
         modifier = modifier,
         textStyle = textStyle,
-        cursorBrush = SolidColor(PrimaryBlue),
+        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
         decorationBox = { innerTextField ->
             Box(modifier = Modifier.fillMaxWidth()) {
@@ -332,22 +331,22 @@ fun OtpInputRow(
                         val isFocused = value.length == index ||
                             (value.length == length && index == length - 1)
                         val borderColor = when {
-                            isFilled -> AccentGreen
-                            isFocused -> PrimaryBlue
-                            else -> AuthBorder
+                            isFilled -> Color(0xFF4CAF50)
+                            isFocused -> MaterialTheme.colorScheme.primary
+                            else -> MaterialTheme.colorScheme.outlineVariant
                         }
                         Box(
                             modifier = Modifier
                                 .width(48.dp)
                                 .height(54.dp)
-                                .background(AuthSurface, RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
                                 .border(1.dp, borderColor, RoundedCornerShape(12.dp)),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = char,
                                 style = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.SemiBold),
-                                color = TextPrimary
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }
@@ -371,10 +370,10 @@ fun AuthResendRow(
     val isDisabled = resendSeconds > 0 || isSending
     val actionText = if (resendSeconds > 0) "Gửi lại sau ${resendSeconds}s" else "Gửi lại mã"
     val annotated = buildAnnotatedString {
-        withStyle(SpanStyle(color = TextSecondary)) { append("Không nhận được mã? ") }
+        withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append("Không nhận được mã? ") }
         withStyle(
             SpanStyle(
-                color = if (isDisabled) AuthMuted else PrimaryBlue,
+                color = if (isDisabled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f) else MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.SemiBold
             )
         ) { append(actionText) }
@@ -424,13 +423,13 @@ fun PasswordRequirementRow(text: String, isMet: Boolean) {
         Icon(
             imageVector = if (isMet) Icons.Outlined.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
             contentDescription = null,
-            tint = if (isMet) AccentGreen else AuthMuted,
+            tint = if (isMet) Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
             modifier = Modifier.size(16.dp)
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = text,
-            color = if (isMet) TextPrimary else TextSecondary,
+            color = if (isMet) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 12.sp
         )
     }

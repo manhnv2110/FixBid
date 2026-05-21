@@ -8,10 +8,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -24,12 +23,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.fixbid.core.components.SectionHeader
 import com.example.fixbid.core.utils.formatCurrencyVnd
-import com.example.fixbid.core.utils.formatShortDateTime
+import com.example.fixbid.core.utils.formatRelativeTime
 import com.example.fixbid.domain.model.Booking
+import com.example.fixbid.domain.model.BookingStatus
 import com.example.fixbid.presentation.customer.profile.ProfileScreen
+import com.example.fixbid.presentation.worker.components.EmptyStateCard
 import com.example.fixbid.presentation.worker.components.WorkerBottomNavbar
-import com.example.fixbid.presentation.worker.jobs.JobRequestsScreen
+import com.example.fixbid.presentation.worker.components.WorkerJobCard
+import com.example.fixbid.presentation.worker.jobs.WorkerMyWorkScreen
 import com.example.fixbid.ui.theme.*
 
 @Composable
@@ -37,15 +40,16 @@ fun WorkerHomeScreen(
     onNotificationClick: () -> Unit = {},
     onJobClick: (String) -> Unit = {},
     onJobRequestClick: (String) -> Unit = {},
+    onBrowseAllRequestsClick: () -> Unit = {},
     onSignOut: () -> Unit = {},
-    showRequestsTab: Boolean = false,
+    showWorkTab: Boolean = false,
     viewModel: WorkerHomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var selectedNavIndex by rememberSaveable { mutableIntStateOf(0) }
 
-    LaunchedEffect(showRequestsTab) {
-        if (showRequestsTab) selectedNavIndex = 1
+    LaunchedEffect(showWorkTab) {
+        if (showWorkTab) selectedNavIndex = 1
     }
 
     Scaffold(
@@ -56,123 +60,117 @@ fun WorkerHomeScreen(
                 onItemSelected = { selectedNavIndex = it }
             )
         },
-        containerColor = BackgroundGray,
+        containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { innerPadding ->
         when (selectedNavIndex) {
             1 -> Box(modifier = Modifier.padding(innerPadding)) {
-                JobRequestsScreen(
-                    embedded = true,
-                    onJobClick = onJobRequestClick
+                WorkerMyWorkScreen(
+                    onJobClick = onJobClick,
+                    onStartJob = viewModel::startJob,
+                    onCompleteJob = viewModel::completeJob
                 )
             }
             2 -> Box(modifier = Modifier.padding(innerPadding)) {
-                WorkerJobsTab(
-                    activeJobs = uiState.activeJobs,
-                    pendingJobs = uiState.pendingJobs,
-                    completedJobs = uiState.completedJobs,
-                    isLoading = uiState.isLoading,
-                    onJobClick = onJobClick,
-                    onStartJob = viewModel::startJob,
-                    onCompleteJob = onJobClick
-                )
-            }
-            3 -> Box(modifier = Modifier.padding(innerPadding)) {
                 ProfileScreen(onSignOut = onSignOut)
             }
+            else -> WorkerDashboard(
+                uiState = uiState,
+                bottomPadding = innerPadding.calculateBottomPadding(),
+                onNotificationClick = onNotificationClick,
+                onToggleAvailability = viewModel::toggleAvailability,
+                onRetry = viewModel::loadDashboard,
+                onJobClick = onJobClick,
+                onJobRequestClick = onJobRequestClick,
+                onBrowseAllRequestsClick = onBrowseAllRequestsClick,
+                onSeeAllWork = { selectedNavIndex = 1 },
+                onStartJob = viewModel::startJob,
+                onCompleteJob = viewModel::completeJob
+            )
+        }
+    }
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+
+@Composable
+private fun WorkerDashboard(
+    uiState: WorkerHomeUiState,
+    bottomPadding: androidx.compose.ui.unit.Dp,
+    onNotificationClick: () -> Unit,
+    onToggleAvailability: () -> Unit,
+    onRetry: () -> Unit,
+    onJobClick: (String) -> Unit,
+    onJobRequestClick: (String) -> Unit,
+    onBrowseAllRequestsClick: () -> Unit,
+    onSeeAllWork: () -> Unit,
+    onStartJob: (String) -> Unit,
+    onCompleteJob: (String) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        DashboardHeader(
+            userName = uiState.userName,
+            isAvailable = uiState.isAvailable,
+            isToggling = uiState.isTogglingAvailability,
+            onToggleAvailability = onToggleAvailability,
+            onNotificationClick = onNotificationClick
+        )
+
+        when {
+            uiState.isLoading -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                }
+            }
+            uiState.errorMessage != null -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            uiState.errorMessage,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 14.sp
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        TextButton(onClick = onRetry) {
+                            Text("Thử lại", color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
+            }
             else -> {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    WorkerDashboardHeader(
-                        userName = uiState.userName,
-                        isAvailable = uiState.isAvailable,
-                        isTogglingAvailability = uiState.isTogglingAvailability,
-                        onToggleAvailability = viewModel::toggleAvailability,
-                        onNotificationClick = onNotificationClick
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp)
+                        .padding(top = 16.dp, bottom = bottomPadding + 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                ) {
+                    EarningsHeroCard(
+                        monthlyEarnings = uiState.monthlyEarnings,
+                        completedCount = uiState.completedCount,
+                        rating = uiState.profile?.averageRating ?: 0.0,
+                        totalReviews = uiState.profile?.totalReviews ?: 0,
+                        isVerified = uiState.profile?.identityVerified ?: false
                     )
 
-                    when {
-                        uiState.isLoading -> {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                CircularProgressIndicator(color = PrimaryBlue)
-                            }
-                        }
-                        uiState.errorMessage != null -> {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(
-                                        uiState.errorMessage!!,
-                                        color = TextSecondary,
-                                        fontSize = 14.sp
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    TextButton(onClick = viewModel::loadDashboard) {
-                                        Text("Thử lại", color = PrimaryBlue)
-                                    }
-                                }
-                            }
-                        }
-                        else -> {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .verticalScroll(rememberScrollState())
-                                    .padding(horizontal = 16.dp)
-                                    .padding(
-                                        top = 20.dp,
-                                        bottom = innerPadding.calculateBottomPadding() + 16.dp
-                                    ),
-                                verticalArrangement = Arrangement.spacedBy(16.dp)
-                            ) {
-                                // Stats cards
-                                StatsRow(
-                                    monthlyEarnings = uiState.monthlyEarnings,
-                                    completedCount = uiState.completedCount,
-                                    rating = uiState.profile?.averageRating ?: 0.0,
-                                    totalReviews = uiState.profile?.totalReviews ?: 0
-                                )
+                    OpenRequestsSection(
+                        requests = uiState.openRequests,
+                        onItemClick = onJobRequestClick,
+                        onSeeAll = onBrowseAllRequestsClick
+                    )
 
-                                // Quick action: browse open job requests
-                                BrowseRequestsCard(
-                                    onClick = { selectedNavIndex = 1 }
-                                )
+                    ActiveWorkSection(
+                        activeJobs = uiState.activeJobs,
+                        pendingJobs = uiState.pendingJobs,
+                        onJobClick = onJobClick,
+                        onStartJob = onStartJob,
+                        onCompleteJob = onCompleteJob,
+                        onSeeAll = onSeeAllWork
+                    )
 
-                                // Active jobs section
-                                if (uiState.activeJobs.isNotEmpty()) {
-                                    ActiveJobsSection(
-                                        jobs = uiState.activeJobs,
-                                        onJobClick = onJobClick,
-                                        onCompleteJob = onJobClick
-                                    )
-                                }
-
-                                // Pending jobs section
-                                if (uiState.pendingJobs.isNotEmpty()) {
-                                    PendingJobsSection(
-                                        jobs = uiState.pendingJobs,
-                                        onJobClick = onJobClick,
-                                        onStartJob = viewModel::startJob
-                                    )
-                                }
-
-                                // Quick stats overview
-                                QuickOverviewCard(
-                                    totalEarnings = uiState.totalEarnings,
-                                    totalJobs = uiState.completedCount,
-                                    isVerified = uiState.profile?.identityVerified ?: false
-                                )
-
-                                // Empty state
-                                if (uiState.activeJobs.isEmpty() && uiState.pendingJobs.isEmpty()) {
-                                    EmptyJobsCard()
-                                }
-                            }
-                        }
+                    if (uiState.profile?.identityVerified == false) {
+                        VerifyTipBanner()
                     }
                 }
             }
@@ -180,322 +178,124 @@ fun WorkerHomeScreen(
     }
 }
 
+// ─── Header ───────────────────────────────────────────────────────────────────
+
 @Composable
-private fun WorkerDashboardHeader(
+private fun DashboardHeader(
     userName: String,
     isAvailable: Boolean,
-    isTogglingAvailability: Boolean,
+    isToggling: Boolean,
     onToggleAvailability: () -> Unit,
     onNotificationClick: () -> Unit
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(PrimaryBlue)
+            .background(MaterialTheme.colorScheme.primary)
             .statusBarsPadding()
             .padding(horizontal = 20.dp)
-            .padding(top = 16.dp, bottom = 24.dp)
+            .padding(top = 16.dp, bottom = 20.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Outlined.Person,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Xin chào, ${userName.ifEmpty { "Thợ dịch vụ" }}",
-                    color = Color.White,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 16.sp
+                    text = "Xin chào,",
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f),
+                    fontSize = 13.sp
+                )
+                Text(
+                    text = userName.ifEmpty { "Thợ dịch vụ" },
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
             IconButton(onClick = onNotificationClick) {
                 Icon(
                     imageVector = Icons.Outlined.Notifications,
                     contentDescription = "Thông báo",
-                    tint = Color.White
+                    tint = MaterialTheme.colorScheme.onPrimary
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
-        Text(
-            text = "Sẵn sàng cho công việc hôm nay?",
-            color = Color.White,
-            fontWeight = FontWeight.Bold,
-            fontSize = 22.sp
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Availability toggle
-        Card(
+        // Availability card
+        Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = Color.White.copy(alpha = 0.15f)
-            )
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.15f)
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
                     Box(
                         modifier = Modifier
                             .size(10.dp)
                             .clip(CircleShape)
-                            .background(if (isAvailable) AccentGreen else Color.Gray)
+                            .background(if (isAvailable) AccentGreen else StatusGray)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = if (isAvailable) "Đang sẵn sàng nhận việc" else "Đang tạm nghỉ",
-                        color = Color.White,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Column {
+                        Text(
+                            text = if (isAvailable) "Đang sẵn sàng nhận việc" else "Đang tạm nghỉ",
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = if (isAvailable) "Khách hàng có thể tìm thấy bạn"
+                            else "Bật để bắt đầu nhận yêu cầu",
+                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.75f),
+                            fontSize = 11.sp
+                        )
+                    }
                 }
                 Switch(
                     checked = isAvailable,
                     onCheckedChange = { onToggleAvailability() },
-                    enabled = !isTogglingAvailability,
+                    enabled = !isToggling,
                     colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
+                        checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
                         checkedTrackColor = AccentGreen,
-                        checkedBorderColor = Color.Transparent,
-                        uncheckedThumbColor = Color.White,
-                        uncheckedTrackColor = Color.Gray.copy(alpha = 0.5f),
-                        uncheckedBorderColor = Color.Transparent
-                    ),
-                    modifier = Modifier.height(24.dp)
+                        uncheckedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                        uncheckedTrackColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.38f)
+                    )
                 )
             }
         }
     }
 }
 
+// ─── Earnings hero ────────────────────────────────────────────────────────────
+
 @Composable
-private fun StatsRow(
+private fun EarningsHeroCard(
     monthlyEarnings: Double,
     completedCount: Int,
     rating: Double,
-    totalReviews: Int
+    totalReviews: Int,
+    isVerified: Boolean
 ) {
-    Row(
+    Card(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        StatCard(
-            modifier = Modifier.weight(1f),
-            icon = Icons.Outlined.AccountBalanceWallet,
-            label = "Thu nhập tháng",
-            value = formatCurrency(monthlyEarnings),
-            iconTint = Color(0xFF2196F3)
-        )
-        StatCard(
-            modifier = Modifier.weight(1f),
-            icon = Icons.Outlined.CheckCircle,
-            label = "Hoàn thành",
-            value = "$completedCount việc",
-            iconTint = AccentGreen
-        )
-        StatCard(
-            modifier = Modifier.weight(1f),
-            icon = Icons.Outlined.Star,
-            label = "Đánh giá",
-            value = if (rating > 0) "%.1f".format(rating) else "—",
-            subtitle = if (totalReviews > 0) "($totalReviews)" else null,
-            iconTint = Color(0xFFFFA726)
-        )
-    }
-}
-
-@Composable
-private fun StatCard(
-    modifier: Modifier = Modifier,
-    icon: ImageVector,
-    label: String,
-    value: String,
-    subtitle: String? = null,
-    iconTint: Color
-) {
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(iconTint.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = iconTint,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = value,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextPrimary
-            )
-            if (subtitle != null) {
-                Text(
-                    text = subtitle,
-                    fontSize = 11.sp,
-                    color = TextSecondary
-                )
-            }
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = label,
-                fontSize = 11.sp,
-                color = TextSecondary
-            )
-        }
-    }
-}
-
-@Composable
-private fun ActiveJobsSection(
-    jobs: List<Booking>,
-    onJobClick: (String) -> Unit,
-    onCompleteJob: (String) -> Unit
-) {
-    Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Đang thực hiện",
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                color = TextPrimary
-            )
-            Badge(
-                containerColor = Color(0xFFE3F2FD),
-                contentColor = PrimaryBlue
-            ) {
-                Text(
-                    text = "${jobs.size}",
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                )
-            }
-        }
-        Spacer(modifier = Modifier.height(10.dp))
-        jobs.forEach { booking ->
-            if (booking.status == com.example.fixbid.domain.model.BookingStatus.PENDING_COMPLETION) {
-                JobCard(
-                    booking = booking,
-                    statusColor = Color(0xFFE65100),
-                    statusLabel = "Chờ xác nhận",
-                    actionLabel = "Đang chờ khách xác nhận",
-                    actionColor = Color(0xFFBDBDBD),
-                    onActionClick = { /* disabled - waiting for customer */ },
-                    onClick = { onJobClick(booking.id) }
-                )
-            } else {
-                JobCard(
-                    booking = booking,
-                    statusColor = Color(0xFF2196F3),
-                    statusLabel = "Đang làm",
-                    actionLabel = "Báo cáo hoàn thành",
-                    actionColor = AccentGreen,
-                    onActionClick = { onCompleteJob(booking.id) },
-                    onClick = { onJobClick(booking.id) }
-                )
-            }
-            Spacer(modifier = Modifier.height(10.dp))
-        }
-    }
-}
-
-@Composable
-private fun PendingJobsSection(
-    jobs: List<Booking>,
-    onJobClick: (String) -> Unit,
-    onStartJob: (String) -> Unit
-) {
-    Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Chờ thực hiện",
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                color = TextPrimary
-            )
-            Badge(
-                containerColor = Color(0xFFFFF3E0),
-                contentColor = Color(0xFFF57C00)
-            ) {
-                Text(
-                    text = "${jobs.size}",
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                )
-            }
-        }
-        Spacer(modifier = Modifier.height(10.dp))
-        jobs.forEach { booking ->
-            JobCard(
-                booking = booking,
-                statusColor = Color(0xFFF57C00),
-                statusLabel = "Đã xác nhận",
-                actionLabel = "Bắt đầu",
-                actionColor = PrimaryBlue,
-                onActionClick = { onStartJob(booking.id) },
-                onClick = { onJobClick(booking.id) }
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-        }
-    }
-}
-
-@Composable
-private fun JobCard(
-    booking: Booking,
-    statusColor: Color,
-    statusLabel: String,
-    actionLabel: String,
-    actionColor: Color,
-    onActionClick: () -> Unit,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
@@ -504,495 +304,352 @@ private fun JobCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Status Pill
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .background(statusColor.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(6.dp)
-                            .clip(CircleShape)
-                            .background(statusColor)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = statusLabel,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = statusColor
-                    )
+                Text(
+                    text = "Thu nhập 30 ngày",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (isVerified) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Outlined.VerifiedUser,
+                            contentDescription = null,
+                            tint = AccentGreen,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Đã xác minh",
+                            fontSize = 11.sp,
+                            color = AccentGreen,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
-                Text(
-                    text = booking.agreedPrice?.let { formatCurrency(it) } ?: "Đang chờ giá",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = PrimaryBlue
-                )
             }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            Text(
-                text = booking.category.displayName,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextPrimary
-            )
-
             Spacer(modifier = Modifier.height(6.dp))
-
             Text(
-                text = booking.description,
-                fontSize = 14.sp,
-                color = TextSecondary,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                lineHeight = 20.sp
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
-            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.4f))
-            Spacer(modifier = Modifier.height(14.dp))
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    Icons.Outlined.LocationOn,
-                    contentDescription = null,
-                    tint = PrimaryBlue,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = booking.address,
-                    fontSize = 13.sp,
-                    color = TextPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    Icons.Outlined.Schedule,
-                    contentDescription = null,
-                    tint = PrimaryBlue,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = formatTime(booking.scheduledAt),
-                    fontSize = 13.sp,
-                    color = TextPrimary,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Button(
-                onClick = onActionClick,
-                modifier = Modifier.fillMaxWidth().height(48.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = actionColor)
-            ) {
-                Text(
-                    text = actionLabel,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
-                    color = Color.White
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun QuickOverviewCard(
-    totalEarnings: Double,
-    totalJobs: Int,
-    isVerified: Boolean
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = "Tổng quan",
+                text = formatCurrencyVnd(monthlyEarnings),
+                fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                color = TextPrimary
+                color = MaterialTheme.colorScheme.onSurface
             )
-            Spacer(modifier = Modifier.height(12.dp))
 
-            OverviewRow(
-                icon = Icons.Outlined.Payments,
-                label = "Tổng thu nhập",
-                value = formatCurrency(totalEarnings),
-                iconTint = AccentGreen
-            )
-            HorizontalDivider(
-                modifier = Modifier.padding(vertical = 10.dp),
-                color = Color(0xFFF5F5F5)
-            )
-            OverviewRow(
-                icon = Icons.Outlined.WorkHistory,
-                label = "Tổng công việc",
-                value = "$totalJobs việc",
-                iconTint = PrimaryBlue
-            )
-            HorizontalDivider(
-                modifier = Modifier.padding(vertical = 10.dp),
-                color = Color(0xFFF5F5F5)
-            )
-            OverviewRow(
-                icon = Icons.Outlined.VerifiedUser,
-                label = "Xác minh danh tính",
-                value = if (isVerified) "Đã xác minh" else "Chưa xác minh",
-                iconTint = if (isVerified) AccentGreen else Color(0xFFF57C00)
-            )
+            Spacer(modifier = Modifier.height(14.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Row(modifier = Modifier.fillMaxWidth()) {
+                MetricCell(
+                    modifier = Modifier.weight(1f),
+                    icon = Icons.Outlined.CheckCircle,
+                    iconTint = AccentGreen,
+                    value = "$completedCount",
+                    label = "Hoàn thành"
+                )
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .height(40.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant)
+                )
+                MetricCell(
+                    modifier = Modifier.weight(1f),
+                    icon = Icons.Outlined.Star,
+                    iconTint = StatusGold,
+                    value = if (rating > 0) "%.1f".format(rating) else "—",
+                    label = if (totalReviews > 0) "$totalReviews đánh giá" else "Chưa có"
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun OverviewRow(
+private fun MetricCell(
+    modifier: Modifier = Modifier,
     icon: ImageVector,
-    label: String,
+    iconTint: Color,
     value: String,
-    iconTint: Color
+    label: String
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.padding(horizontal = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = iconTint,
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(
-            text = label,
-            fontSize = 14.sp,
-            color = TextSecondary,
-            modifier = Modifier.weight(1f)
-        )
-        Text(
-            text = value,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = TextPrimary
-        )
-    }
-}
-
-@Composable
-private fun EmptyJobsCard() {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.WorkOff,
-                contentDescription = null,
-                tint = TextSecondary.copy(alpha = 0.5f),
-                modifier = Modifier.size(48.dp)
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "Chưa có công việc nào",
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
-                color = TextSecondary
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Khi khách hàng đặt dịch vụ, việc làm sẽ hiển thị tại đây",
-                fontSize = 13.sp,
-                color = TextSecondary.copy(alpha = 0.7f)
-            )
-        }
-    }
-}
-
-@Composable
-private fun WorkerJobsTab(
-    activeJobs: List<Booking>,
-    pendingJobs: List<Booking>,
-    completedJobs: List<Booking>,
-    isLoading: Boolean,
-    onJobClick: (String) -> Unit,
-    onStartJob: (String) -> Unit,
-    onCompleteJob: (String) -> Unit
-) {
-    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
-    val tabs = listOf("Đang thực hiện", "Đã hoàn thành")
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(BackgroundGray)
-    ) {
-        // Header
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .background(PrimaryBlue)
-                .statusBarsPadding()
-                .padding(horizontal = 20.dp, vertical = 16.dp)
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(iconTint.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = "Việc làm của tôi",
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 20.sp,
-                modifier = Modifier.align(Alignment.Center)
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = iconTint,
+                modifier = Modifier.size(20.dp)
             )
         }
-
-        // Tab Row
-        TabRow(
-            selectedTabIndex = selectedTab,
-            containerColor = Color.White,
-            contentColor = PrimaryBlue,
-            indicator = { tabPositions ->
-                TabRowDefaults.SecondaryIndicator(
-                    Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                    height = 3.dp,
-                    color = PrimaryBlue
-                )
-            },
-            divider = {}
-        ) {
-            tabs.forEachIndexed { index, title ->
-                val count = when (index) {
-                    0 -> activeJobs.size + pendingJobs.size
-                    else -> completedJobs.size
-                }
-                Tab(
-                    selected = selectedTab == index,
-                    onClick = { selectedTab = index },
-                    text = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = title,
-                                fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
-                                color = if (selectedTab == index) PrimaryBlue else TextSecondary,
-                                fontSize = 14.sp
-                            )
-                            if (count > 0) {
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .size(20.dp)
-                                        .clip(CircleShape)
-                                        .background(
-                                            if (selectedTab == index) PrimaryBlue else Color(0xFFE0E0E0)
-                                        ),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = count.toString(),
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (selectedTab == index) Color.White else TextSecondary
-                                    )
-                                }
-                            }
-                        }
-                    }
-                )
-            }
+        Spacer(modifier = Modifier.width(10.dp))
+        Column {
+            Text(
+                text = value,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = label,
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
+    }
+}
 
-        if (isLoading) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(color = PrimaryBlue)
-            }
+// ─── Open requests preview ────────────────────────────────────────────────────
+
+@Composable
+private fun OpenRequestsSection(
+    requests: List<Booking>,
+    onItemClick: (String) -> Unit,
+    onSeeAll: () -> Unit
+) {
+    Column {
+        SectionHeader(
+            title = "Yêu cầu mới cho bạn",
+            actionLabel = "Xem tất cả",
+            onActionClick = onSeeAll
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (requests.isEmpty()) {
+            EmptyStateCard(
+                icon = Icons.Outlined.Inbox,
+                title = "Chưa có yêu cầu phù hợp",
+                message = "Khi có yêu cầu mới đúng kỹ năng của bạn, chúng sẽ hiện ở đây",
+                actionLabel = "Khám phá tất cả",
+                onActionClick = onSeeAll
+            )
         } else {
-            when (selectedTab) {
-                0 -> {
-                    // Active tab
-                    if (activeJobs.isEmpty() && pendingJobs.isEmpty()) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(
-                                    Icons.Outlined.WorkOff,
-                                    contentDescription = null,
-                                    tint = TextSecondary.copy(alpha = 0.5f),
-                                    modifier = Modifier.size(48.dp)
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Text(
-                                    "Không có việc đang thực hiện",
-                                    color = TextSecondary,
-                                    fontSize = 15.sp
-                                )
-                            }
-                        }
-                    } else {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .verticalScroll(rememberScrollState())
-                                .padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            if (activeJobs.isNotEmpty()) {
-                                ActiveJobsSection(
-                                    jobs = activeJobs,
-                                    onJobClick = onJobClick,
-                                    onCompleteJob = onCompleteJob
-                                )
-                            }
-                            if (pendingJobs.isNotEmpty()) {
-                                PendingJobsSection(
-                                    jobs = pendingJobs,
-                                    onJobClick = onJobClick,
-                                    onStartJob = onStartJob
-                                )
-                            }
-                        }
-                    }
-                }
-                1 -> {
-                    // Completed tab
-                    if (completedJobs.isEmpty()) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(
-                                    Icons.Outlined.CheckCircleOutline,
-                                    contentDescription = null,
-                                    tint = TextSecondary.copy(alpha = 0.5f),
-                                    modifier = Modifier.size(48.dp)
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Text(
-                                    "Chưa có việc hoàn thành",
-                                    color = TextSecondary,
-                                    fontSize = 15.sp
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    "Các công việc đã hoàn thành sẽ hiển thị ở đây",
-                                    color = TextSecondary.copy(alpha = 0.7f),
-                                    fontSize = 13.sp
-                                )
-                            }
-                        }
-                    } else {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .verticalScroll(rememberScrollState())
-                                .padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            completedJobs.forEach { booking ->
-                                JobCard(
-                                    booking = booking,
-                                    statusColor = AccentGreen,
-                                    statusLabel = "Hoàn thành",
-                                    actionLabel = "Xem chi tiết",
-                                    actionColor = PrimaryBlue,
-                                    onActionClick = { onJobClick(booking.id) },
-                                    onClick = { onJobClick(booking.id) }
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                        }
-                    }
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                requests.take(3).forEach { booking ->
+                    RequestPreviewCard(
+                        booking = booking,
+                        onClick = { onItemClick(booking.id) }
+                    )
                 }
             }
         }
     }
 }
 
-private fun formatCurrency(amount: Double): String = formatCurrencyVnd(amount)
-private fun formatTime(timestamp: Long): String = formatShortDateTime(timestamp)
-
-
 @Composable
-private fun BrowseRequestsCard(onClick: () -> Unit) {
+private fun RequestPreviewCard(
+    booking: Booking,
+    onClick: () -> Unit
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = LightBlue.copy(alpha = 0.5f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryBlue.copy(alpha = 0.2f))
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier = Modifier.padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(PrimaryBlue.copy(alpha = 0.1f)),
+                    .size(44.dp)
+                    .clip(MaterialTheme.shapes.medium)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    Icons.Outlined.Search,
+                    Icons.Outlined.Build,
                     contentDescription = null,
-                    tint = PrimaryBlue,
-                    modifier = Modifier.size(24.dp)
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(22.dp)
                 )
             }
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    "Tìm việc ngay",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = PrimaryBlue
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = booking.category.displayName,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        text = formatRelativeTime(booking.createdAt),
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    "Xem yêu cầu mới và đặt mức giá của bạn",
-                    fontSize = 13.sp,
-                    color = TextSecondary,
-                    lineHeight = 18.sp
+                    text = booking.description,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Outlined.LocationOn,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(12.dp)
+                    )
+                    Spacer(modifier = Modifier.width(2.dp))
+                    Text(
+                        text = booking.address,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = booking.agreedPrice?.let { formatCurrencyVnd(it) } ?: "Thoả thuận",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
             Icon(
-                Icons.Default.ChevronRight,
+                Icons.Filled.ChevronRight,
                 contentDescription = null,
-                tint = PrimaryBlue
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp)
             )
+        }
+    }
+}
+
+// ─── Active work preview ──────────────────────────────────────────────────────
+
+@Composable
+private fun ActiveWorkSection(
+    activeJobs: List<Booking>,
+    pendingJobs: List<Booking>,
+    onJobClick: (String) -> Unit,
+    onStartJob: (String) -> Unit,
+    onCompleteJob: (String) -> Unit,
+    onSeeAll: () -> Unit
+) {
+    val total = activeJobs.size + pendingJobs.size
+    if (total == 0) return
+
+    Column {
+        SectionHeader(
+            title = "Việc đang chạy ($total)",
+            actionLabel = "Xem tất cả",
+            onActionClick = onSeeAll
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            // Pending completion first (action needed by customer)
+            val pendingCompletion = activeJobs.filter { it.status == BookingStatus.PENDING_COMPLETION }
+            val inProgress = activeJobs.filter { it.status == BookingStatus.IN_PROGRESS }
+
+            (pendingCompletion + inProgress + pendingJobs).take(2).forEach { booking ->
+                when (booking.status) {
+                BookingStatus.IN_PROGRESS -> WorkerJobCard(
+                        booking = booking,
+                        statusColor = StatusBlueProgress,
+                        statusLabel = "Đang làm",
+                        onClick = { onJobClick(booking.id) },
+                        actionLabel = "Báo hoàn thành",
+                        actionColor = AccentGreen,
+                        onActionClick = { onJobClick(booking.id) }
+                    )
+                    BookingStatus.PENDING_COMPLETION -> WorkerJobCard(
+                        booking = booking,
+                        statusColor = StatusOrangeDeep,
+                        statusLabel = "Chờ khách xác nhận",
+                        onClick = { onJobClick(booking.id) }
+                    )
+                    BookingStatus.CONFIRMED -> WorkerJobCard(
+                        booking = booking,
+                        statusColor = StatusOrange,
+                        statusLabel = "Đã xác nhận",
+                        onClick = { onJobClick(booking.id) },
+                        actionLabel = "Bắt đầu",
+                        actionColor = PrimaryBlue,
+                        onActionClick = { onStartJob(booking.id) }
+                    )
+                    else -> WorkerJobCard(
+                        booking = booking,
+                        statusColor = StatusGray,
+                        statusLabel = booking.status.name,
+                        onClick = { onJobClick(booking.id) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ─── Tip banner ───────────────────────────────────────────────────────────────
+
+@Composable
+private fun VerifyTipBanner() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Outlined.VerifiedUser,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Xác minh danh tính",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                Text(
+                    text = "Tăng tới 30% lượt được chọn bằng việc xác minh hồ sơ",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                    lineHeight = 16.sp
+                )
+            }
         }
     }
 }

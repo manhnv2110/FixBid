@@ -5,8 +5,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.fixbid.domain.model.Bid
 import com.example.fixbid.domain.model.Resource
+import com.example.fixbid.domain.model.WorkerProfile
 import com.example.fixbid.domain.repository.BidRepository
 import com.example.fixbid.domain.repository.BookingRepository
+import com.example.fixbid.domain.repository.WorkerRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,6 +26,7 @@ sealed class BiddingUiState {
 class BiddingViewModel @Inject constructor(
     private val bidRepository: BidRepository,
     private val bookingRepository: BookingRepository,
+    private val workerRepository: WorkerRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -31,6 +34,12 @@ class BiddingViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow<BiddingUiState>(BiddingUiState.Loading)
     val uiState: StateFlow<BiddingUiState> = _uiState.asStateFlow()
+
+    private val _selectedWorkerProfile = MutableStateFlow<WorkerProfile?>(null)
+    val selectedWorkerProfile: StateFlow<WorkerProfile?> = _selectedWorkerProfile.asStateFlow()
+
+    private val _isLoadingProfile = MutableStateFlow(false)
+    val isLoadingProfile: StateFlow<Boolean> = _isLoadingProfile.asStateFlow()
 
     init {
         loadBids()
@@ -53,6 +62,26 @@ class BiddingViewModel @Inject constructor(
                 is Resource.Loading -> { /* no-op */ }
             }
         }
+    }
+
+    fun loadWorkerProfile(workerId: String) {
+        viewModelScope.launch {
+            _isLoadingProfile.value = true
+            when (val result = workerRepository.getWorkerById(workerId)) {
+                is Resource.Success -> {
+                    _selectedWorkerProfile.value = result.data
+                }
+                is Resource.Error -> {
+                    _selectedWorkerProfile.value = null
+                }
+                is Resource.Loading -> { /* no-op */ }
+            }
+            _isLoadingProfile.value = false
+        }
+    }
+
+    fun clearSelectedWorkerProfile() {
+        _selectedWorkerProfile.value = null
     }
 
     fun acceptBid(bidId: String) {
