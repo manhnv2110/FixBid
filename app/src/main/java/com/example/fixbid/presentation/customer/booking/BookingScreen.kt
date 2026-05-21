@@ -1,8 +1,14 @@
 package com.example.fixbid.presentation.customer.booking
 
+import android.Manifest
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -12,13 +18,18 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.fixbid.core.components.ScheduleDateTimePicker
 import com.example.fixbid.domain.model.ServiceCategory
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,9 +58,53 @@ fun BookingScreen(
 
     var description by remember { mutableStateOf("") }
     var address by remember { mutableStateOf("") }
+    var addressLatitude by remember { mutableStateOf<Double?>(null) }
+    var addressLongitude by remember { mutableStateOf<Double?>(null) }
+    var scheduledAtMillis by remember { mutableStateOf<Long?>(null) }
+    var showAddressPicker by remember { mutableStateOf(false) }
+    var isFetchingMyLocation by remember { mutableStateOf(false) }
     
     val initialFullName by viewModel.initialFullName.collectAsState()
     val initialPhone by viewModel.initialPhone.collectAsState()
+
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    // Fired after the user grants ACCESS_FINE/COARSE_LOCATION; immediately fetches a
+    // fix and reverse-geocodes it.
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { result ->
+        val granted = result[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                result[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (!granted) {
+            Toast.makeText(
+                context,
+                "Cần quyền truy cập vị trí để tự động điền địa chỉ",
+                Toast.LENGTH_SHORT
+            ).show()
+            return@rememberLauncherForActivityResult
+        }
+        scope.launch {
+            isFetchingMyLocation = true
+            val loc = viewModel.locator.getCurrentLocation()
+            if (loc == null) {
+                isFetchingMyLocation = false
+                Toast.makeText(
+                    context,
+                    "Không lấy được vị trí. Hãy bật GPS và thử lại.",
+                    Toast.LENGTH_SHORT
+                ).show()
+                return@launch
+            }
+            addressLatitude = loc.latitude
+            addressLongitude = loc.longitude
+            val resolved = viewModel.geocoder.reverseGeocode(loc.latitude, loc.longitude)
+            address = resolved
+                ?: "%.5f, %.5f".format(loc.latitude, loc.longitude)
+            isFetchingMyLocation = false
+        }
+    }
     
     var fullName by remember(initialFullName) { mutableStateOf(initialFullName) }
     var phoneNumber by remember(initialPhone) { mutableStateOf(initialPhone) }
@@ -148,7 +203,38 @@ fun BookingScreen(
                 }
             }
 
-            // Address card
+            // Schedule card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    SectionLabel(
+                        icon = Icons.Outlined.EventAvailable,
+                        text = if (selectedCategory == ServiceCategory.CLEANING)
+                            "Lịch dọn dẹp"
+                        else "Thời gian hẹn"
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    ScheduleDateTimePicker(
+                        scheduledAtMillis = scheduledAtMillis,
+                        onScheduledAtChange = { scheduledAtMillis = it }
+                    )
+                    if (selectedCategory == ServiceCategory.CLEANING) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "Chọn ngày và khung giờ bạn muốn nhân viên có mặt. Thợ sẽ đến đúng giờ đã hẹn.",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
+            }
+
+            // Address card — typed input + GPS auto-fill + map picker
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
@@ -158,18 +244,137 @@ fun BookingScreen(
                 Column(modifier = Modifier.padding(16.dp)) {
                     SectionLabel(icon = Icons.Outlined.LocationOn, text = "Địa chỉ")
                     Spacer(modifier = Modifier.height(10.dp))
+
+                    // Quick actions: GPS + map picker. Each is a tap-friendly chip
+                    // matching the look of Material 3 assist chips.
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        AddressActionChip(
+                            modifier = Modifier.weight(1f),
+                            icon = Icons.Outlined.MyLocation,
+                            label = "Vị trí hiện tại",
+                            loading = isFetchingMyLocation,
+                            onClick = {
+                                if (viewModel.locator.hasFineLocationPermission()) {
+                                    scope.launch {
+                                        isFetchingMyLocation = true
+                                        val loc = viewModel.locator.getCurrentLocation()
+                                        if (loc == null) {
+                                            isFetchingMyLocation = false
+                                            Toast.makeText(
+                                                context,
+                                                "Không lấy được vị trí. Hãy bật GPS và thử lại.",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                            return@launch
+                                        }
+                                        addressLatitude = loc.latitude
+                                        addressLongitude = loc.longitude
+                                        val resolved = viewModel.geocoder.reverseGeocode(
+                                            loc.latitude, loc.longitude
+                                        )
+                                        address = resolved
+                                            ?: "%.5f, %.5f".format(loc.latitude, loc.longitude)
+                                        isFetchingMyLocation = false
+                                    }
+                                } else {
+                                    locationPermissionLauncher.launch(
+                                        arrayOf(
+                                            Manifest.permission.ACCESS_FINE_LOCATION,
+                                            Manifest.permission.ACCESS_COARSE_LOCATION
+                                        )
+                                    )
+                                }
+                            }
+                        )
+                        AddressActionChip(
+                            modifier = Modifier.weight(1f),
+                            icon = Icons.Outlined.Map,
+                            label = "Chọn trên bản đồ",
+                            onClick = { showAddressPicker = true }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
                     OutlinedTextField(
                         value = address,
-                        onValueChange = { address = it },
-                        placeholder = { Text("Số nhà, đường, phường/xã, quận/huyện", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)) },
+                        onValueChange = { newValue ->
+                            address = newValue
+                            // Manual edits invalidate the previously captured pin.
+                            if (addressLatitude != null || addressLongitude != null) {
+                                addressLatitude = null
+                                addressLongitude = null
+                            }
+                        },
+                        placeholder = {
+                            Text(
+                                "Số nhà, đường, phường/xã, quận/huyện",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp),
                         colors = fieldColors(),
-                        singleLine = true,
+                        maxLines = 3,
                         leadingIcon = {
-                            Icon(Icons.Outlined.LocationOn, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                            Icon(
+                                Icons.Outlined.LocationOn,
+                                null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
                         }
                     )
+
+                    // Pin confirmation badge — surfaces that we have precise coords so
+                    // the customer feels confident the worker will land at the door.
+                    if (addressLatitude != null && addressLongitude != null) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
+                                .clickable { showAddressPicker = true }
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Outlined.PinDrop,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Đã ghim vị trí trên bản đồ",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "%.5f, %.5f".format(
+                                        addressLatitude!!,
+                                        addressLongitude!!
+                                    ),
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            Text(
+                                text = "Đổi",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
                 }
             }
 
@@ -288,11 +493,13 @@ fun BookingScreen(
             }
 
             // Submit button
+            val requiresSchedule = selectedCategory == ServiceCategory.CLEANING
             val canSubmit = uiState !is BookingUiState.Loading &&
                     description.isNotBlank() &&
                     address.isNotBlank() &&
                     phoneNumber.isNotBlank() &&
-                    fullName.isNotBlank()
+                    fullName.isNotBlank() &&
+                    (!requiresSchedule || scheduledAtMillis != null)
 
             Button(
                 onClick = {
@@ -302,7 +509,11 @@ fun BookingScreen(
                         address = address,
                         phoneNumber = phoneNumber,
                         fullName = fullName,
-                        notes = notes
+                        notes = notes,
+                        scheduledAtMillis = scheduledAtMillis
+                            ?: System.currentTimeMillis(),
+                        latitude = addressLatitude,
+                        longitude = addressLongitude
                     )
                 },
                 modifier = Modifier
@@ -331,6 +542,25 @@ fun BookingScreen(
             }
 
             Spacer(modifier = Modifier.height(24.dp))
+        }
+
+        // Address picker bottom sheet (hosted inside the Scaffold so the system bars
+        // adjust correctly with the IME).
+        if (showAddressPicker) {
+            AddressPickerSheet(
+                initialLatitude = addressLatitude,
+                initialLongitude = addressLongitude,
+                initialAddress = address,
+                locationRepository = viewModel.locator,
+                geocoderRepository = viewModel.geocoder,
+                onDismiss = { showAddressPicker = false },
+                onConfirm = { lat, lng, resolved ->
+                    addressLatitude = lat
+                    addressLongitude = lng
+                    address = resolved
+                    showAddressPicker = false
+                }
+            )
         }
     }
 }
@@ -364,3 +594,51 @@ private fun fieldColors() = OutlinedTextFieldDefaults.colors(
     unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
     cursorColor = MaterialTheme.colorScheme.primary
 )
+
+/**
+ * Tonal action chip used by the address card. Mirrors the look of Material 3 assist
+ * chips but expands to fill the available row width so the two actions sit on a tidy
+ * 50/50 grid.
+ */
+@Composable
+private fun AddressActionChip(
+    modifier: Modifier = Modifier,
+    icon: ImageVector,
+    label: String,
+    loading: Boolean = false,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f))
+            .clickable(enabled = !loading, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        if (loading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.primary
+            )
+        } else {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}

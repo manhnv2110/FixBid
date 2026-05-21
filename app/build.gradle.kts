@@ -103,6 +103,15 @@ dependencies {
     // Image Loading
     implementation("io.coil-kt:coil-compose:2.6.0")
 
+    // Maps & Navigation (OpenStreetMap)
+    implementation("org.osmdroid:osmdroid-android:6.1.18")
+
+    // Fused Location (worker current location)
+    implementation("com.google.android.gms:play-services-location:21.3.0")
+
+    // Permissions helper for Compose
+    implementation("com.google.accompanist:accompanist-permissions:0.34.0")
+
     // Test
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

@@ -254,6 +254,18 @@ fun FixBidNavHost() {
             arguments = listOf(navArgument("bookingId") { type = NavType.StringType })
         ) {
             com.example.fixbid.presentation.worker.jobdetail.JobDetailScreen(
+                onBackClick = { navController.popBackStack() },
+                onNavigateToCustomer = { bookingId ->
+                    navController.navigate("worker_navigation/$bookingId")
+                }
+            )
+        }
+
+        composable(
+            route = "worker_navigation/{bookingId}",
+            arguments = listOf(navArgument("bookingId") { type = NavType.StringType })
+        ) {
+            com.example.fixbid.presentation.worker.navigation.WorkerNavigationScreen(
                 onBackClick = { navController.popBackStack() }
             )
         }

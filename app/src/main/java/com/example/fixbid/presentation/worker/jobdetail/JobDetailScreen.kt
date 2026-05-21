@@ -48,6 +48,7 @@ import com.example.fixbid.ui.theme.*
 @Composable
 fun JobDetailScreen(
     onBackClick: () -> Unit,
+    onNavigateToCustomer: (String) -> Unit = {},
     viewModel: JobDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -76,7 +77,8 @@ fun JobDetailScreen(
                     booking = data.booking,
                     myBid = data.myBid,
                     onPlaceBid = viewModel::openBidDialog,
-                    onReportCompletion = viewModel::openCompletionDialog
+                    onReportCompletion = viewModel::openCompletionDialog,
+                    onNavigateToCustomer = { onNavigateToCustomer(data.booking.id) }
                 )
             }
         },
@@ -543,7 +545,8 @@ private fun JobDetailBottomBar(
     booking: Booking,
     myBid: Bid?,
     onPlaceBid: () -> Unit,
-    onReportCompletion: () -> Unit
+    onReportCompletion: () -> Unit,
+    onNavigateToCustomer: () -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -578,20 +581,57 @@ private fun JobDetailBottomBar(
 
                 // Thợ đã được chọn → vào làm việc
                 BookingStatus.CONFIRMED -> {
-                    StatusInfoRow(
-                        isPositive = true,
-                        text = "Bạn đã được chọn. Hãy đến đúng giờ và bắt đầu làm việc."
-                    )
+                    Column {
+                        StatusInfoRow(
+                            isPositive = true,
+                            text = "Bạn đã được chọn. Hãy đến đúng giờ và bắt đầu làm việc."
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        PrimaryActionButton(
+                            label = "Chỉ đường tới khách",
+                            icon = Icons.Outlined.Directions,
+                            onClick = onNavigateToCustomer
+                        )
+                    }
                 }
 
-                // Đang làm → báo hoàn thành
+                // Đang làm → báo hoàn thành + cho phép xem chỉ đường
                 BookingStatus.IN_PROGRESS -> {
-                    PrimaryActionButton(
-                        label = "Báo hoàn thành",
-                        icon = Icons.Outlined.AssignmentTurnedIn,
-                        onClick = onReportCompletion,
-                        backgroundColor = AccentGreen
-                    )
+                    Column {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            OutlinedButton(
+                                onClick = onNavigateToCustomer,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(52.dp),
+                                shape = MaterialTheme.shapes.medium
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Directions,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Chỉ đường", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                            Button(
+                                onClick = onReportCompletion,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(52.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = AccentGreen),
+                                shape = MaterialTheme.shapes.medium
+                            ) {
+                                Icon(
+                                    Icons.Outlined.AssignmentTurnedIn,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Hoàn thành", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            }
+                        }
+                    }
                 }
 
                 BookingStatus.PENDING_COMPLETION -> {

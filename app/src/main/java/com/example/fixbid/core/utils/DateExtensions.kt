@@ -2,30 +2,48 @@ package com.example.fixbid.core.utils
 
 import java.time.Instant
 import java.time.LocalDateTime
+import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 /**
- * Parse ISO-8601 timestamp string to epoch millis.
- * Handles both "2025-01-15T10:30:00Z" and "2025-01-15T10:30:00+07:00" formats.
- * Also handles Supabase format "2025-01-15 10:30:00+00" (space instead of T).
+ * Parse an ISO-8601 / Postgrest timestamp into epoch millis.
+ *
+ * Handles every common shape Supabase emits:
+ * - `2025-01-15T10:30:00Z`                 (UTC, ISO_INSTANT)
+ * - `2025-01-15T10:30:00.123456Z`          (with fractional seconds)
+ * - `2025-01-15T10:30:00+07:00`            (offset with full minutes)
+ * - `2025-01-15T10:30:00+00`               (Postgrest short offset – no minutes)
+ * - `2025-01-15 10:30:00+00`               (Postgrest with space separator)
+ * - `2025-01-15T10:30:00`                  (no offset – assumed UTC)
+ *
+ * Returns `0L` on any failure rather than throwing, since the call sites
+ * already render `0L` as a friendly em-dash.
  */
 fun String.toEpochMillis(): Long {
     if (isBlank()) return 0L
+
+    // Normalise Postgrest quirks before handing the string to java.time:
+    //   - swap the space separator with the canonical `T`
+    //   - expand short numeric offsets ("+00" / "-05") to "+00:00" / "-05:00"
+    val normalized = this
+        .trim()
+        .replace(' ', 'T')
+        .let { s ->
+            // Match a trailing "+HH" or "-HH" with no minutes and pad it.
+            Regex("([+-])(\\d{2})$").replace(s) { match ->
+                "${match.groupValues[1]}${match.groupValues[2]}:00"
+            }
+        }
+
     return runCatching {
-        // Try standard ISO-8601 first
-        Instant.parse(this).toEpochMilli()
-    }.recoverCatching {
-        // Supabase sometimes returns "2025-01-15 10:30:00.123456+00"
-        // Replace space with T and handle timezone
-        val normalized = this
-            .replace(" ", "T")
-            .replace(Regex("\\+00$"), "+00:00")
-            .replace(Regex("\\+00:00:00$"), "+00:00")
+        // 1. UTC `Z` form — fastest path.
         Instant.parse(normalized).toEpochMilli()
     }.recoverCatching {
-        // Try parsing as LocalDateTime (no timezone) and assume UTC
-        val normalized = this.replace(" ", "T").substringBefore("+").substringBefore("-", this)
+        // 2. Any explicit offset (`+07:00`, `-05:30`, …).
+        OffsetDateTime.parse(normalized).toInstant().toEpochMilli()
+    }.recoverCatching {
+        // 3. Bare local datetime (no zone) — assume UTC.
         LocalDateTime.parse(normalized.take(19))
             .atZone(ZoneId.of("UTC"))
             .toInstant()

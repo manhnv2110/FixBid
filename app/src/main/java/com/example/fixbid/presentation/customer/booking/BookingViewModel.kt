@@ -2,6 +2,7 @@ package com.example.fixbid.presentation.customer.booking
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.fixbid.data.location.GeocoderRepository
 import com.example.fixbid.domain.model.Booking
 import com.example.fixbid.domain.model.BookingStatus
 import com.example.fixbid.domain.model.BookingType
@@ -27,8 +28,14 @@ sealed class BookingUiState {
 @HiltViewModel
 class BookingViewModel @Inject constructor(
     private val bookingRepository: BookingRepository,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val geocoderRepository: GeocoderRepository,
+    private val locationRepository: com.example.fixbid.data.location.LocationRepository
 ) : ViewModel() {
+
+    // Exposed for the address picker sheet (UI-only consumer).
+    val geocoder: GeocoderRepository get() = geocoderRepository
+    val locator: com.example.fixbid.data.location.LocationRepository get() = locationRepository
 
     private val _uiState = MutableStateFlow<BookingUiState>(BookingUiState.Idle)
     val uiState: StateFlow<BookingUiState> = _uiState.asStateFlow()
@@ -54,7 +61,10 @@ class BookingViewModel @Inject constructor(
         address: String,
         phoneNumber: String,
         fullName: String,
-        notes: String
+        notes: String,
+        scheduledAtMillis: Long,
+        latitude: Double? = null,
+        longitude: Double? = null
     ) {
         viewModelScope.launch {
             _uiState.value = BookingUiState.Loading
@@ -65,12 +75,24 @@ class BookingViewModel @Inject constructor(
                 return@launch
             }
 
+            // If the customer typed a free-form address but didn't pick a point on the
+            // map, run a forward-geocode on submit so workers always get coordinates
+            // they can navigate to. This is best-effort: if it fails the booking
+            // still goes through, we just won't have lat/lng.
+            val (resolvedLat, resolvedLng) = if (latitude != null && longitude != null) {
+                latitude to longitude
+            } else {
+                val geo = geocoderRepository.resolveAddress(address)
+                (geo?.latitude) to (geo?.longitude)
+            }
+
             val customerNote = buildString {
                 append("SĐT: $phoneNumber")
                 append("\nTên: $fullName")
                 if (notes.isNotBlank()) append("\nGhi chú: $notes")
             }
 
+            val now = System.currentTimeMillis()
             val booking = Booking(
                 id = UUID.randomUUID().toString(),
                 customerId = currentUser.id,
@@ -78,17 +100,17 @@ class BookingViewModel @Inject constructor(
                 category = category,
                 description = description,
                 address = address,
-                latitude = null,
-                longitude = null,
-                scheduledAt = System.currentTimeMillis(),
+                latitude = resolvedLat,
+                longitude = resolvedLng,
+                scheduledAt = scheduledAtMillis,
                 estimatedDurationHours = 1.0,
                 status = BookingStatus.BIDDING,
                 type = BookingType.BIDDING,
                 agreedPrice = null,
                 customerNote = customerNote,
                 workerNote = null,
-                createdAt = System.currentTimeMillis(),
-                updatedAt = System.currentTimeMillis()
+                createdAt = now,
+                updatedAt = now
             )
 
             when (val result = bookingRepository.createBiddingBooking(booking)) {

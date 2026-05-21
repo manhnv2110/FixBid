@@ -23,6 +23,8 @@ CREATE TABLE public.bookings (
   description text NOT NULL,
   address text NOT NULL,
   coordinates USER-DEFINED,
+  latitude double precision,
+  longitude double precision,
   scheduled_at timestamp with time zone NOT NULL,
   estimated_duration_hours numeric NOT NULL DEFAULT 1 CHECK (estimated_duration_hours > 0::numeric),
   status USER-DEFINED NOT NULL DEFAULT 'pending'::booking_status,
