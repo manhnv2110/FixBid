@@ -39,6 +39,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 fun BookingHistoryScreen(
     onBookingClick: (String) -> Unit,
     onCompletionConfirmClick: (String) -> Unit = {},
+    onPaymentClick: (String) -> Unit = {},
     viewModel: BookingHistoryViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -200,6 +201,7 @@ fun BookingHistoryScreen(
                                     onClick = {
                                         when (booking.status) {
                                             BookingStatus.BIDDING -> onBookingClick(booking.id)
+                                            BookingStatus.AWAITING_PAYMENT -> onPaymentClick(booking.id)
                                             BookingStatus.PENDING_COMPLETION -> onCompletionConfirmClick(booking.id)
                                             else -> { /* no action for other statuses */ }
                                         }
@@ -257,6 +259,7 @@ private fun BookingCard(
             .fillMaxWidth()
             .clickable(
                 enabled = booking.status == BookingStatus.BIDDING ||
+                        booking.status == BookingStatus.AWAITING_PAYMENT ||
                         booking.status == BookingStatus.PENDING_COMPLETION,
                 onClick = onClick
             ),
@@ -461,6 +464,7 @@ private fun getStatusInfo(status: BookingStatus): StatusInfo {
     val isDark = isSystemInDarkTheme()
     return when (status) {
         BookingStatus.BIDDING -> StatusInfo("Chờ báo giá", if (isDark) Color(0xFF4DB6AC) else Color(0xFF00897B))
+        BookingStatus.AWAITING_PAYMENT -> StatusInfo("Chờ thanh toán", if (isDark) Color(0xFFFFB74D) else Color(0xFFF57C00))
         BookingStatus.PENDING -> StatusInfo("Chờ xác nhận", if (isDark) Color(0xFFFFD54F) else Color(0xFFFFA000))
         BookingStatus.CONFIRMED -> StatusInfo("Đã xác nhận", if (isDark) Color(0xFF64B5F6) else Color(0xFF1565C0))
         BookingStatus.IN_PROGRESS -> StatusInfo("Đang làm", if (isDark) Color(0xFFBA68C8) else Color(0xFF6A1B9A))

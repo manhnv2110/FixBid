@@ -36,6 +36,7 @@ fun HomeScreen(
     onNotificationClick: () -> Unit = {},
     onBookingClick: (String) -> Unit = {},
     onCompletionConfirmClick: (String) -> Unit = {},
+    onPaymentClick: (String) -> Unit = {},
     onSignOut: () -> Unit = {},
     showHistoryTab: Boolean = false,
     viewModel: HomeViewModel = hiltViewModel()
@@ -66,7 +67,8 @@ fun HomeScreen(
             1 -> Box(modifier = Modifier.padding(innerPadding)) {
                 BookingHistoryScreen(
                     onBookingClick = onBookingClick,
-                    onCompletionConfirmClick = onCompletionConfirmClick
+                    onCompletionConfirmClick = onCompletionConfirmClick,
+                    onPaymentClick = onPaymentClick
                 )
             }
             2 -> Box(modifier = Modifier.padding(innerPadding)) {

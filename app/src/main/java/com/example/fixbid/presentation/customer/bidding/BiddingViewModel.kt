@@ -10,8 +10,11 @@ import com.example.fixbid.domain.repository.BidRepository
 import com.example.fixbid.domain.repository.BookingRepository
 import com.example.fixbid.domain.repository.WorkerRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -20,6 +23,11 @@ sealed class BiddingUiState {
     object Loading : BiddingUiState()
     data class Success(val bids: List<Bid>) : BiddingUiState()
     data class Error(val message: String) : BiddingUiState()
+}
+
+sealed class BiddingEvent {
+    data class Toast(val message: String) : BiddingEvent()
+    data class NavigateToPayment(val bookingId: String) : BiddingEvent()
 }
 
 @HiltViewModel
@@ -40,6 +48,9 @@ class BiddingViewModel @Inject constructor(
 
     private val _isLoadingProfile = MutableStateFlow(false)
     val isLoadingProfile: StateFlow<Boolean> = _isLoadingProfile.asStateFlow()
+
+    private val _events = MutableSharedFlow<BiddingEvent>()
+    val events: SharedFlow<BiddingEvent> = _events.asSharedFlow()
 
     init {
         loadBids()
@@ -84,15 +95,24 @@ class BiddingViewModel @Inject constructor(
         _selectedWorkerProfile.value = null
     }
 
+    /**
+     * Khách chọn thợ (accept bid).
+     * Sau khi accept thành công:
+     * - DB trigger (handle_bid_accepted) tự set booking = awaiting_payment,
+     *   gán worker_id, agreed_price, và reject các bid khác.
+     * - Navigate sang màn hình thanh toán.
+     * - Booking chỉ chuyển sang CONFIRMED sau khi thanh toán VNPay thành công
+     *   (trong ProcessVNPayReturnUseCase).
+     */
     fun acceptBid(bidId: String) {
         viewModelScope.launch {
             when (val result = bidRepository.acceptBid(bidId)) {
                 is Resource.Success -> {
-                    // Reload bids to reflect the change
-                    loadBids()
+                    _events.emit(BiddingEvent.Toast("Đã chọn thợ! Vui lòng tiến hành thanh toán."))
+                    _events.emit(BiddingEvent.NavigateToPayment(bookingId))
                 }
                 is Resource.Error -> {
-                    // Could show a toast/snackbar, for now just reload
+                    _events.emit(BiddingEvent.Toast(result.message))
                     loadBids()
                 }
                 is Resource.Loading -> { /* no-op */ }
