@@ -571,7 +571,7 @@ private fun ActiveWorkSection(
 
             (pendingCompletion + inProgress + pendingJobs).take(2).forEach { booking ->
                 when (booking.status) {
-                BookingStatus.IN_PROGRESS -> WorkerJobCard(
+                    BookingStatus.IN_PROGRESS -> WorkerJobCard(
                         booking = booking,
                         statusColor = StatusBlueProgress,
                         statusLabel = "Đang làm",
