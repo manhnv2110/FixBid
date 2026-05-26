@@ -14,7 +14,6 @@ val localProps = Properties().apply {
     if (file.exists()) load(file.inputStream())
 }
 
-// Fallback: nếu không có trong local.properties thì lấy từ gradle.properties / env
 fun resolveProp(key: String): String {
     val fromLocal = localProps[key]?.toString()
     if (!fromLocal.isNullOrBlank()) return fromLocal
@@ -38,6 +37,10 @@ android {
 
         buildConfigField("String", "SUPABASE_URL", "\"${resolveProp("SUPABASE_URL")}\"")
         buildConfigField("String", "SUPABASE_API_KEY", "\"${resolveProp("SUPABASE_API_KEY")}\"")
+
+        // VNPay Sandbox
+        buildConfigField("String", "VNPAY_TMN_CODE", "\"${resolveProp("VNPAY_TMN_CODE")}\"")
+        buildConfigField("String", "VNPAY_HASH_SECRET", "\"${resolveProp("VNPAY_HASH_SECRET")}\"")
     }
 
     buildTypes {

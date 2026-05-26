@@ -49,15 +49,20 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    FixBidNavHost()
+                    FixBidNavHost(intent = intent)
                 }
             }
         }
     }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+    }
 }
 
 @Composable
-fun FixBidNavHost() {
+fun FixBidNavHost(intent: android.content.Intent? = null) {
     val authViewModel: AuthViewModel = hiltViewModel()
     val uiState by authViewModel.uiState.collectAsState()
 
@@ -108,6 +113,18 @@ fun FixBidNavHost() {
         !uiState.isAuthenticated -> AuthRoutes.Welcome
         uiState.userRole == UserRole.WORKER -> "worker_home"
         else -> "home"
+    }
+
+    // Handle VNPay deep link return: fixbid://vnpay-return?vnp_...
+    LaunchedEffect(intent?.data) {
+        val uri = intent?.data ?: return@LaunchedEffect
+        if (uri.scheme == "fixbid" && uri.host == "vnpay-return") {
+            // Navigate to vnpay_return route with the full URI
+            val encodedUri = java.net.URLEncoder.encode(uri.toString(), "UTF-8")
+            navController.navigate("vnpay_return/$encodedUri") {
+                launchSingleTop = true
+            }
+        }
     }
 
     NavHost(
@@ -204,6 +221,9 @@ fun FixBidNavHost() {
                 },
                 onCompletionConfirmClick = { bookingId ->
                     navController.navigate("completion_confirm/$bookingId")
+                },
+                onPaymentClick = { bookingId ->
+                    navController.navigate("payment/$bookingId")
                 },
                 onSignOut = {
                     navController.navigate(AuthRoutes.Welcome) {
@@ -307,6 +327,37 @@ fun FixBidNavHost() {
                 onBackClick = { navController.popBackStack() },
                 onWorkerClick = { workerId ->
                     /* TODO: Navigate to worker profile */
+                },
+                onNavigateToPayment = { bId ->
+                    navController.navigate("payment/$bId")
+                }
+            )
+        }
+
+        // ─── Payment screen ──────────────────────────────────────────────
+        composable(
+            route = "payment/{bookingId}",
+            arguments = listOf(navArgument("bookingId") { type = NavType.StringType })
+        ) {
+            com.example.fixbid.presentation.customer.payment.PaymentScreen(
+                onBackClick = { navController.popBackStack() },
+                onPaymentSuccess = {
+                    navController.popBackStack("home", inclusive = false)
+                }
+            )
+        }
+
+        // ─── VNPay return deep link handler ──────────────────────────────
+        composable(
+            route = "vnpay_return/{encodedUri}",
+            arguments = listOf(navArgument("encodedUri") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val encodedUri = backStackEntry.arguments?.getString("encodedUri") ?: ""
+            val decodedUri = java.net.URLDecoder.decode(encodedUri, "UTF-8")
+            com.example.fixbid.presentation.customer.payment.VNPayReturnScreen(
+                returnUri = decodedUri,
+                onDone = {
+                    navController.popBackStack("home", inclusive = false)
                 }
             )
         }

@@ -8,9 +8,6 @@ import org.osmdroid.config.Configuration
 class FixBidApplication : Application() {
     override fun onCreate() {
         super.onCreate()
-        // Initialise osmdroid: a polite User-Agent is required by the OpenStreetMap
-        // tile policy. Cache lives under the app's external files dir so we never
-        // need WRITE_EXTERNAL_STORAGE on modern devices.
         Configuration.getInstance().apply {
             userAgentValue = packageName
             osmdroidBasePath = getExternalFilesDir("osmdroid")
