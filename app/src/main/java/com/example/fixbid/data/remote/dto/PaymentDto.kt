@@ -1,6 +1,7 @@
 package com.example.fixbid.data.remote.dto
 
 import com.example.fixbid.core.utils.toEpochMillis
+import com.example.fixbid.domain.model.EscrowStatus
 import com.example.fixbid.domain.model.Payment
 import com.example.fixbid.domain.model.PaymentMethod
 import com.example.fixbid.domain.model.PaymentStatus
@@ -20,6 +21,8 @@ data class PaymentDto(
     val status: String = "pending",
     @SerialName("transaction_id")   val transactionId: String? = null,
     @SerialName("paid_at")          val paidAt: String? = null,
+    @SerialName("released_at")      val releasedAt: String? = null,
+    @SerialName("escrow_status")    val escrowStatus: String = "none",
     @SerialName("created_at")       val createdAt: String = ""
 ) {
     fun toDomain() = Payment(
@@ -36,6 +39,9 @@ data class PaymentDto(
             .getOrDefault(PaymentStatus.PENDING),
         transactionId  = transactionId,
         paidAt         = paidAt?.toEpochMillis(),
+        releasedAt     = releasedAt?.toEpochMillis(),
+        escrowStatus   = runCatching { EscrowStatus.valueOf(escrowStatus.uppercase()) }
+            .getOrDefault(EscrowStatus.NONE),
         createdAt      = createdAt.toEpochMillis()
     )
 }
@@ -50,5 +56,6 @@ fun Payment.toDto() = PaymentDto(
     workerReceives = workerReceives,
     method         = method.name.lowercase(),
     status         = status.name.lowercase(),
-    transactionId  = transactionId
+    transactionId  = transactionId,
+    escrowStatus   = escrowStatus.name.lowercase()
 )

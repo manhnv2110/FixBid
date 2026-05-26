@@ -12,7 +12,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -577,6 +576,14 @@ private fun JobDetailBottomBar(
                             else "Bạn đã đặt giá. Chờ khách phản hồi."
                         )
                     }
+                }
+
+                // Khách đã chọn thợ, đang chờ thanh toán
+                BookingStatus.AWAITING_PAYMENT -> {
+                    StatusInfoRow(
+                        isPositive = false,
+                        text = "Khách đang tiến hành thanh toán. Vui lòng chờ."
+                    )
                 }
 
                 // Thợ đã được chọn → vào làm việc

@@ -49,14 +49,31 @@ fun BiddingWorkersScreen(
     bookingId: String,
     onBackClick: () -> Unit,
     onWorkerClick: (String) -> Unit,
+    onNavigateToPayment: (String) -> Unit = {},
     viewModel: BiddingViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val selectedWorkerProfile by viewModel.selectedWorkerProfile.collectAsState()
     val isLoadingProfile by viewModel.isLoadingProfile.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     var showBottomSheet by remember { mutableStateOf(false) }
     var clickedBid by remember { mutableStateOf<Bid?>(null) }
+
+    // Collect events (navigation, toast)
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is BiddingEvent.Toast -> {
+                    android.widget.Toast.makeText(context, event.message, android.widget.Toast.LENGTH_SHORT).show()
+                }
+                is BiddingEvent.NavigateToPayment -> {
+                    showBottomSheet = false
+                    onNavigateToPayment(event.bookingId)
+                }
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
