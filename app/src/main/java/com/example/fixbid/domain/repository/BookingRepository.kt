@@ -1,5 +1,6 @@
 package com.example.fixbid.domain.repository
 
+import com.example.fixbid.domain.model.ServiceCategory
 import com.example.fixbid.domain.model.Booking
 import com.example.fixbid.domain.model.BookingStatus
 import com.example.fixbid.domain.model.Resource
@@ -10,36 +11,19 @@ interface BookingRepository {
     // Customer
     suspend fun createDirectBooking(booking: Booking): Resource<Booking>
     suspend fun createBiddingBooking(booking: Booking): Resource<Booking>
-    suspend fun getCustomerBookings(
-        customerId: String,
-        status: BookingStatus? = null
-    ): Resource<List<Booking>>
+    suspend fun getCustomerBookings(customerId: String, status: BookingStatus? = null): Resource<List<Booking>>
     suspend fun cancelBooking(bookingId: String, reason: String): Resource<Unit>
 
     // Worker
-    suspend fun getWorkerBookings(
-        workerId: String,
-        status: BookingStatus? = null
-    ): Resource<List<Booking>>
-    suspend fun getOpenJobRequests(
-        categories: List<com.example.fixbid.domain.model.ServiceCategory>? = null,
-        excludeBookingIds: List<String> = emptyList()
-    ): Resource<List<Booking>>
+    suspend fun getWorkerBookings(workerId: String, status: BookingStatus? = null): Resource<List<Booking>>
+    suspend fun getOpenJobRequests(categories: List<ServiceCategory>? = null, excludeBookingIds: List<String> = emptyList()): Resource<List<Booking>>
     suspend fun confirmBooking(bookingId: String): Resource<Booking>
     suspend fun startJob(bookingId: String): Resource<Booking>
     suspend fun completeJob(bookingId: String, workerNote: String?): Resource<Booking>
-    suspend fun submitJobCompletion(
-        bookingId: String,
-        completionNote: String?,
-        completionImageUrls: List<String>
-    ): Resource<Booking>
+    suspend fun submitJobCompletion(bookingId: String, completionNote: String?, completionImageUrls: List<String>): Resource<Booking>
 
     // Storage - upload completion images
-    suspend fun uploadCompletionImage(
-        bookingId: String,
-        imageBytes: ByteArray,
-        fileName: String
-    ): Resource<String>
+    suspend fun uploadCompletionImage(bookingId: String, imageBytes: ByteArray, fileName: String): Resource<String>
 
     // Customer – completion confirmation
     suspend fun confirmCompletion(bookingId: String): Resource<Booking>
@@ -47,5 +31,6 @@ interface BookingRepository {
 
     // Shared
     suspend fun getBookingById(bookingId: String): Resource<Booking>
+    suspend fun updateBookingStatus(bookingId: String, status: String): Resource<Booking>
     fun observeBooking(bookingId: String): Flow<Booking?>
 }

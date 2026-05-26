@@ -196,6 +196,20 @@ class BookingRepositoryImpl @Inject constructor(
             Resource.Success(result.toDomain())
         }.getOrElse { Resource.Error(it.message ?: "Không tìm thấy booking") }
 
+    override suspend fun updateBookingStatus(bookingId: String, status: String): Resource<Booking> =
+        runCatching {
+            val result = client.postgrest[Tables.BOOKINGS].update(
+                buildJsonObject {
+                    put("status", status)
+                    put("updated_at", java.time.Instant.now().toString())
+                }
+            ) {
+                filter { eq("id", bookingId) }
+                select(Columns.ALL)
+            }.decodeSingle<BookingDto>()
+            Resource.Success(result.toDomain())
+        }.getOrElse { Resource.Error(it.message ?: "Cập nhật trạng thái thất bại") }
+
     override fun observeBooking(bookingId: String): Flow<Booking?> {
         val channel = client.realtime.channel("booking_updates_$bookingId")
 
