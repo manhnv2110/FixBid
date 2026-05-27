@@ -1,9 +1,6 @@
 package com.example.fixbid.presentation.customer.chat
 
 import android.widget.Toast
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -12,7 +9,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,12 +21,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.fixbid.core.components.AppHeader
 import com.example.fixbid.core.utils.toFormattedDate
 import com.example.fixbid.domain.model.Message
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
     onBackClick: () -> Unit = {},
@@ -63,28 +59,21 @@ fun ChatScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            ChatTopBar(
-                workerName = viewModel.workerName,
-                onBackClick = onBackClick
-            )
-        },
-        bottomBar = {
-            ChatInputBar(
-                text = uiState.inputText,
-                onTextChange = viewModel::onInputChange,
-                onSend = viewModel::sendMessage,
-                isSending = uiState.isSending
-            )
-        },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        // Header xanh — đúng theo design chuẩn của app
+        AppHeader(
+            title = viewModel.workerName,
+            onBackClick = onBackClick,
+            backgroundColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary
+        )
+
+        // Messages area
+        Box(modifier = Modifier.weight(1f)) {
             when {
                 uiState.isLoading -> {
                     CircularProgressIndicator(
@@ -122,68 +111,33 @@ fun ChatScreen(
 
             // Error banner
             uiState.errorMessage?.let { err ->
-                AnimatedVisibility(
-                    visible = true,
-                    enter = fadeIn(),
-                    exit = fadeOut(),
+                Card(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .padding(12.dp)
+                        .padding(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text(
-                            text = err,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
+                    Text(
+                        text = err,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
             }
         }
-    }
-}
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ChatTopBar(
-    workerName: String,
-    onBackClick: () -> Unit
-) {
-    CenterAlignedTopAppBar(
-        title = {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = workerName,
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "Thợ sửa chữa",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        },
-        navigationIcon = {
-            IconButton(onClick = onBackClick) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Quay lại",
-                    tint = MaterialTheme.colorScheme.onSurface
-                )
-            }
-        },
-        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-            containerColor = MaterialTheme.colorScheme.surface
+        // Input bar
+        ChatInputBar(
+            text = uiState.inputText,
+            onTextChange = viewModel::onInputChange,
+            onSend = viewModel::sendMessage,
+            isSending = uiState.isSending
         )
-    )
+    }
 }
 
 @Composable

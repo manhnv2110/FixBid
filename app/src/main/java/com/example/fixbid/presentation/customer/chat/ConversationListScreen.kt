@@ -42,18 +42,20 @@ fun ConversationListScreen(
         modifier = Modifier.fillMaxSize()
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Title header
+            // Header xanh — chuẩn design app (giống BookingHistoryScreen)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface)
+                    .background(MaterialTheme.colorScheme.primary)
+                    .statusBarsPadding()
                     .padding(horizontal = 20.dp, vertical = 16.dp)
             ) {
                 Text(
                     text = "Tin nhắn",
-                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onPrimary,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    fontSize = 20.sp,
+                    modifier = Modifier.align(Alignment.Center)
                 )
             }
             HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
