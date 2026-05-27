@@ -10,11 +10,13 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun BottomNavbar(
     selectedIndex: Int,
-    onItemSelected: (Int) -> Unit
+    onItemSelected: (Int) -> Unit,
+    chatUnreadCount: Int = 0
 ) {
     val items = listOf(
         Triple("Trang chủ", Icons.Filled.Home, Icons.Outlined.Home),
         Triple("Lịch sử", Icons.Filled.History, Icons.Outlined.History),
+        Triple("Chat", Icons.Filled.ChatBubble, Icons.Outlined.ChatBubbleOutline),
         Triple("Hồ sơ", Icons.Filled.Person, Icons.Outlined.Person)
     )
 
@@ -27,10 +29,25 @@ fun BottomNavbar(
                 selected = selectedIndex == index,
                 onClick = { onItemSelected(index) },
                 icon = {
-                    Icon(
-                        imageVector = if (selectedIndex == index) activeIcon else inactiveIcon,
-                        contentDescription = label
-                    )
+                    if (index == 2 && chatUnreadCount > 0) {
+                        BadgedBox(
+                            badge = {
+                                Badge {
+                                    Text(if (chatUnreadCount > 9) "9+" else "$chatUnreadCount")
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = if (selectedIndex == index) activeIcon else inactiveIcon,
+                                contentDescription = label
+                            )
+                        }
+                    } else {
+                        Icon(
+                            imageVector = if (selectedIndex == index) activeIcon else inactiveIcon,
+                            contentDescription = label
+                        )
+                    }
                 },
                 label = { Text(label) },
                 colors = NavigationBarItemDefaults.colors(

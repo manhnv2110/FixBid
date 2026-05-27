@@ -13,6 +13,7 @@ interface ChatRepository {
     ): Resource<Conversation>
 
     suspend fun getConversations(userId: String): Resource<List<Conversation>>
+    suspend fun getMessages(conversationId: String): Resource<List<Message>>
     suspend fun sendMessage(message: Message): Resource<Message>
     suspend fun markAsRead(conversationId: String, userId: String): Resource<Unit>
     fun observeMessages(conversationId: String): Flow<List<Message>>

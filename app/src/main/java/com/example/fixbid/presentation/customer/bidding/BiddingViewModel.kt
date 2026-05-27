@@ -6,8 +6,10 @@ import androidx.lifecycle.viewModelScope
 import com.example.fixbid.domain.model.Bid
 import com.example.fixbid.domain.model.Resource
 import com.example.fixbid.domain.model.WorkerProfile
+import com.example.fixbid.domain.repository.AuthRepository
 import com.example.fixbid.domain.repository.BidRepository
 import com.example.fixbid.domain.repository.BookingRepository
+import com.example.fixbid.domain.repository.ChatRepository
 import com.example.fixbid.domain.repository.WorkerRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -28,6 +30,11 @@ sealed class BiddingUiState {
 sealed class BiddingEvent {
     data class Toast(val message: String) : BiddingEvent()
     data class NavigateToPayment(val bookingId: String) : BiddingEvent()
+    data class NavigateToChat(
+        val conversationId: String,
+        val workerId: String,
+        val workerName: String
+    ) : BiddingEvent()
 }
 
 @HiltViewModel
@@ -35,6 +42,8 @@ class BiddingViewModel @Inject constructor(
     private val bidRepository: BidRepository,
     private val bookingRepository: BookingRepository,
     private val workerRepository: WorkerRepository,
+    private val chatRepository: ChatRepository,
+    private val authRepository: AuthRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -116,6 +125,38 @@ class BiddingViewModel @Inject constructor(
                     loadBids()
                 }
                 is Resource.Loading -> { /* no-op */ }
+            }
+        }
+    }
+
+    /**
+     * Tạo hoặc mở cuộc trò chuyện với thợ, sau đó navigate sang ChatScreen.
+     */
+    fun openChatWithWorker(workerId: String, workerName: String) {
+        viewModelScope.launch {
+            val currentUser = authRepository.getCurrentUser()
+            val customerId = currentUser?.id ?: run {
+                _events.emit(BiddingEvent.Toast("Bạn cần đăng nhập để nhắn tin"))
+                return@launch
+            }
+            when (val result = chatRepository.getOrCreateConversation(
+                customerId = customerId,
+                workerId   = workerId,
+                bookingId  = bookingId.ifBlank { null }
+            )) {
+                is Resource.Success -> {
+                    _events.emit(
+                        BiddingEvent.NavigateToChat(
+                            conversationId = result.data.id,
+                            workerId       = workerId,
+                            workerName     = workerName
+                        )
+                    )
+                }
+                is Resource.Error -> {
+                    _events.emit(BiddingEvent.Toast(result.message))
+                }
+                is Resource.Loading -> {}
             }
         }
     }

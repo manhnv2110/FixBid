@@ -39,6 +39,18 @@ class ChatRepositoryImpl @Inject constructor(
         Resource.Success(result.toDomain())
     }.getOrElse { Resource.Error(it.message ?: "Gửi tin nhắn thất bại") }
 
+    override suspend fun getMessages(conversationId: String): Resource<List<Message>> =
+        runCatching {
+            val msgs = client.postgrest[Tables.MESSAGES]
+                .select(Columns.ALL) {
+                    filter { eq("conversation_id", conversationId) }
+                    order("created_at", Order.ASCENDING)
+                }
+                .decodeList<MessageDto>()
+                .map { it.toDomain() }
+            Resource.Success(msgs)
+        }.getOrElse { Resource.Error(it.message ?: "Lỗi tải tin nhắn") }
+
     override fun observeMessages(conversationId: String): Flow<List<Message>> {
         val channel = client.realtime.channel("messages_$conversationId")
         return channel

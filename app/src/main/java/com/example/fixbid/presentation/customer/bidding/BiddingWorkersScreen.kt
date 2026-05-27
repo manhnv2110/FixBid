@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Badge
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.Schedule
@@ -50,6 +51,7 @@ fun BiddingWorkersScreen(
     onBackClick: () -> Unit,
     onWorkerClick: (String) -> Unit,
     onNavigateToPayment: (String) -> Unit = {},
+    onNavigateToChat: (conversationId: String, workerId: String, workerName: String) -> Unit = { _, _, _ -> },
     viewModel: BiddingViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -70,6 +72,11 @@ fun BiddingWorkersScreen(
                 is BiddingEvent.NavigateToPayment -> {
                     showBottomSheet = false
                     onNavigateToPayment(event.bookingId)
+                }
+                is BiddingEvent.NavigateToChat -> {
+                    showBottomSheet = false
+                    viewModel.clearSelectedWorkerProfile()
+                    onNavigateToChat(event.conversationId, event.workerId, event.workerName)
                 }
             }
         }
@@ -204,6 +211,12 @@ fun BiddingWorkersScreen(
                             clickedBid?.let { viewModel.acceptBid(it.id) }
                             showBottomSheet = false
                             viewModel.clearSelectedWorkerProfile()
+                        },
+                        onChat = {
+                            clickedBid?.let {
+                                val name = it.worker?.fullName ?: "Thợ"
+                                viewModel.openChatWithWorker(it.workerId, name)
+                            }
                         }
                     )
                 }
@@ -383,7 +396,8 @@ private fun WorkerProfileBottomSheetContent(
     bid: Bid?,
     profile: WorkerProfile?,
     isLoading: Boolean,
-    onAccept: () -> Unit
+    onAccept: () -> Unit,
+    onChat: () -> Unit = {}
 ) {
     if (isLoading) {
         Box(
@@ -486,15 +500,12 @@ private fun WorkerProfileBottomSheetContent(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Rating
             StatCard(
                 icon = Icons.Outlined.Star,
                 value = "${profile.averageRating}",
                 label = "${profile.totalReviews} đánh giá",
                 modifier = Modifier.weight(1f)
             )
-
-            // Jobs Done
             StatCard(
                 icon = Icons.Outlined.TaskAlt,
                 value = "${profile.totalJobsDone}",
@@ -509,15 +520,12 @@ private fun WorkerProfileBottomSheetContent(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Experience
             StatCard(
                 icon = Icons.Outlined.Badge,
                 value = "${profile.experienceYears} năm",
                 label = "Kinh nghiệm",
                 modifier = Modifier.weight(1f)
             )
-
-            // Base rate
             val baseRateFormatted = NumberFormat.getNumberInstance(Locale("vi", "VN"))
                 .format(profile.pricePerHour.toLong()) + " đ/h"
             StatCard(
@@ -559,7 +567,7 @@ private fun WorkerProfileBottomSheetContent(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        androidx.compose.foundation.layout.FlowRow(
+        FlowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -574,19 +582,41 @@ private fun WorkerProfileBottomSheetContent(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Accept bid inside bottom sheet
-        if (bid.status == BidStatus.PENDING) {
-            Button(
-                onClick = onAccept,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                shape = RoundedCornerShape(12.dp)
+        // Action buttons row: Chat + Accept
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Chat button — always shown
+            OutlinedButton(
+                onClick = onChat,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
             ) {
-                Text(
-                    text = "Đồng ý thuê thợ này",
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(vertical = 4.dp)
+                Icon(
+                    imageVector = Icons.Outlined.ChatBubbleOutline,
+                    contentDescription = "Nhắn tin",
+                    modifier = Modifier.size(18.dp)
                 )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Nhắn tin", fontWeight = FontWeight.SemiBold)
+            }
+
+            // Accept button — only for pending bids
+            if (bid.status == BidStatus.PENDING) {
+                Button(
+                    onClick = onAccept,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = "Đồng ý thuê",
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                }
             }
         }
     }

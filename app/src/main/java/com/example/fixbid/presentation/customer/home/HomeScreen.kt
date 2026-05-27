@@ -28,6 +28,8 @@ import com.example.fixbid.core.components.PromoBanner
 import com.example.fixbid.core.components.SearchBar
 import com.example.fixbid.presentation.customer.history.BookingHistoryScreen
 import com.example.fixbid.presentation.customer.profile.ProfileScreen
+import com.example.fixbid.presentation.customer.chat.ConversationListScreen
+import com.example.fixbid.presentation.customer.chat.ConversationListViewModel
 import androidx.compose.runtime.saveable.rememberSaveable
 
 @Composable
@@ -39,13 +41,16 @@ fun HomeScreen(
     onPaymentClick: (String) -> Unit = {},
     onSignOut: () -> Unit = {},
     showHistoryTab: Boolean = false,
-    viewModel: HomeViewModel = hiltViewModel()
+    onChatConversationClick: (conversationId: String, workerId: String, workerName: String) -> Unit = { _, _, _ -> },
+    viewModel: HomeViewModel = hiltViewModel(),
+    chatListViewModel: ConversationListViewModel = hiltViewModel()
 ) {
 
     val uiState by viewModel.uiState.collectAsState()
+    val chatUnreadCount by chatListViewModel.unreadCount.collectAsState()
     var selectedNavIndex by rememberSaveable { mutableIntStateOf(0) }
 
-    // Switch to history tab when signaled
+    // Switch to history tab when signaled (History is still index 1)
     LaunchedEffect(showHistoryTab) {
         if (showHistoryTab) {
             selectedNavIndex = 1
@@ -57,7 +62,8 @@ fun HomeScreen(
         bottomBar = {
             BottomNavbar(
                 selectedIndex = selectedNavIndex,
-                onItemSelected = { selectedNavIndex = it }
+                onItemSelected = { selectedNavIndex = it },
+                chatUnreadCount = chatUnreadCount
             )
         },
         containerColor = MaterialTheme.colorScheme.background,
@@ -72,6 +78,12 @@ fun HomeScreen(
                 )
             }
             2 -> Box(modifier = Modifier.padding(innerPadding)) {
+                ConversationListScreen(
+                    onConversationClick = onChatConversationClick,
+                    viewModel = chatListViewModel
+                )
+            }
+            3 -> Box(modifier = Modifier.padding(innerPadding)) {
                 ProfileScreen(onSignOut = onSignOut)
             }
             else -> Column(

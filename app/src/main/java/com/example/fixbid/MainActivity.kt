@@ -31,6 +31,7 @@ import com.example.fixbid.presentation.auth.*
 import com.example.fixbid.presentation.customer.bidding.BiddingWorkersScreen
 import com.example.fixbid.presentation.customer.booking.BookingScreen
 import com.example.fixbid.presentation.customer.booking.BookingSuccessScreen
+import com.example.fixbid.presentation.customer.chat.ChatScreen
 import com.example.fixbid.presentation.customer.home.HomeScreen
 import com.example.fixbid.presentation.worker.home.WorkerHomeScreen
 import com.example.fixbid.presentation.notification.NotificationListScreen
@@ -230,7 +231,11 @@ fun FixBidNavHost(intent: android.content.Intent? = null) {
                         popUpTo(0) { inclusive = true }
                     }
                 },
-                showHistoryTab = showHistory
+                showHistoryTab = showHistory,
+                onChatConversationClick = { conversationId, workerId, workerName ->
+                    val encodedName = java.net.URLEncoder.encode(workerName, "UTF-8")
+                    navController.navigate("chat/$conversationId/$workerId/$encodedName")
+                }
             )
         }
 
@@ -330,6 +335,10 @@ fun FixBidNavHost(intent: android.content.Intent? = null) {
                 },
                 onNavigateToPayment = { bId ->
                     navController.navigate("payment/$bId")
+                },
+                onNavigateToChat = { conversationId, workerId, workerName ->
+                    val encodedName = java.net.URLEncoder.encode(workerName, "UTF-8")
+                    navController.navigate("chat/$conversationId/$workerId/$encodedName")
                 }
             )
         }
@@ -376,6 +385,20 @@ fun FixBidNavHost(intent: android.content.Intent? = null) {
 
         composable("notification_list") {
             NotificationListScreen(
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        // ─── Chat screen ──────────────────────────────────────────────────
+        composable(
+            route = "chat/{conversationId}/{workerId}/{workerName}",
+            arguments = listOf(
+                navArgument("conversationId") { type = NavType.StringType },
+                navArgument("workerId")       { type = NavType.StringType },
+                navArgument("workerName")     { type = NavType.StringType }
+            )
+        ) {
+            ChatScreen(
                 onBackClick = { navController.popBackStack() }
             )
         }
