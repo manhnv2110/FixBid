@@ -1,131 +1,73 @@
 package com.example.fixbid.presentation.customer.history
 
+import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.fixbid.ui.theme.BackgroundGray
-import com.example.fixbid.ui.theme.LightBlue
-import com.example.fixbid.ui.theme.PrimaryBlue
-import com.example.fixbid.ui.theme.TextPrimary
-import com.example.fixbid.ui.theme.TextSecondary
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.fixbid.core.utils.toFormattedDate
+import com.example.fixbid.core.utils.toRelativeTime
+import com.example.fixbid.domain.model.Booking
+import com.example.fixbid.domain.model.BookingStatus
+import com.example.fixbid.domain.model.ServiceCategory
+import com.example.fixbid.core.components.StatusPill
 import androidx.compose.runtime.saveable.rememberSaveable
-
-// ─── Stub data models ───────────────────────────────────────────────────────
-
-enum class BookingStatus(val label: String, val color: Color) {
-    BIDDING("Đang nhận báo giá", Color(0xFF00897B)),
-    CONFIRMED("Đã chọn thợ", Color(0xFF1565C0)),
-    CANCELLED("Đã huỷ", Color(0xFFB0BEC5)),
-    DONE("Hoàn thành", Color(0xFF43A047))
-}
-
-data class BookingItem(
-    val id: String,
-    val category: String,
-    val description: String,
-    val address: String,
-    val date: String,
-    val status: BookingStatus,
-    val bidCount: Int = 0,
-    val workerName: String? = null,
-    val finalPrice: String? = null
-)
-
-// Sample stub data – replace with real ViewModel / repository calls later
-private val sampleBooked = listOf(
-    BookingItem(
-        id = "1",
-        category = "Sửa điện",
-        description = "Đèn phòng khách chập chờn, cần kiểm tra lại toàn bộ hệ thống.",
-        address = "12 Nguyễn Trãi, Hà Nội",
-        date = "10/05/2026",
-        status = BookingStatus.BIDDING,
-        bidCount = 3
-    ),
-    BookingItem(
-        id = "2",
-        category = "Điều hòa",
-        description = "Điều hòa không lạnh, cần vệ sinh và nạp gas.",
-        address = "45 Lê Duẩn, Đà Nẵng",
-        date = "09/05/2026",
-        status = BookingStatus.CONFIRMED,
-        bidCount = 5,
-        workerName = "Anh Minh",
-        finalPrice = "200.000 đ"
-    ),
-    BookingItem(
-        id = "3",
-        category = "Khóa cửa",
-        description = "Mất chìa khóa, cần thay ổ khóa mới.",
-        address = "88 Trần Hưng Đạo, HCM",
-        date = "07/05/2026",
-        status = BookingStatus.CANCELLED
-    )
-)
-
-private val sampleDone = listOf(
-    BookingItem(
-        id = "4",
-        category = "Sửa ống nước",
-        description = "Ống nước nhà bếp bị rò, đã được thay mới hoàn toàn.",
-        address = "20 Bạch Đằng, Hà Nội",
-        date = "01/05/2026",
-        status = BookingStatus.DONE,
-        workerName = "Anh Tuấn",
-        finalPrice = "350.000 đ"
-    ),
-    BookingItem(
-        id = "5",
-        category = "Vệ sinh",
-        description = "Tổng vệ sinh căn hộ 2 phòng ngủ.",
-        address = "33 Điện Biên Phủ, HCM",
-        date = "25/04/2026",
-        status = BookingStatus.DONE,
-        workerName = "Chị Hoa",
-        finalPrice = "500.000 đ"
-    )
-)
-
-// ─── Screen ─────────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BookingHistoryScreen(
-    onBookingClick: (String) -> Unit
+    onBookingClick: (String) -> Unit,
+    onCompletionConfirmClick: (String) -> Unit = {},
+    onPaymentClick: (String) -> Unit = {},
+    viewModel: BookingHistoryViewModel = hiltViewModel()
 ) {
+    val uiState by viewModel.uiState.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
-    val tabs = listOf("Đã đặt", "Đã làm")
+    val tabs = listOf("Đang xử lý", "Hoàn thành")
+
+    // Auto refresh khi screen hiển thị lại
+    LaunchedEffect(Unit) {
+        viewModel.refresh()
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundGray)
+            .background(MaterialTheme.colorScheme.background)
     ) {
         // Header
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(PrimaryBlue)
+                .background(MaterialTheme.colorScheme.primary)
                 .statusBarsPadding()
                 .padding(horizontal = 20.dp, vertical = 16.dp)
         ) {
             Text(
-                text = "Lịch sử đặt lịch",
-                color = Color.White,
+                text = "Đơn dịch vụ",
+                color = MaterialTheme.colorScheme.onPrimary,
                 fontWeight = FontWeight.Bold,
                 fontSize = 20.sp,
                 modifier = Modifier.align(Alignment.Center)
@@ -135,54 +77,379 @@ fun BookingHistoryScreen(
         // Tab Row
         TabRow(
             selectedTabIndex = selectedTab,
-            containerColor = Color.White,
-            contentColor = PrimaryBlue,
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.primary,
             indicator = { tabPositions ->
                 TabRowDefaults.SecondaryIndicator(
                     Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                    color = PrimaryBlue
+                    height = 3.dp,
+                    color = MaterialTheme.colorScheme.primary
                 )
+            },
+            divider = {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
             }
         ) {
             tabs.forEachIndexed { index, title ->
+                val count = when (val state = uiState) {
+                    is HistoryUiState.Success -> {
+                        if (index == 0) state.activeBookings.size else state.completedBookings.size
+                    }
+                    else -> 0
+                }
                 Tab(
                     selected = selectedTab == index,
                     onClick = { selectedTab = index },
                     text = {
-                        Text(
-                            text = title,
-                            fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
-                            color = if (selectedTab == index) PrimaryBlue else TextSecondary
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = title,
+                                fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
+                                color = if (selectedTab == index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 14.sp
+                            )
+                            if (count > 0) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (selectedTab == index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = count.toString(),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (selectedTab == index) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
                     }
                 )
             }
         }
 
         // Content
-        val items = if (selectedTab == 0) sampleBooked else sampleDone
-
-        if (items.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Chưa có dịch vụ nào", color = TextSecondary)
+        when (val state = uiState) {
+            is HistoryUiState.Loading -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, strokeWidth = 3.dp)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("Đang tải...", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                    }
+                }
             }
-        } else {
-            LazyColumn(
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(
-                    items = items,
-                    key = { it.id }
-                ) { item ->
-                    BookingCard(
-                        item = item, 
-                        isDone = selectedTab == 1,
-                        onClick = {
-                            if (item.status == BookingStatus.BIDDING) {
-                                onBookingClick(item.id)
-                            }
+            is HistoryUiState.Error -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(32.dp)
+                    ) {
+                        Icon(
+                            Icons.Outlined.CloudOff,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            state.message,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 14.sp
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedButton(
+                            onClick = viewModel::loadBookings,
+                            shape = MaterialTheme.shapes.medium
+                        ) {
+                            Icon(Icons.Outlined.Refresh, null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Thử lại")
                         }
+                    }
+                }
+            }
+            is HistoryUiState.Success -> {
+                val items = if (selectedTab == 0) state.activeBookings else state.completedBookings
+
+                PullToRefreshBox(
+                    isRefreshing = isRefreshing,
+                    onRefresh = viewModel::refresh,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    if (items.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            EmptyState(isActive = selectedTab == 0)
+                        }
+                    } else {
+                        LazyColumn(
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(items = items, key = { it.id }) { booking ->
+                                BookingCard(
+                                    booking = booking,
+                                    isDone = selectedTab == 1,
+                                    onClick = {
+                                        when (booking.status) {
+                                            BookingStatus.BIDDING -> onBookingClick(booking.id)
+                                            BookingStatus.AWAITING_PAYMENT -> onPaymentClick(booking.id)
+                                            BookingStatus.PENDING_COMPLETION -> onCompletionConfirmClick(booking.id)
+                                            else -> { /* no action for other statuses */ }
+                                        }
+                                    }
+                                )
+                            }
+                            // Bottom spacing
+                            item { Spacer(modifier = Modifier.height(8.dp)) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyState(isActive: Boolean) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.padding(32.dp)
+    ) {
+        Icon(
+            imageVector = if (isActive) Icons.Outlined.Assignment else Icons.Outlined.CheckCircleOutline,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
+            modifier = Modifier.size(56.dp)
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = if (isActive) "Chưa có đơn nào đang xử lý" else "Chưa có đơn hoàn thành",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = if (isActive) "Đặt dịch vụ ngay để bắt đầu!" else "Các đơn hoàn thành sẽ hiển thị ở đây",
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.outline
+        )
+    }
+}
+
+@Composable
+private fun BookingCard(
+    booking: Booking,
+    isDone: Boolean,
+    onClick: () -> Unit
+) {
+    val statusInfo = getStatusInfo(booking.status)
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(
+                enabled = booking.status == BookingStatus.BIDDING ||
+                        booking.status == BookingStatus.AWAITING_PAYMENT ||
+                        booking.status == BookingStatus.PENDING_COMPLETION,
+                onClick = onClick
+            ),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Top: Category icon + name + status
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Category icon
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(MaterialTheme.shapes.medium)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = getCategoryIcon(booking.category),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = booking.category.displayName,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = booking.createdAt.toRelativeTime(),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                // Status badge
+                StatusPill(
+                    text = statusInfo.label,
+                    color = statusInfo.color
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Description
+            Text(
+                text = booking.description,
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                lineHeight = 18.sp
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Address row
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Outlined.LocationOn,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = booking.address,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            // Bottom section based on status
+            if (booking.status == BookingStatus.BIDDING) {
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Outlined.Gavel,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Đang chờ báo giá từ thợ",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    Icon(
+                        Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            if (booking.status == BookingStatus.PENDING_COMPLETION) {
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Outlined.CheckCircle,
+                            contentDescription = null,
+                            tint = statusInfo.color,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Thợ đã báo xong, bấm để xác nhận",
+                            fontSize = 12.sp,
+                            color = statusInfo.color,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    Icon(
+                        Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = statusInfo.color,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            if (isDone && booking.agreedPrice != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (booking.worker != null) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.tertiaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = booking.worker.fullName.first().toString(),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = booking.worker.fullName,
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                    Text(
+                        text = "${java.text.NumberFormat.getNumberInstance(java.util.Locale("vi", "VN")).format(booking.agreedPrice.toLong())} đ",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }
@@ -190,147 +457,32 @@ fun BookingHistoryScreen(
     }
 }
 
-// ─── Card ────────────────────────────────────────────────────────────────────
+private data class StatusInfo(val label: String, val color: Color)
 
 @Composable
-private fun BookingCard(
-    item: BookingItem, 
-    isDone: Boolean,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(enabled = !isDone && item.status == BookingStatus.BIDDING, onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // Top row: category + status badge
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = item.category,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = TextPrimary
-                )
-                StatusBadge(status = item.status)
-            }
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Text(
-                text = item.description,
-                fontSize = 13.sp,
-                color = TextSecondary,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Address & date row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "📍 ${item.address}",
-                    fontSize = 12.sp,
-                    color = TextSecondary,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = item.date,
-                    fontSize = 12.sp,
-                    color = TextSecondary
-                )
-            }
-
-            // Bid info (only in "Đã đặt" tab)
-            if (!isDone && item.bidCount > 0) {
-                Spacer(modifier = Modifier.height(10.dp))
-                HorizontalDivider(color = Color(0xFFF0F0F0))
-                Spacer(modifier = Modifier.height(10.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(LightBlue)
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        Text(
-                            text = "${item.bidCount} báo giá",
-                            fontSize = 12.sp,
-                            color = PrimaryBlue,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                    if (item.workerName != null) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Đã chọn: ${item.workerName}",
-                            fontSize = 12.sp,
-                            color = TextSecondary
-                        )
-                    }
-                }
-            }
-
-            // Completed or Confirmed info (for "Đã làm" tab or CONFIRMED status)
-            if (isDone || item.status == BookingStatus.CONFIRMED) {
-                Spacer(modifier = Modifier.height(10.dp))
-                HorizontalDivider(color = Color(0xFFF0F0F0))
-                Spacer(modifier = Modifier.height(10.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (item.workerName != null) {
-                        Text(
-                            text = "🔧 Thợ: ${item.workerName}",
-                            fontSize = 12.sp,
-                            color = TextSecondary
-                        )
-                    }
-                    if (item.finalPrice != null) {
-                        Text(
-                            text = item.finalPrice,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = PrimaryBlue
-                        )
-                    }
-                }
-            }
-        }
+private fun getStatusInfo(status: BookingStatus): StatusInfo {
+    val isDark = isSystemInDarkTheme()
+    return when (status) {
+        BookingStatus.BIDDING -> StatusInfo("Chờ báo giá", if (isDark) Color(0xFF4DB6AC) else Color(0xFF00897B))
+        BookingStatus.AWAITING_PAYMENT -> StatusInfo("Chờ thanh toán", if (isDark) Color(0xFFFFB74D) else Color(0xFFF57C00))
+        BookingStatus.PENDING -> StatusInfo("Chờ xác nhận", if (isDark) Color(0xFFFFD54F) else Color(0xFFFFA000))
+        BookingStatus.CONFIRMED -> StatusInfo("Đã xác nhận", if (isDark) Color(0xFF64B5F6) else Color(0xFF1565C0))
+        BookingStatus.IN_PROGRESS -> StatusInfo("Đang làm", if (isDark) Color(0xFFBA68C8) else Color(0xFF6A1B9A))
+        BookingStatus.PENDING_COMPLETION -> StatusInfo("Chờ xác nhận hoàn thành", if (isDark) Color(0xFFFF8A65) else Color(0xFFE65100))
+        BookingStatus.COMPLETED -> StatusInfo("Hoàn thành", if (isDark) Color(0xFF81C784) else Color(0xFF43A047))
+        BookingStatus.CANCELLED -> StatusInfo("Đã huỷ", if (isDark) Color(0xFFCFD8DC) else Color(0xFFB0BEC5))
+        BookingStatus.DISPUTED -> StatusInfo("Tranh chấp", if (isDark) Color(0xFFE57373) else Color(0xFFD32F2F))
     }
 }
 
-// ─── Status badge ────────────────────────────────────────────────────────────
-
-@Composable
-private fun StatusBadge(status: BookingStatus) {
-    val bgColor = status.color.copy(alpha = 0.12f)
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(bgColor)
-            .padding(horizontal = 10.dp, vertical = 4.dp)
-    ) {
-        Text(
-            text = status.label,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = status.color
-        )
-    }
+private fun getCategoryIcon(category: ServiceCategory): ImageVector = when (category) {
+    ServiceCategory.PLUMBING -> Icons.Outlined.Plumbing
+    ServiceCategory.ELECTRICAL -> Icons.Outlined.ElectricalServices
+    ServiceCategory.CARPENTRY -> Icons.Outlined.Carpenter
+    ServiceCategory.AIR_CONDITIONING -> Icons.Outlined.AcUnit
+    ServiceCategory.APPLIANCE_REPAIR -> Icons.Outlined.Kitchen
+    ServiceCategory.CLEANING -> Icons.Outlined.CleaningServices
+    ServiceCategory.LOCKSMITH -> Icons.Outlined.Lock
+    ServiceCategory.ROOFING -> Icons.Outlined.Roofing
+    ServiceCategory.OTHER -> Icons.Outlined.Build
 }

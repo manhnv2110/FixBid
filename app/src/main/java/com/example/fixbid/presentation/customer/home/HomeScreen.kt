@@ -18,7 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.fixbid.core.utils.ServiceCategoryMapper
 import com.example.fixbid.domain.model.ServiceCategory
 import com.example.fixbid.core.components.BottomNavbar
@@ -26,23 +26,31 @@ import com.example.fixbid.core.components.CategoryGrid
 import com.example.fixbid.core.components.NotificationCard
 import com.example.fixbid.core.components.PromoBanner
 import com.example.fixbid.core.components.SearchBar
-import com.example.fixbid.ui.theme.BackgroundGray
-import com.example.fixbid.ui.theme.PrimaryBlue
-import com.example.fixbid.ui.theme.TextPrimary
 import com.example.fixbid.presentation.customer.history.BookingHistoryScreen
-
+import com.example.fixbid.presentation.customer.profile.ProfileScreen
 import androidx.compose.runtime.saveable.rememberSaveable
 
-@Preview
 @Composable
 fun HomeScreen(
-    onCategoryClick: (ServiceCategory) -> Unit,
-    onNotificationClick: () -> Unit,
-    onBookingClick: (String) -> Unit,
+    onCategoryClick: (ServiceCategory) -> Unit = {},
+    onNotificationClick: () -> Unit = {},
+    onBookingClick: (String) -> Unit = {},
+    onCompletionConfirmClick: (String) -> Unit = {},
+    onPaymentClick: (String) -> Unit = {},
+    onSignOut: () -> Unit = {},
+    showHistoryTab: Boolean = false,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
+
     val uiState by viewModel.uiState.collectAsState()
     var selectedNavIndex by rememberSaveable { mutableIntStateOf(0) }
+
+    // Switch to history tab when signaled
+    LaunchedEffect(showHistoryTab) {
+        if (showHistoryTab) {
+            selectedNavIndex = 1
+        }
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -52,12 +60,19 @@ fun HomeScreen(
                 onItemSelected = { selectedNavIndex = it }
             )
         },
-        containerColor = BackgroundGray,
+        containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { innerPadding ->
         when (selectedNavIndex) {
             1 -> Box(modifier = Modifier.padding(innerPadding)) {
-                BookingHistoryScreen(onBookingClick = onBookingClick)
+                BookingHistoryScreen(
+                    onBookingClick = onBookingClick,
+                    onCompletionConfirmClick = onCompletionConfirmClick,
+                    onPaymentClick = onPaymentClick
+                )
+            }
+            2 -> Box(modifier = Modifier.padding(innerPadding)) {
+                ProfileScreen(onSignOut = onSignOut)
             }
             else -> Column(
                 modifier = Modifier.fillMaxSize()
@@ -99,7 +114,7 @@ private fun HomeHeader(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(PrimaryBlue)
+            .background(MaterialTheme.colorScheme.primary)
             .statusBarsPadding()
             .padding(horizontal = 20.dp)
             .padding(top = 16.dp, bottom = 24.dp)
@@ -113,13 +128,13 @@ private fun HomeHeader(
                 Icon(
                     imageVector = Icons.Outlined.LocationOn,
                     contentDescription = "Vị trí",
-                    tint = Color.White,
+                    tint = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = "Hà Nội",      // TODO: lấy từ GPS thực tế
-                    color = Color.White,
+                    text = "Hà Nội",
+                    color = MaterialTheme.colorScheme.onPrimary,
                     fontWeight = FontWeight.Medium,
                     fontSize = 16.sp
                 )
@@ -128,7 +143,7 @@ private fun HomeHeader(
                 Icon(
                     imageVector = Icons.Outlined.Notifications,
                     contentDescription = "Thông báo",
-                    tint = Color.White
+                    tint = MaterialTheme.colorScheme.onPrimary
                 )
             }
         }
@@ -137,7 +152,7 @@ private fun HomeHeader(
 
         Text(
             text = "Bạn cần giúp gì nào?",
-            color = Color.White,
+            color = MaterialTheme.colorScheme.onPrimary,
             fontWeight = FontWeight.Bold,
             fontSize = 22.sp
         )
@@ -169,7 +184,6 @@ private fun NotificationSection(
             )
         }
         is NotificationUiState.Success -> {
-            // Chỉ hiển thị 3 thông báo mới nhất trên HomeScreen
             val recent = state.notifications
                 .filter { !it.isRead }
                 .take(3)
@@ -209,7 +223,7 @@ private fun CategorySection(
             text = "Danh mục dịch vụ",
             fontWeight = FontWeight.Bold,
             fontSize = 18.sp,
-            color = TextPrimary
+            color = MaterialTheme.colorScheme.onSurface
         )
 
         Spacer(modifier = Modifier.height(12.dp))

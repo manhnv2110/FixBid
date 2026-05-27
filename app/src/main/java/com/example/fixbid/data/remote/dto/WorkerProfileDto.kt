@@ -24,7 +24,7 @@ data class WorkerProfileDto(
     fun toDomain() = WorkerProfile(
         userId = userId,
         bio = bio,
-        skills = skills.mapNotNull { runCatching { ServiceCategory.valueOf(it) }.getOrNull() },
+        skills = skills.mapNotNull { runCatching { ServiceCategory.valueOf(it.uppercase()) }.getOrNull() },
         experienceYears = experienceYears,
         pricePerHour = pricePerHour,
         location = location,

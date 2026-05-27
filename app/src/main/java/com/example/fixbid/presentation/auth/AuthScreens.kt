@@ -13,9 +13,11 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -54,17 +56,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.fixbid.domain.model.UserRole
-import com.example.fixbid.ui.theme.AccentGreen
-import com.example.fixbid.ui.theme.AuthBackground
-import com.example.fixbid.ui.theme.AuthBorder
-import com.example.fixbid.ui.theme.AuthMuted
-import com.example.fixbid.ui.theme.AuthSurface
 import com.example.fixbid.ui.theme.FixBidTheme
-import com.example.fixbid.ui.theme.LightBlue
-import com.example.fixbid.ui.theme.PrimaryBlue
-import com.example.fixbid.ui.theme.TextPrimary
-import com.example.fixbid.ui.theme.TextSecondary
-import com.example.fixbid.ui.theme.White
 
 // ─── WelcomeScreen ─────────────────────────────────────────────────────────────
 
@@ -74,7 +66,7 @@ fun WelcomeScreen(
     onCreateAccount: () -> Unit
 ) {
     Scaffold(
-        containerColor = AuthBackground,
+        containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets.safeDrawing
     ) { padding ->
         Column(
@@ -85,7 +77,7 @@ fun WelcomeScreen(
         ) {
             Text(
                 text = "Chào mừng",
-                color = AuthMuted,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp
             )
 
@@ -98,7 +90,7 @@ fun WelcomeScreen(
             Text(
                 text = "Sửa nhanh, giá minh bạch",
                 style = MaterialTheme.typography.headlineMedium,
-                color = TextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -106,7 +98,7 @@ fun WelcomeScreen(
             Text(
                 text = "Đặt thợ sửa chữa chuyên nghiệp chỉ với vài bước. " +
                     "Tạo tài khoản hoặc đăng nhập để tiếp tục.",
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 14.sp,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
@@ -127,10 +119,10 @@ fun WelcomeScreen(
                     .fillMaxWidth()
                     .height(52.dp),
                 shape = RoundedCornerShape(14.dp),
-                border = BorderStroke(1.dp, PrimaryBlue),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
                 colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = White,
-                    contentColor = PrimaryBlue
+                    containerColor = Color.Transparent,
+                    contentColor = MaterialTheme.colorScheme.primary
                 )
             ) {
                 Text(
@@ -152,12 +144,12 @@ fun WelcomeScreen(
                     .fillMaxWidth()
                     .height(52.dp),
                 shape = RoundedCornerShape(14.dp),
-                border = BorderStroke(1.dp, AuthBorder),
-                colors = ButtonDefaults.outlinedButtonColors(containerColor = White)
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.Transparent)
             ) {
                 AuthSocialIcon(label = "G", contentColor = Color(0xFF4285F4))
                 Spacer(modifier = Modifier.width(10.dp))
-                Text("Tiếp tục với Google", color = TextPrimary)
+                Text("Tiếp tục với Google", color = MaterialTheme.colorScheme.onSurface)
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -178,21 +170,22 @@ fun LoginScreen(
     onBack: () -> Unit
 ) {
     Scaffold(
-        containerColor = AuthBackground,
-        contentWindowInsets = WindowInsets.safeDrawing
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets.systemBars
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
+                .imePadding()
                 .padding(horizontal = 24.dp, vertical = 16.dp)
         ) {
             IconButton(onClick = onBack) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
                     contentDescription = "Quay lại",
-                    tint = TextSecondary
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -203,12 +196,12 @@ fun LoginScreen(
             Text(
                 text = "Đăng nhập",
                 style = MaterialTheme.typography.headlineMedium,
-                color = TextPrimary
+                color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = "Nhập email hoặc số điện thoại và mật khẩu của bạn",
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 14.sp
             )
 
@@ -244,7 +237,7 @@ fun LoginScreen(
 
             Text(
                 text = "Quên mật khẩu?",
-                color = PrimaryBlue,
+                color = MaterialTheme.colorScheme.primary,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier
@@ -271,10 +264,10 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center
             ) {
-                Text("Chưa có tài khoản? ", color = TextSecondary, fontSize = 13.sp)
+                Text("Chưa có tài khoản? ", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                 Text(
                     text = "Đăng ký ngay",
-                    color = PrimaryBlue,
+                    color = MaterialTheme.colorScheme.primary,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.clickable { onGoToRegister() }
@@ -301,21 +294,22 @@ fun RegisterScreen(
     onBack: () -> Unit
 ) {
     Scaffold(
-        containerColor = AuthBackground,
-        contentWindowInsets = WindowInsets.safeDrawing
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets.systemBars
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
+                .imePadding()
                 .padding(horizontal = 24.dp, vertical = 16.dp)
         ) {
             IconButton(onClick = onBack) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
                     contentDescription = "Quay lại",
-                    tint = TextSecondary
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -326,12 +320,12 @@ fun RegisterScreen(
             Text(
                 text = "Tạo tài khoản",
                 style = MaterialTheme.typography.headlineMedium,
-                color = TextPrimary
+                color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = "Điền thông tin bên dưới để bắt đầu sử dụng FixBid",
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 14.sp
             )
 
@@ -384,11 +378,15 @@ fun RegisterScreen(
                 value = state.password,
                 onValueChange = onPasswordChange,
                 label = "Mật khẩu",
-                placeholder = "Tối thiểu 6 ký tự",
+                placeholder = "Tối thiểu 8 ký tự",
                 leadingIcon = Icons.Outlined.Lock,
                 isPassword = true,
                 enabled = !state.isSubmitting
             )
+
+            if (state.password.isNotEmpty()) {
+                PasswordRequirementsList(password = state.password)
+            }
 
             Spacer(modifier = Modifier.height(14.dp))
 
@@ -403,7 +401,16 @@ fun RegisterScreen(
                 enabled = !state.isSubmitting
             )
 
-            AuthErrorText(message = state.errorMessage)
+            if (state.confirmPassword.isNotEmpty()) {
+                ConfirmPasswordRequirement(isMatched = state.password == state.confirmPassword)
+            }
+
+            val displayError = if (state.errorMessage?.contains("weak_password", ignoreCase = true) == true) {
+                "Mật khẩu chưa đủ mạnh. Vui lòng kiểm tra các yêu cầu bên trên."
+            } else {
+                state.errorMessage
+            }
+            AuthErrorText(message = displayError)
 
             Spacer(modifier = Modifier.height(14.dp))
 
@@ -415,15 +422,15 @@ fun RegisterScreen(
                     checked = state.acceptedTerms,
                     onCheckedChange = onAcceptTermsChange,
                     enabled = !state.isSubmitting,
-                    colors = CheckboxDefaults.colors(checkedColor = PrimaryBlue)
+                    colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
                 )
                 val termsText = buildAnnotatedString {
-                    withStyle(SpanStyle(color = TextSecondary)) { append("Tôi đồng ý với ") }
-                    withStyle(SpanStyle(color = PrimaryBlue, fontWeight = FontWeight.SemiBold)) {
+                    withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append("Tôi đồng ý với ") }
+                    withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)) {
                         append("Điều khoản")
                     }
-                    withStyle(SpanStyle(color = TextSecondary)) { append(" và ") }
-                    withStyle(SpanStyle(color = PrimaryBlue, fontWeight = FontWeight.SemiBold)) {
+                    withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append(" và ") }
+                    withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)) {
                         append("Chính sách bảo mật")
                     }
                 }
@@ -445,10 +452,10 @@ fun RegisterScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center
             ) {
-                Text("Đã có tài khoản? ", color = TextSecondary, fontSize = 13.sp)
+                Text("Đã có tài khoản? ", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                 Text(
                     text = "Đăng nhập",
-                    color = PrimaryBlue,
+                    color = MaterialTheme.colorScheme.primary,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.clickable { onGoToLogin() }
@@ -469,7 +476,7 @@ private fun RolePicker(
     Column {
         Text(
             text = "Bạn là?",
-            color = TextSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium
         )
@@ -507,8 +514,8 @@ private fun RoleOption(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val border = if (selected) PrimaryBlue else AuthBorder
-    val background = if (selected) LightBlue else AuthSurface
+    val border = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+    val background = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
     Column(
         modifier = modifier
             .clip(shape = RoundedCornerShape(14.dp))
@@ -520,7 +527,7 @@ private fun RoleOption(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = title,
-                color = TextPrimary,
+                color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f)
@@ -529,7 +536,7 @@ private fun RoleOption(
                 Icon(
                     imageVector = Icons.Outlined.CheckCircle,
                     contentDescription = null,
-                    tint = PrimaryBlue,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(18.dp)
                 )
             }
@@ -537,7 +544,7 @@ private fun RoleOption(
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = description,
-            color = TextSecondary,
+            color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 12.sp
         )
     }
@@ -555,7 +562,7 @@ fun OtpVerificationScreen(
     onBack: () -> Unit
 ) {
     Scaffold(
-        containerColor = AuthBackground,
+        containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets.safeDrawing
     ) { padding ->
         Column(
@@ -568,7 +575,7 @@ fun OtpVerificationScreen(
                 Icon(
                     imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
                     contentDescription = "Quay lại",
-                    tint = TextSecondary
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -579,7 +586,7 @@ fun OtpVerificationScreen(
             Text(
                 text = "Nhập mã xác thực",
                 style = MaterialTheme.typography.headlineMedium,
-                color = TextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -587,7 +594,7 @@ fun OtpVerificationScreen(
             val destinationLabel = if (state.method == AuthMethod.Email) "email" else "số điện thoại"
             Text(
                 text = "Chúng tôi đã gửi mã xác thực tới $destinationLabel của bạn",
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 14.sp,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
@@ -602,14 +609,14 @@ fun OtpVerificationScreen(
             ) {
                 Text(
                     text = state.sentTo,
-                    color = TextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "Chỉnh",
-                    color = AccentGreen,
+                    color = MaterialTheme.colorScheme.primary,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.clickable { onEditContact() }
@@ -659,7 +666,7 @@ fun ForgotPasswordScreen(
     onBack: () -> Unit
 ) {
     Scaffold(
-        containerColor = AuthBackground,
+        containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets.safeDrawing
     ) { padding ->
         Column(
@@ -672,7 +679,7 @@ fun ForgotPasswordScreen(
                 Icon(
                     imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
                     contentDescription = "Quay lại",
-                    tint = TextSecondary
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -683,12 +690,12 @@ fun ForgotPasswordScreen(
             Text(
                 text = "Quên mật khẩu",
                 style = MaterialTheme.typography.headlineMedium,
-                color = TextPrimary
+                color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = "Nhập email của bạn để nhận liên kết đặt lại mật khẩu",
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 14.sp
             )
 

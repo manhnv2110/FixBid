@@ -13,8 +13,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.fixbid.ui.theme.PrimaryBlue
-import com.example.fixbid.ui.theme.White
 import com.example.fixbid.R
 
 @Composable
@@ -22,7 +20,7 @@ fun PromoBanner(modifier: Modifier = Modifier) {
     Card(
         modifier  = modifier.fillMaxWidth().height(130.dp),
         shape     = RoundedCornerShape(16.dp),
-        colors    = CardDefaults.cardColors(containerColor = White),
+        colors    = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Row(
@@ -34,16 +32,16 @@ fun PromoBanner(modifier: Modifier = Modifier) {
         ) {
             Column {
                 Text(
-                    text       = "20% OFF",
+                    text       = "GIẢM 20%",
                     fontWeight = FontWeight.ExtraBold,
                     fontSize   = 24.sp,
-                    color      = PrimaryBlue
+                    color      = MaterialTheme.colorScheme.onPrimaryContainer
                 )
                 Text(
-                    text       = "For this Seasonal",
+                    text       = "Cho dịch vụ đầu tiên",
                     fontWeight = FontWeight.Medium,
                     fontSize   = 14.sp,
-                    color      = PrimaryBlue
+                    color      = MaterialTheme.colorScheme.onPrimaryContainer
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -53,16 +51,16 @@ fun PromoBanner(modifier: Modifier = Modifier) {
                         modifier           = Modifier.size(32.dp).padding(end = 6.dp)
                     )
                     Text(
-                        text       = "CODE : FIXEN",
+                        text       = "MÃ : FIXEN",
                         fontWeight = FontWeight.Bold,
                         fontSize   = 13.sp,
-                        color      = PrimaryBlue
+                        color      = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 }
             }
 
             Box(
-                modifier        = Modifier.width(130.dp).fillMaxHeight().background(White),
+                modifier        = Modifier.width(130.dp).fillMaxHeight().background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center
             ) {
                 Image(

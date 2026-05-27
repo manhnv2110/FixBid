@@ -1,0 +1,159 @@
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.bids (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  booking_id uuid NOT NULL,
+  worker_id uuid NOT NULL,
+  proposed_price numeric NOT NULL CHECK (proposed_price > 0::numeric),
+  estimated_duration_hours numeric NOT NULL DEFAULT 1,
+  message text NOT NULL,
+  status USER-DEFINED NOT NULL DEFAULT 'pending'::bid_status,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT bids_pkey PRIMARY KEY (id),
+  CONSTRAINT bids_booking_id_fkey FOREIGN KEY (booking_id) REFERENCES public.bookings(id),
+  CONSTRAINT bids_worker_id_fkey FOREIGN KEY (worker_id) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.bookings (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  customer_id uuid NOT NULL,
+  worker_id uuid,
+  category USER-DEFINED NOT NULL,
+  description text NOT NULL,
+  address text NOT NULL,
+  coordinates USER-DEFINED,
+  latitude double precision,
+  longitude double precision,
+  scheduled_at timestamp with time zone NOT NULL,
+  estimated_duration_hours numeric NOT NULL DEFAULT 1 CHECK (estimated_duration_hours > 0::numeric),
+  status USER-DEFINED NOT NULL DEFAULT 'pending'::booking_status,
+  type USER-DEFINED NOT NULL DEFAULT 'direct'::booking_type,
+  agreed_price numeric CHECK (agreed_price >= 0::numeric),
+  customer_note text,
+  worker_note text,
+  cancel_reason text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT bookings_pkey PRIMARY KEY (id),
+  CONSTRAINT bookings_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.profiles(id),
+  CONSTRAINT bookings_worker_id_fkey FOREIGN KEY (worker_id) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.conversations (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  customer_id uuid NOT NULL,
+  worker_id uuid NOT NULL,
+  booking_id uuid,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT conversations_pkey PRIMARY KEY (id),
+  CONSTRAINT conversations_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.profiles(id),
+  CONSTRAINT conversations_worker_id_fkey FOREIGN KEY (worker_id) REFERENCES public.profiles(id),
+  CONSTRAINT conversations_booking_id_fkey FOREIGN KEY (booking_id) REFERENCES public.bookings(id)
+);
+CREATE TABLE public.fcm_tokens (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  user_id uuid NOT NULL,
+  token text NOT NULL,
+  device_info text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT fcm_tokens_pkey PRIMARY KEY (id),
+  CONSTRAINT fcm_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.messages (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  conversation_id uuid NOT NULL,
+  sender_id uuid NOT NULL,
+  content text NOT NULL DEFAULT ''::text,
+  type USER-DEFINED NOT NULL DEFAULT 'text'::message_type,
+  image_url text,
+  is_read boolean NOT NULL DEFAULT false,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT messages_pkey PRIMARY KEY (id),
+  CONSTRAINT messages_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES public.conversations(id),
+  CONSTRAINT messages_sender_id_fkey FOREIGN KEY (sender_id) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.notifications (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  user_id uuid NOT NULL,
+  title text NOT NULL,
+  body text NOT NULL,
+  type USER-DEFINED NOT NULL,
+  reference_id uuid,
+  is_read boolean NOT NULL DEFAULT false,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT notifications_pkey PRIMARY KEY (id),
+  CONSTRAINT notifications_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.payments (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  booking_id uuid NOT NULL UNIQUE,
+  customer_id uuid NOT NULL,
+  worker_id uuid NOT NULL,
+  amount numeric NOT NULL CHECK (amount > 0::numeric),
+  platform_fee numeric NOT NULL DEFAULT 0,
+  worker_receives numeric NOT NULL,
+  method USER-DEFINED NOT NULL,
+  status USER-DEFINED NOT NULL DEFAULT 'pending'::payment_status,
+  transaction_id text,
+  paid_at timestamp with time zone,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT payments_pkey PRIMARY KEY (id),
+  CONSTRAINT payments_booking_id_fkey FOREIGN KEY (booking_id) REFERENCES public.bookings(id),
+  CONSTRAINT payments_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.profiles(id),
+  CONSTRAINT payments_worker_id_fkey FOREIGN KEY (worker_id) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.profiles (
+  id uuid NOT NULL,
+  email text,
+  full_name text NOT NULL,
+  phone_number text,
+  avatar_url text,
+  role USER-DEFINED NOT NULL DEFAULT 'customer'::user_role,
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT profiles_pkey PRIMARY KEY (id),
+  CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.reviews (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  booking_id uuid NOT NULL UNIQUE,
+  customer_id uuid NOT NULL,
+  worker_id uuid NOT NULL,
+  rating smallint NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  comment text,
+  image_urls ARRAY NOT NULL DEFAULT '{}'::text[],
+  worker_reply text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT reviews_pkey PRIMARY KEY (id),
+  CONSTRAINT reviews_booking_id_fkey FOREIGN KEY (booking_id) REFERENCES public.bookings(id),
+  CONSTRAINT reviews_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.profiles(id),
+  CONSTRAINT reviews_worker_id_fkey FOREIGN KEY (worker_id) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.spatial_ref_sys (
+  srid integer NOT NULL CHECK (srid > 0 AND srid <= 998999),
+  auth_name character varying,
+  auth_srid integer,
+  srtext character varying,
+  proj4text character varying,
+  CONSTRAINT spatial_ref_sys_pkey PRIMARY KEY (srid)
+);
+CREATE TABLE public.worker_profiles (
+  user_id uuid NOT NULL,
+  bio text NOT NULL DEFAULT ''::text,
+  skills ARRAY NOT NULL DEFAULT '{}'::service_category[],
+  experience_years integer NOT NULL DEFAULT 0 CHECK (experience_years >= 0),
+  price_per_hour numeric NOT NULL DEFAULT 0 CHECK (price_per_hour >= 0::numeric),
+  location text NOT NULL DEFAULT ''::text,
+  coordinates USER-DEFINED,
+  is_available boolean NOT NULL DEFAULT true,
+  average_rating numeric NOT NULL DEFAULT 0 CHECK (average_rating >= 0::numeric AND average_rating <= 5::numeric),
+  total_reviews integer NOT NULL DEFAULT 0 CHECK (total_reviews >= 0),
+  total_jobs_done integer NOT NULL DEFAULT 0 CHECK (total_jobs_done >= 0),
+  identity_verified boolean NOT NULL DEFAULT false,
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT worker_profiles_pkey PRIMARY KEY (user_id),
+  CONSTRAINT worker_profiles_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id)
+);

@@ -1,11 +1,17 @@
 package com.example.fixbid.di
 
-import com.example.fixbid.data.remote.supabase.createFixBidSupabaseClient
+import com.example.fixbid.BuildConfig
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.auth.Auth
+import io.github.jan.supabase.auth.FlowType
+import io.github.jan.supabase.createSupabaseClient
+import io.github.jan.supabase.postgrest.Postgrest
+import io.github.jan.supabase.realtime.Realtime
+import io.github.jan.supabase.storage.Storage
 import javax.inject.Singleton
 
 @Module
@@ -14,5 +20,18 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideSupabaseClient(): SupabaseClient = createFixBidSupabaseClient()
+    fun provideSupabaseClient(): SupabaseClient = createSupabaseClient(
+        supabaseUrl = BuildConfig.SUPABASE_URL,
+        supabaseKey = BuildConfig.SUPABASE_API_KEY
+    ) {
+        install(Auth) {
+            flowType = FlowType.PKCE
+            alwaysAutoRefresh = true
+        }
+        install(Postgrest) {
+            defaultSchema = "public"
+        }
+        install(Realtime)
+        install(Storage)
+    }
 }

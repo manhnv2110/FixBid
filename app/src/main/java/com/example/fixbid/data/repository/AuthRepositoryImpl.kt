@@ -13,6 +13,7 @@ import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.postgrest.from
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -25,7 +26,7 @@ class AuthRepositoryImpl @Inject constructor(
     override val currentUser: Flow<User?> =
         client.auth.sessionStatus.map { status ->
             if (status is SessionStatus.Authenticated) {
-                getCurrentUser()
+                fetchUserProfile()
             } else null
         }
 
@@ -45,7 +46,7 @@ class AuthRepositoryImpl @Inject constructor(
                 put("role",          role.name.lowercase())
             }
         }
-        val user = getCurrentUser() ?: return Resource.Error("Không thể tạo tài khoản")
+        val user = fetchUserProfile() ?: return Resource.Error("Không thể tạo tài khoản")
         Resource.Success(user)
     }.getOrElse { Resource.Error(it.message ?: "Đăng ký thất bại") }
 
@@ -57,7 +58,7 @@ class AuthRepositoryImpl @Inject constructor(
             this.email    = email
             this.password = password
         }
-        val user = getCurrentUser() ?: return Resource.Error("Đăng nhập thất bại")
+        val user = fetchUserProfile() ?: return Resource.Error("Đăng nhập thất bại")
         Resource.Success(user)
     }.getOrElse { Resource.Error(it.message ?: "Đăng nhập thất bại") }
 
@@ -71,17 +72,35 @@ class AuthRepositoryImpl @Inject constructor(
         Resource.Success(Unit)
     }.getOrElse { Resource.Error(it.message ?: "Lỗi") }
 
-    override suspend fun getCurrentUser(): User? = runCatching {
+    override suspend fun getCurrentUser(): User? {
+        // Đợi session load xong từ storage
+        awaitSession()
+        return fetchUserProfile()
+    }
+
+    override suspend fun updateProfile(user: User): Resource<User> = runCatching {
+        awaitSession()
+        client.from(Tables.PROFILES)
+            .update(user.toDto()) { filter { eq("id", user.id) } }
+        Resource.Success(user)
+    }.getOrElse { Resource.Error(it.message ?: "Cập nhật thất bại") }
+
+    /**
+     * Đợi cho đến khi session status không còn Initializing.
+     * Đảm bảo auth token đã sẵn sàng trước khi gọi postgrest.
+     */
+    private suspend fun awaitSession() {
+        client.auth.sessionStatus.first { it !is SessionStatus.Initializing }
+    }
+
+    /**
+     * Fetch profile từ DB. Chỉ gọi khi đã chắc chắn có session.
+     */
+    private suspend fun fetchUserProfile(): User? = runCatching {
         val userId = client.auth.currentUserOrNull()?.id ?: return null
         client.from(Tables.PROFILES)
             .select { filter { eq("id", userId) } }
             .decodeSingle<UserDto>()
             .toDomain()
     }.getOrNull()
-
-    override suspend fun updateProfile(user: User): Resource<User> = runCatching {
-        client.from(Tables.PROFILES)
-            .update(user.toDto()) { filter { eq("id", user.id) } }
-        Resource.Success(user)
-    }.getOrElse { Resource.Error(it.message ?: "Cập nhật thất bại") }
 }

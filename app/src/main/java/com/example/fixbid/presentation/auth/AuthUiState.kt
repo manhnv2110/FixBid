@@ -67,6 +67,7 @@ data class OtpFormState(
 data class AuthUiState(
     val isAuthenticated: Boolean = false,
     val isBootstrapping: Boolean = true,
+    val userRole: UserRole? = null,
     val login: LoginFormState = LoginFormState(),
     val register: RegisterFormState = RegisterFormState(),
     val forgotPassword: ForgotPasswordFormState = ForgotPasswordFormState(),

@@ -4,8 +4,9 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.fixbid.data.repository.ProfileRepository
-import com.example.fixbid.data.supabase
 import com.example.fixbid.domain.model.UserRole
+import dagger.hilt.android.lifecycle.HiltViewModel
+import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.OtpType
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
@@ -17,28 +18,25 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /**
  * One-shot navigation/signal events emitted by the auth flow.
  */
 sealed interface AuthEvent {
-    /** Opens the OTP verification screen after a successful sign-up request. */
     data object NavigateToOtp : AuthEvent
-
-    /** Opens the main app shell after a successful sign-in/verification. */
     data object NavigateToHome : AuthEvent
-
-    /** Pops back to the login screen (e.g. after password reset email sent). */
     data object NavigateBackToLogin : AuthEvent
-
-    /** Shows a transient snackbar/toast message. */
     data class Toast(val message: String) : AuthEvent
 }
 
-class AuthViewModel(
-    private val profileRepository: ProfileRepository = ProfileRepository()
+@HiltViewModel
+class AuthViewModel @Inject constructor(
+    private val profileRepository: ProfileRepository,
+    private val supabase: SupabaseClient
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AuthUiState())
@@ -51,14 +49,24 @@ class AuthViewModel(
 
     init {
         viewModelScope.launch {
-            val session = runCatching { supabase.auth.currentSessionOrNull() }.getOrNull()
+            // Đợi session load xong từ storage (không dùng currentSessionOrNull vì có thể chưa sẵn sàng)
+            val status = supabase.auth.sessionStatus.first { it !is io.github.jan.supabase.auth.status.SessionStatus.Initializing }
+            val isLoggedIn = status is io.github.jan.supabase.auth.status.SessionStatus.Authenticated
+            var role: UserRole? = null
+            if (isLoggedIn) {
+                val userId = supabase.auth.currentSessionOrNull()?.user?.id
+                if (userId != null) {
+                    role = profileRepository.getProfile(userId).getOrNull()?.role
+                }
+            }
             _uiState.update {
                 it.copy(
-                    isAuthenticated = session != null,
-                    isBootstrapping = false
+                    isAuthenticated = isLoggedIn,
+                    isBootstrapping = false,
+                    userRole = role
                 )
             }
-            if (session != null) {
+            if (isLoggedIn) {
                 _events.tryEmit(AuthEvent.NavigateToHome)
             }
         }
@@ -111,9 +119,6 @@ class AuthViewModel(
                     }
                     AuthMethod.Phone -> {
                         val phone = normalizePhone(identifier)
-                        // Try phone/password sign-in first; if the Supabase
-                        // phone provider isn't configured, fall back to
-                        // looking up the email registered with this phone.
                         runCatching {
                             supabase.auth.signInWith(Phone) {
                                 this.phone = phone
@@ -132,10 +137,15 @@ class AuthViewModel(
                     }
                 }
             }.onSuccess {
+                val userId = supabase.auth.currentSessionOrNull()?.user?.id
+                val role = if (userId != null) {
+                    profileRepository.getProfile(userId).getOrNull()?.role
+                } else null
                 _uiState.update {
                     it.copy(
                         login = it.login.copy(isSubmitting = false, password = ""),
-                        isAuthenticated = true
+                        isAuthenticated = true,
+                        userRole = role
                     )
                 }
                 _events.tryEmit(AuthEvent.NavigateToHome)
@@ -209,8 +219,6 @@ class AuthViewModel(
                 supabase.auth.signUpWith(Email) {
                     this.email = email
                     this.password = form.password
-                    // Stored on `auth.users.user_metadata` so a Supabase DB
-                    // trigger (or manual upsert below) can populate `profiles`.
                     data = buildJsonMetadata(
                         fullName = fullName,
                         phoneNumber = phone,
@@ -238,11 +246,8 @@ class AuthViewModel(
                 }
 
                 if (session != null) {
-                    // Email confirmation is disabled on this Supabase project,
-                    // so the user is already signed in. Write the profile row
-                    // and go straight to Home.
                     finalizeProfile(session.user?.id)
-                    _uiState.update { it.copy(isAuthenticated = true) }
+                    _uiState.update { it.copy(isAuthenticated = true, userRole = form.role) }
                     _events.tryEmit(AuthEvent.NavigateToHome)
                 } else {
                     startResendCountdown()
@@ -286,10 +291,12 @@ class AuthViewModel(
             }.onSuccess {
                 val userId = supabase.auth.currentSessionOrNull()?.user?.id
                 finalizeProfile(userId)
+                val role = _uiState.value.pendingRegistration?.role
                 _uiState.update {
                     it.copy(
                         otp = it.otp.copy(isVerifying = false, otp = ""),
                         isAuthenticated = true,
+                        userRole = role,
                         pendingRegistration = null
                     )
                 }
@@ -380,7 +387,7 @@ class AuthViewModel(
         }
     }
 
-    // ─── Sign out (for completeness / future use) ────────────────────────────
+    // ─── Sign out ─────────────────────────────────────────────────────────────
 
     fun signOut() {
         viewModelScope.launch {

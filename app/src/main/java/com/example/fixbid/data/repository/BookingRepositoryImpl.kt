@@ -17,6 +17,7 @@ import io.github.jan.supabase.realtime.PostgresAction
 import io.github.jan.supabase.postgrest.query.filter.FilterOperator
 import io.github.jan.supabase.realtime.channel
 import io.github.jan.supabase.realtime.decodeRecord
+import io.github.jan.supabase.storage.storage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.buildJsonObject
@@ -75,6 +76,27 @@ class BookingRepositoryImpl @Inject constructor(
         Resource.Success(result.map { it.toDomain() })
     }.getOrElse { Resource.Error(it.message ?: "Lỗi tải danh sách công việc") }
 
+    override suspend fun getOpenJobRequests(
+        categories: List<com.example.fixbid.domain.model.ServiceCategory>?,
+        excludeBookingIds: List<String>
+    ): Resource<List<Booking>> = runCatching {
+        val result = client.postgrest[Tables.BOOKINGS].select(Columns.ALL) {
+            filter {
+                eq("type", "bidding")
+                eq("status", "bidding")
+                filter("worker_id", FilterOperator.IS, "null")
+                if (!categories.isNullOrEmpty()) {
+                    val csv = categories.joinToString(",") { it.name.lowercase() }
+                    filter("category", FilterOperator.IN, "($csv)")
+                }
+            }
+            order("created_at", Order.DESCENDING)
+            limit(50)
+        }.decodeList<BookingDto>()
+        val excludeSet = excludeBookingIds.toSet()
+        Resource.Success(result.map { it.toDomain() }.filter { it.id !in excludeSet })
+    }.getOrElse { Resource.Error(it.message ?: "Lỗi tải danh sách yêu cầu") }
+
     override suspend fun confirmBooking(bookingId: String): Resource<Booking> =
         updateStatus(bookingId, BookingStatus.CONFIRMED)
 
@@ -85,9 +107,9 @@ class BookingRepositoryImpl @Inject constructor(
         runCatching {
             val result = client.postgrest[Tables.BOOKINGS].update(
                 buildJsonObject {
-                    put("status", "completed")
+                    put("status", "pending_completion")
                     workerNote?.let { put("worker_note", it) }
-                    put("updated_at", System.currentTimeMillis().toString())
+                    put("updated_at", java.time.Instant.now().toString())
                 }
             ) {
                 filter { eq("id", bookingId) }
@@ -95,6 +117,39 @@ class BookingRepositoryImpl @Inject constructor(
             }.decodeSingle<BookingDto>()
             Resource.Success(result.toDomain())
         }.getOrElse { Resource.Error(it.message ?: "Lỗi") }
+
+    override suspend fun submitJobCompletion(
+        bookingId: String,
+        completionNote: String?,
+        completionImageUrls: List<String>
+    ): Resource<Booking> = runCatching {
+        val result = client.postgrest[Tables.BOOKINGS].update(
+            buildJsonObject {
+                put("status", "pending_completion")
+                completionNote?.let { put("completion_note", it) }
+                put("completion_images", kotlinx.serialization.json.JsonArray(
+                    completionImageUrls.map { kotlinx.serialization.json.JsonPrimitive(it) }
+                ))
+                put("updated_at", java.time.Instant.now().toString())
+            }
+        ) {
+            filter { eq("id", bookingId) }
+            select(Columns.ALL)
+        }.decodeSingle<BookingDto>()
+        Resource.Success(result.toDomain())
+    }.getOrElse { Resource.Error(it.message ?: "Gửi hoàn thành thất bại") }
+
+    override suspend fun uploadCompletionImage(
+        bookingId: String,
+        imageBytes: ByteArray,
+        fileName: String
+    ): Resource<String> = runCatching {
+        val path = "completions/$bookingId/$fileName"
+        val bucket = client.storage.from("booking-images")
+        bucket.upload(path, imageBytes) { upsert = true }
+        val publicUrl = bucket.publicUrl(path)
+        Resource.Success(publicUrl)
+    }.getOrElse { Resource.Error(it.message ?: "Upload ảnh thất bại") }
 
     override suspend fun cancelBooking(bookingId: String, reason: String): Resource<Unit> =
         runCatching {
@@ -104,6 +159,35 @@ class BookingRepositoryImpl @Inject constructor(
             Resource.Success(Unit)
         }.getOrElse { Resource.Error(it.message ?: "Hủy thất bại") }
 
+    override suspend fun confirmCompletion(bookingId: String): Resource<Booking> =
+        runCatching {
+            val result = client.postgrest[Tables.BOOKINGS].update(
+                buildJsonObject {
+                    put("status", "completed")
+                    put("updated_at", java.time.Instant.now().toString())
+                }
+            ) {
+                filter { eq("id", bookingId) }
+                select(Columns.ALL)
+            }.decodeSingle<BookingDto>()
+            Resource.Success(result.toDomain())
+        }.getOrElse { Resource.Error(it.message ?: "Xác nhận hoàn thành thất bại") }
+
+    override suspend fun rejectCompletion(bookingId: String, reason: String): Resource<Booking> =
+        runCatching {
+            val result = client.postgrest[Tables.BOOKINGS].update(
+                buildJsonObject {
+                    put("status", "in_progress")
+                    put("customer_note", reason)
+                    put("updated_at", java.time.Instant.now().toString())
+                }
+            ) {
+                filter { eq("id", bookingId) }
+                select(Columns.ALL)
+            }.decodeSingle<BookingDto>()
+            Resource.Success(result.toDomain())
+        }.getOrElse { Resource.Error(it.message ?: "Từ chối hoàn thành thất bại") }
+
     override suspend fun getBookingById(bookingId: String): Resource<Booking> =
         runCatching {
             val result = client.postgrest[Tables.BOOKINGS]
@@ -111,6 +195,20 @@ class BookingRepositoryImpl @Inject constructor(
                 .decodeSingle<BookingDto>()
             Resource.Success(result.toDomain())
         }.getOrElse { Resource.Error(it.message ?: "Không tìm thấy booking") }
+
+    override suspend fun updateBookingStatus(bookingId: String, status: String): Resource<Booking> =
+        runCatching {
+            val result = client.postgrest[Tables.BOOKINGS].update(
+                buildJsonObject {
+                    put("status", status)
+                    put("updated_at", java.time.Instant.now().toString())
+                }
+            ) {
+                filter { eq("id", bookingId) }
+                select(Columns.ALL)
+            }.decodeSingle<BookingDto>()
+            Resource.Success(result.toDomain())
+        }.getOrElse { Resource.Error(it.message ?: "Cập nhật trạng thái thất bại") }
 
     override fun observeBooking(bookingId: String): Flow<Booking?> {
         val channel = client.realtime.channel("booking_updates_$bookingId")

@@ -1,7 +1,5 @@
 package com.example.fixbid.domain.model
 
-enum class UserRole { CUSTOMER, WORKER }
-
 data class User(
     val id: String,
     val email: String,
