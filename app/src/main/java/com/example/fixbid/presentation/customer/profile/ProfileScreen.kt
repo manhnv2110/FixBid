@@ -2,6 +2,7 @@ package com.example.fixbid.presentation.customer.profile
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -32,6 +33,7 @@ fun ProfileScreen(
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val currentTheme by viewModel.appTheme.collectAsState(initial = "system")
     val isDark = isSystemInDarkTheme()
 
     Column(
@@ -176,12 +178,6 @@ fun ProfileScreen(
                                     icon = Icons.Outlined.Person,
                                     label = "Họ và tên",
                                     value = user.fullName
-                                )
-
-                                ProfileInfoRow(
-                                    icon = Icons.Outlined.Badge,
-                                    label = "Vai trò",
-                                    value = user.role.displayName
                                 )
 
                                 Spacer(modifier = Modifier.height(4.dp))
@@ -349,18 +345,17 @@ fun ProfileScreen(
                     ) {
                         Column(modifier = Modifier.padding(vertical = 8.dp)) {
                             ProfileMenuItem(
-                                icon = Icons.Outlined.History,
-                                title = "Lịch sử đặt lịch",
-                                subtitle = "Xem các dịch vụ đã đặt"
+                                icon = Icons.Outlined.Payment,
+                                title = "Thanh toán",
+                                subtitle = "Quản lý phương thức thanh toán"
                             )
                             HorizontalDivider(
                                 modifier = Modifier.padding(horizontal = 20.dp),
                                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
                             )
-                            ProfileMenuItem(
-                                icon = Icons.Outlined.Payment,
-                                title = "Thanh toán",
-                                subtitle = "Quản lý phương thức thanh toán"
+                            ThemeSelectorMenuItem(
+                                currentTheme = currentTheme,
+                                onThemeChange = viewModel::saveTheme
                             )
                             HorizontalDivider(
                                 modifier = Modifier.padding(horizontal = 20.dp),
@@ -495,5 +490,96 @@ private fun ProfileMenuItem(
             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
             modifier = Modifier.size(20.dp)
         )
+    }
+}
+
+@Composable
+private fun ThemeSelectorMenuItem(
+    currentTheme: String,
+    onThemeChange: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    
+    val themeLabel = when (currentTheme) {
+        "light" -> "Sáng"
+        "dark" -> "Tối"
+        else -> "Theo thiết bị"
+    }
+    
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = true }
+                .padding(horizontal = 20.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Palette,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(22.dp)
+            )
+            Spacer(modifier = Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Giao diện ứng dụng",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Chế độ sáng, tối hoặc theo thiết bị",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = themeLabel,
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Icon(
+                    imageVector = Icons.Default.ArrowDropDown,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+        ) {
+            DropdownMenuItem(
+                text = { Text("Sáng", color = MaterialTheme.colorScheme.onSurface) },
+                leadingIcon = { Icon(Icons.Outlined.LightMode, null, tint = MaterialTheme.colorScheme.primary) },
+                onClick = {
+                    onThemeChange("light")
+                    expanded = false
+                }
+            )
+            DropdownMenuItem(
+                text = { Text("Tối", color = MaterialTheme.colorScheme.onSurface) },
+                leadingIcon = { Icon(Icons.Outlined.DarkMode, null, tint = MaterialTheme.colorScheme.primary) },
+                onClick = {
+                    onThemeChange("dark")
+                    expanded = false
+                }
+            )
+            DropdownMenuItem(
+                text = { Text("Theo thiết bị", color = MaterialTheme.colorScheme.onSurface) },
+                leadingIcon = { Icon(Icons.Outlined.Settings, null, tint = MaterialTheme.colorScheme.primary) },
+                onClick = {
+                    onThemeChange("system")
+                    expanded = false
+                }
+            )
+        }
     }
 }

@@ -21,6 +21,7 @@ class UserPreferencesDataStore @Inject constructor(
         val KEY_ROLE         = stringPreferencesKey("user_role")
         val KEY_USER_ID      = stringPreferencesKey("user_id")
         val KEY_FCM_TOKEN    = stringPreferencesKey("fcm_token")
+        val KEY_THEME        = stringPreferencesKey("app_theme")
     }
 
     val userRole: Flow<UserRole?> = context.dataStore.data.map { prefs ->
@@ -28,6 +29,8 @@ class UserPreferencesDataStore @Inject constructor(
     }
 
     val userId: Flow<String?> = context.dataStore.data.map { it[KEY_USER_ID] }
+
+    val appTheme: Flow<String> = context.dataStore.data.map { it[KEY_THEME] ?: "system" }
 
     suspend fun saveUserSession(userId: String, role: UserRole) {
         context.dataStore.edit {
@@ -42,5 +45,9 @@ class UserPreferencesDataStore @Inject constructor(
 
     suspend fun saveFcmToken(token: String) {
         context.dataStore.edit { it[KEY_FCM_TOKEN] = token }
+    }
+
+    suspend fun saveTheme(theme: String) {
+        context.dataStore.edit { it[KEY_THEME] = theme }
     }
 }

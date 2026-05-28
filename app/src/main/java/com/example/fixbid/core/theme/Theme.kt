@@ -63,9 +63,8 @@ private val DarkColorScheme = darkColorScheme(
 )
 
 @Composable
-fun SetStatusBarColor(darkIcons: Boolean) {
+fun SetStatusBarColor(darkIcons: Boolean, darkTheme: Boolean = isSystemInDarkTheme()) {
     val view = LocalView.current
-    val darkTheme = isSystemInDarkTheme()
     
     // In dark theme, status bar icons should always be light (not darkIcons)
     val appearanceLightIcons = if (darkTheme) false else darkIcons

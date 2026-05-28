@@ -7,8 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.*
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -19,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -35,22 +35,34 @@ import com.example.fixbid.presentation.customer.chat.ChatScreen
 import com.example.fixbid.presentation.customer.home.HomeScreen
 import com.example.fixbid.presentation.worker.home.WorkerHomeScreen
 import com.example.fixbid.presentation.notification.NotificationListScreen
+import com.example.fixbid.presentation.auth.AuthLogo
 import com.example.fixbid.ui.theme.FixBidTheme
 import com.example.fixbid.ui.theme.PrimaryBlue
+import javax.inject.Inject
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject
+    lateinit var userPreferencesDataStore: com.example.fixbid.data.local.UserPreferencesDataStore
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            FixBidTheme {
+            val appTheme by userPreferencesDataStore.appTheme.collectAsState(initial = "system")
+            val isDark = when (appTheme) {
+                "dark" -> true
+                "light" -> false
+                else -> androidx.compose.foundation.isSystemInDarkTheme()
+            }
+            FixBidTheme(darkTheme = isDark) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    FixBidNavHost(intent = intent)
+                    FixBidNavHost(isDark = isDark, intent = intent)
                 }
             }
         }
@@ -63,14 +75,24 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun FixBidNavHost(intent: android.content.Intent? = null) {
+fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
     val authViewModel: AuthViewModel = hiltViewModel()
     val uiState by authViewModel.uiState.collectAsState()
 
     // Show loading while bootstrapping (checking saved session)
     if (uiState.isBootstrapping) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = PrimaryBlue)
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                AuthLogo()
+                Spacer(modifier = Modifier.height(24.dp))
+                CircularProgressIndicator(color = PrimaryBlue)
+            }
         }
         return
     }
@@ -81,7 +103,7 @@ fun FixBidNavHost(intent: android.content.Intent? = null) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val needsLightIcons = currentRoute == "home" || currentRoute == "worker_home"
-    com.example.fixbid.ui.theme.SetStatusBarColor(darkIcons = !needsLightIcons)
+    com.example.fixbid.ui.theme.SetStatusBarColor(darkIcons = !needsLightIcons, darkTheme = isDark)
 
     // Listen to auth events for navigation
     LaunchedEffect(Unit) {

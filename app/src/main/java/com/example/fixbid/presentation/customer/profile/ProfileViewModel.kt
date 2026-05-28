@@ -2,10 +2,12 @@ package com.example.fixbid.presentation.customer.profile
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.fixbid.data.local.UserPreferencesDataStore
 import com.example.fixbid.domain.model.Resource
 import com.example.fixbid.domain.model.User
 import com.example.fixbid.domain.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,8 +27,17 @@ data class ProfileUiState(
 
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val userPreferencesDataStore: UserPreferencesDataStore
 ) : ViewModel() {
+
+    val appTheme: Flow<String> = userPreferencesDataStore.appTheme
+
+    fun saveTheme(theme: String) {
+        viewModelScope.launch {
+            userPreferencesDataStore.saveTheme(theme)
+        }
+    }
 
     private val _uiState = MutableStateFlow(ProfileUiState())
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()

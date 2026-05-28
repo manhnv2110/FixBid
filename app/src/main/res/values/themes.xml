@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
 
-    <style name="Theme.FixBid" parent="Theme.Material3.Light.NoActionBar" />
+    <style name="Theme.FixBid" parent="Theme.Material3.Light.NoActionBar">
+        <!-- Set window background to dark theme color to prevent the white flash on launch -->
+        <item name="android:windowBackground">#111418</item>
+        <!-- Set status/navigation bar to dark theme color to match the screen background -->
+        <item name="android:statusBarColor">#111418</item>
+        <item name="android:navigationBarColor">#111418</item>
+        <!-- Ensure status bar icons are light-colored -->
+        <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
+    </style>
 </resources>
