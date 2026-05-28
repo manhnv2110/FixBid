@@ -183,6 +183,10 @@ private fun JobDetailContent(
 
         DescriptionCard(booking = data.booking)
 
+        if (!data.booking.descriptionImages.isNullOrEmpty()) {
+            DescriptionImagesCard(images = data.booking.descriptionImages!!)
+        }
+
         InfoCard(booking = data.booking)
 
         data.myBid?.let { bid -> MyBidCard(bid = bid) }
@@ -388,6 +392,117 @@ private fun DescriptionCard(booking: Booking) {
                 color = MaterialTheme.colorScheme.onSurface,
                 lineHeight = 20.sp
             )
+        }
+    }
+}
+
+// ─── Description images (from customer) ──────────────────────────────────────────────
+
+@Composable
+private fun DescriptionImagesCard(images: List<String>) {
+    var selectedImage by remember { mutableStateOf<String?>(null) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.foundation.layout.Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Outlined.Photo,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text(
+                        text = "Ảnh mô tả công việc",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "${images.size} ảnh từ khách hàng",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                items(images) { url ->
+                    AsyncImage(
+                        model = url,
+                        contentDescription = "Ảnh mô tả",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(110.dp)
+                            .clip(MaterialTheme.shapes.medium)
+                            .border(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.outlineVariant,
+                                shape = MaterialTheme.shapes.medium
+                            )
+                            .clickable { selectedImage = url }
+                    )
+                }
+            }
+        }
+    }
+
+    // Full-screen image viewer dialog
+    selectedImage?.let { url ->
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { selectedImage = null }
+        ) {
+            androidx.compose.foundation.layout.Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(MaterialTheme.shapes.medium)
+                    .background(Color.Black)
+                    .clickable { selectedImage = null },
+                contentAlignment = Alignment.Center
+            ) {
+                AsyncImage(
+                    model = url,
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
+                )
+                androidx.compose.foundation.layout.Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.5f))
+                        .clickable { selectedImage = null },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Outlined.Close,
+                        contentDescription = "Đóng",
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
         }
     }
 }

@@ -25,6 +25,10 @@ interface BookingRepository {
     // Storage - upload completion images
     suspend fun uploadCompletionImage(bookingId: String, imageBytes: ByteArray, fileName: String): Resource<String>
 
+    // Storage - upload description images (khi khách tạo yêu cầu)
+    suspend fun uploadDescriptionImage(bookingId: String, imageBytes: ByteArray, fileName: String): Resource<String>
+    suspend fun updateDescriptionImages(bookingId: String, imageUrls: List<String>): Resource<Booking>
+
     // Customer – completion confirmation
     suspend fun confirmCompletion(bookingId: String): Resource<Booking>
     suspend fun rejectCompletion(bookingId: String, reason: String): Resource<Booking>

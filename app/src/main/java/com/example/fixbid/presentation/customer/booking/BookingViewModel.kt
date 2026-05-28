@@ -1,5 +1,6 @@
 package com.example.fixbid.presentation.customer.booking
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.fixbid.data.location.GeocoderRepository
@@ -46,6 +47,10 @@ class BookingViewModel @Inject constructor(
     private val _initialPhone = MutableStateFlow("")
     val initialPhone: StateFlow<String> = _initialPhone.asStateFlow()
 
+    // Ảnh mô tả công việc được chọn bởi người dùng
+    private val _descriptionImageUris = MutableStateFlow<List<Uri>>(emptyList())
+    val descriptionImageUris: StateFlow<List<Uri>> = _descriptionImageUris.asStateFlow()
+
     init {
         viewModelScope.launch {
             authRepository.getCurrentUser()?.let { user ->
@@ -53,6 +58,17 @@ class BookingViewModel @Inject constructor(
                 _initialPhone.value = user.phoneNumber ?: ""
             }
         }
+    }
+
+    fun onDescriptionImagesSelected(uris: List<Uri>) {
+        val current = _descriptionImageUris.value.toMutableList()
+        val remaining = 5 - current.size
+        current.addAll(uris.take(remaining))
+        _descriptionImageUris.value = current
+    }
+
+    fun removeDescriptionImage(uri: Uri) {
+        _descriptionImageUris.value = _descriptionImageUris.value.filter { it != uri }
     }
 
     fun createBooking(
@@ -64,7 +80,8 @@ class BookingViewModel @Inject constructor(
         notes: String,
         scheduledAtMillis: Long,
         latitude: Double? = null,
-        longitude: Double? = null
+        longitude: Double? = null,
+        imageResolver: (Uri) -> ByteArray?
     ) {
         viewModelScope.launch {
             _uiState.value = BookingUiState.Loading
@@ -115,6 +132,34 @@ class BookingViewModel @Inject constructor(
 
             when (val result = bookingRepository.createBiddingBooking(booking)) {
                 is Resource.Success -> {
+                    val createdBooking = result.data
+                    val selectedUris = _descriptionImageUris.value
+
+                    // Upload ảnh mô tả (nếu có)
+                    if (selectedUris.isNotEmpty()) {
+                        val uploadedUrls = mutableListOf<String>()
+                        selectedUris.forEachIndexed { index, uri ->
+                            val bytes = imageResolver(uri)
+                            if (bytes != null) {
+                                val fileName = "desc_${System.currentTimeMillis()}_$index.jpg"
+                                val uploadResult = bookingRepository.uploadDescriptionImage(
+                                    bookingId = createdBooking.id,
+                                    imageBytes = bytes,
+                                    fileName = fileName
+                                )
+                                if (uploadResult is Resource.Success) {
+                                    uploadedUrls.add(uploadResult.data)
+                                }
+                            }
+                        }
+                        if (uploadedUrls.isNotEmpty()) {
+                            bookingRepository.updateDescriptionImages(
+                                bookingId = createdBooking.id,
+                                imageUrls = uploadedUrls
+                            )
+                        }
+                    }
+
                     _uiState.value = BookingUiState.Success
                 }
                 is Resource.Error -> {

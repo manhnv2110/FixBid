@@ -151,6 +151,36 @@ class BookingRepositoryImpl @Inject constructor(
         Resource.Success(publicUrl)
     }.getOrElse { Resource.Error(it.message ?: "Upload ảnh thất bại") }
 
+    override suspend fun uploadDescriptionImage(
+        bookingId: String,
+        imageBytes: ByteArray,
+        fileName: String
+    ): Resource<String> = runCatching {
+        val path = "descriptions/$bookingId/$fileName"
+        val bucket = client.storage.from("booking-images")
+        bucket.upload(path, imageBytes) { upsert = true }
+        val publicUrl = bucket.publicUrl(path)
+        Resource.Success(publicUrl)
+    }.getOrElse { Resource.Error(it.message ?: "Upload ảnh mô tả thất bại") }
+
+    override suspend fun updateDescriptionImages(
+        bookingId: String,
+        imageUrls: List<String>
+    ): Resource<Booking> = runCatching {
+        val result = client.postgrest[Tables.BOOKINGS].update(
+            buildJsonObject {
+                put("description_images", kotlinx.serialization.json.JsonArray(
+                    imageUrls.map { kotlinx.serialization.json.JsonPrimitive(it) }
+                ))
+                put("updated_at", java.time.Instant.now().toString())
+            }
+        ) {
+            filter { eq("id", bookingId) }
+            select(Columns.ALL)
+        }.decodeSingle<BookingDto>()
+        Resource.Success(result.toDomain())
+    }.getOrElse { Resource.Error(it.message ?: "Cập nhật ảnh mô tả thất bại") }
+
     override suspend fun cancelBooking(bookingId: String, reason: String): Resource<Unit> =
         runCatching {
             client.postgrest[Tables.BOOKINGS].update(
