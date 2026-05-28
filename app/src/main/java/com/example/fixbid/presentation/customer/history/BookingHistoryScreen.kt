@@ -38,6 +38,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 @Composable
 fun BookingHistoryScreen(
     onBookingClick: (String) -> Unit,
+    onBiddingWorkersClick: (String) -> Unit,
     onCompletionConfirmClick: (String) -> Unit = {},
     onPaymentClick: (String) -> Unit = {},
     viewModel: BookingHistoryViewModel = hiltViewModel()
@@ -198,14 +199,10 @@ fun BookingHistoryScreen(
                                 BookingCard(
                                     booking = booking,
                                     isDone = selectedTab == 1,
-                                    onClick = {
-                                        when (booking.status) {
-                                            BookingStatus.BIDDING -> onBookingClick(booking.id)
-                                            BookingStatus.AWAITING_PAYMENT -> onPaymentClick(booking.id)
-                                            BookingStatus.PENDING_COMPLETION -> onCompletionConfirmClick(booking.id)
-                                            else -> { /* no action for other statuses */ }
-                                        }
-                                    }
+                                    onClick = { onBookingClick(booking.id) },
+                                    onBiddingWorkersClick = { onBiddingWorkersClick(booking.id) },
+                                    onPaymentClick = { onPaymentClick(booking.id) },
+                                    onCompletionConfirmClick = { onCompletionConfirmClick(booking.id) }
                                 )
                             }
                             // Bottom spacing
@@ -250,19 +247,17 @@ private fun EmptyState(isActive: Boolean) {
 private fun BookingCard(
     booking: Booking,
     isDone: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onBiddingWorkersClick: () -> Unit,
+    onPaymentClick: () -> Unit,
+    onCompletionConfirmClick: () -> Unit
 ) {
     val statusInfo = getStatusInfo(booking.status)
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(
-                enabled = booking.status == BookingStatus.BIDDING ||
-                        booking.status == BookingStatus.AWAITING_PAYMENT ||
-                        booking.status == BookingStatus.PENDING_COMPLETION,
-                onClick = onClick
-            ),
+            .clickable(onClick = onClick),
         shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
@@ -350,7 +345,12 @@ private fun BookingCard(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(onClick = onBiddingWorkersClick)
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f))
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -363,10 +363,10 @@ private fun BookingCard(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Đang chờ báo giá từ thợ",
+                            text = "Xem danh sách báo giá từ thợ",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.Bold
                         )
                     }
                     Icon(
@@ -378,12 +378,55 @@ private fun BookingCard(
                 }
             }
 
+            if (booking.status == BookingStatus.AWAITING_PAYMENT) {
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(onClick = onPaymentClick)
+                        .background(statusInfo.color.copy(alpha = 0.15f))
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Outlined.Payments,
+                            contentDescription = null,
+                            tint = statusInfo.color,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Bấm để tiến hành thanh toán",
+                            fontSize = 12.sp,
+                            color = statusInfo.color,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Icon(
+                        Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = statusInfo.color,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
             if (booking.status == BookingStatus.PENDING_COMPLETION) {
                 Spacer(modifier = Modifier.height(12.dp))
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(onClick = onCompletionConfirmClick)
+                        .background(statusInfo.color.copy(alpha = 0.15f))
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -399,7 +442,7 @@ private fun BookingCard(
                             text = "Thợ đã báo xong, bấm để xác nhận",
                             fontSize = 12.sp,
                             color = statusInfo.color,
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.Bold
                         )
                     }
                     Icon(

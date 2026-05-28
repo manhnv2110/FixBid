@@ -13,6 +13,8 @@ interface BookingRepository {
     suspend fun createBiddingBooking(booking: Booking): Resource<Booking>
     suspend fun getCustomerBookings(customerId: String, status: BookingStatus? = null): Resource<List<Booking>>
     suspend fun cancelBooking(bookingId: String, reason: String): Resource<Unit>
+    suspend fun deleteBooking(bookingId: String): Resource<Unit>
+    suspend fun updateBooking(booking: Booking): Resource<Booking>
 
     // Worker
     suspend fun getWorkerBookings(workerId: String, status: BookingStatus? = null): Resource<List<Booking>>

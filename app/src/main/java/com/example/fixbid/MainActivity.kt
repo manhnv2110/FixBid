@@ -218,6 +218,9 @@ fun FixBidNavHost(intent: android.content.Intent? = null) {
                 },
                 onNotificationClick = { navController.navigate("notification_list") },
                 onBookingClick = { bookingId ->
+                    navController.navigate("customer_booking_detail/$bookingId")
+                },
+                onBiddingWorkersClick = { bookingId ->
                     navController.navigate("bidding_workers/$bookingId")
                 },
                 onCompletionConfirmClick = { bookingId ->
@@ -303,21 +306,42 @@ fun FixBidNavHost(intent: android.content.Intent? = null) {
             BookingScreen(
                 initialCategoryName = categoryName,
                 onBackClick = { navController.popBackStack() },
-                onSubmitSuccess = { navController.navigate("booking_success") }
+                onSubmitSuccess = { bookingId -> navController.navigate("booking_success/$bookingId") }
             )
         }
 
-        composable("booking_success") {
+        composable(
+            route = "booking_success/{bookingId}",
+            arguments = listOf(navArgument("bookingId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val bookingId = backStackEntry.arguments?.getString("bookingId") ?: ""
             BookingSuccessScreen(
+                bookingId = bookingId,
                 onExploreOtherServicesClick = {
                     navController.popBackStack("home", inclusive = false)
                 },
-                onHomeClick = {
-                    // Navigate back to home and signal to show history tab
-                    navController.previousBackStackEntry
-                        ?.savedStateHandle
-                        ?.set("show_history", true)
-                    navController.popBackStack("home", inclusive = false)
+                onViewDetailClick = { bId ->
+                    navController.navigate("customer_booking_detail/$bId") {
+                        popUpTo("home") { inclusive = false }
+                    }
+                }
+            )
+        }
+
+        composable(
+            route = "customer_booking_detail/{bookingId}",
+            arguments = listOf(navArgument("bookingId") { type = NavType.StringType })
+        ) {
+            com.example.fixbid.presentation.customer.booking.CustomerBookingDetailScreen(
+                onBackClick = { navController.popBackStack() },
+                onNavigateToBids = { bId ->
+                    navController.navigate("bidding_workers/$bId")
+                },
+                onNavigateToPayment = { bId ->
+                    navController.navigate("payment/$bId")
+                },
+                onNavigateToCompletionConfirm = { bId ->
+                    navController.navigate("completion_confirm/$bId")
                 }
             )
         }

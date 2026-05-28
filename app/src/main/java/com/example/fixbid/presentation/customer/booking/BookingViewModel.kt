@@ -22,7 +22,7 @@ import javax.inject.Inject
 sealed class BookingUiState {
     object Idle : BookingUiState()
     object Loading : BookingUiState()
-    object Success : BookingUiState()
+    data class Success(val bookingId: String) : BookingUiState()
     data class Error(val message: String) : BookingUiState()
 }
 
@@ -160,7 +160,7 @@ class BookingViewModel @Inject constructor(
                         }
                     }
 
-                    _uiState.value = BookingUiState.Success
+                    _uiState.value = BookingUiState.Success(createdBooking.id)
                 }
                 is Resource.Error -> {
                     _uiState.value = BookingUiState.Error(result.message)

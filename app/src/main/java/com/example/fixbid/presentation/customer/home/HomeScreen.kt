@@ -37,6 +37,7 @@ fun HomeScreen(
     onCategoryClick: (ServiceCategory) -> Unit = {},
     onNotificationClick: () -> Unit = {},
     onBookingClick: (String) -> Unit = {},
+    onBiddingWorkersClick: (String) -> Unit = {},
     onCompletionConfirmClick: (String) -> Unit = {},
     onPaymentClick: (String) -> Unit = {},
     onSignOut: () -> Unit = {},
@@ -73,6 +74,7 @@ fun HomeScreen(
             1 -> Box(modifier = Modifier.padding(innerPadding)) {
                 BookingHistoryScreen(
                     onBookingClick = onBookingClick,
+                    onBiddingWorkersClick = onBiddingWorkersClick,
                     onCompletionConfirmClick = onCompletionConfirmClick,
                     onPaymentClick = onPaymentClick
                 )

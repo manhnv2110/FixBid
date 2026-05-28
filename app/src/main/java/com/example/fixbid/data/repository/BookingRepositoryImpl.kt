@@ -251,6 +251,40 @@ class BookingRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun deleteBooking(bookingId: String): Resource<Unit> =
+        runCatching {
+            // Delete associated table rows first to prevent foreign key issues
+            runCatching {
+                client.postgrest[Tables.BIDS].delete {
+                    filter { eq("booking_id", bookingId) }
+                }
+            }
+            runCatching {
+                client.postgrest[Tables.PAYMENTS].delete {
+                    filter { eq("booking_id", bookingId) }
+                }
+            }
+            runCatching {
+                client.postgrest[Tables.REVIEWS].delete {
+                    filter { eq("booking_id", bookingId) }
+                }
+            }
+            client.postgrest[Tables.BOOKINGS].delete {
+                filter { eq("id", bookingId) }
+            }
+            Resource.Success(Unit)
+        }.getOrElse { Resource.Error(it.message ?: "Xóa booking thất bại") }
+
+    override suspend fun updateBooking(booking: Booking): Resource<Booking> =
+        runCatching {
+            val dto = booking.toDto().copy(updatedAt = java.time.Instant.now().toString())
+            val result = client.postgrest[Tables.BOOKINGS].update(dto) {
+                filter { eq("id", booking.id) }
+                select(Columns.ALL)
+            }.decodeSingle<BookingDto>()
+            Resource.Success(result.toDomain())
+        }.getOrElse { Resource.Error(it.message ?: "Cập nhật booking thất bại") }
+
     private suspend fun updateStatus(bookingId: String, status: BookingStatus): Resource<Booking> =
         runCatching {
             val result = client.postgrest[Tables.BOOKINGS].update(

@@ -43,15 +43,17 @@ import kotlinx.coroutines.launch
 fun BookingScreen(
     initialCategoryName: String?,
     onBackClick: () -> Unit,
-    onSubmitSuccess: () -> Unit,
+    onSubmitSuccess: (String) -> Unit,
     viewModel: BookingViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
     LaunchedEffect(uiState) {
-        if (uiState is BookingUiState.Success) {
+        val state = uiState
+        if (state is BookingUiState.Success) {
+            val bookingId = state.bookingId
             viewModel.resetState()
-            onSubmitSuccess()
+            onSubmitSuccess(bookingId)
         }
     }
 
@@ -151,18 +153,18 @@ fun BookingScreen(
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Category selection card
+            // Card 1: Thông tin dịch vụ (Service category + Description + Description Images)
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(12.dp)) {
                     SectionLabel(icon = Icons.Outlined.Category, text = "Loại dịch vụ")
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     ExposedDropdownMenuBox(
                         expanded = expanded,
                         onExpandedChange = { expanded = !expanded },
@@ -193,19 +195,10 @@ fun BookingScreen(
                             }
                         }
                     }
-                }
-            }
 
-            // Description card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    SectionLabel(icon = Icons.Outlined.Description, text = "Mô tả công việc")
                     Spacer(modifier = Modifier.height(10.dp))
+                    SectionLabel(icon = Icons.Outlined.Description, text = "Mô tả công việc")
+                    Spacer(modifier = Modifier.height(6.dp))
                     OutlinedTextField(
                         value = description,
                         onValueChange = { description = it },
@@ -216,9 +209,9 @@ fun BookingScreen(
                         maxLines = 4
                     )
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     // Ảnh mô tả công việc
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -236,7 +229,7 @@ fun BookingScreen(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -329,27 +322,27 @@ fun BookingScreen(
                 }
             }
 
-            // Schedule card
+            // Card 2: Thời gian & Địa điểm (Schedule + Address)
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(12.dp)) {
                     SectionLabel(
                         icon = Icons.Outlined.EventAvailable,
                         text = if (selectedCategory == ServiceCategory.CLEANING)
                             "Lịch dọn dẹp"
                         else "Thời gian hẹn"
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     ScheduleDateTimePicker(
                         scheduledAtMillis = scheduledAtMillis,
                         onScheduledAtChange = { scheduledAtMillis = it }
                     )
                     if (selectedCategory == ServiceCategory.CLEANING) {
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = "Chọn ngày và khung giờ bạn muốn nhân viên có mặt. Thợ sẽ đến đúng giờ đã hẹn.",
                             fontSize = 12.sp,
@@ -357,22 +350,11 @@ fun BookingScreen(
                             lineHeight = 16.sp
                         )
                     }
-                }
-            }
 
-            // Address card — typed input + GPS auto-fill + map picker
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    SectionLabel(icon = Icons.Outlined.LocationOn, text = "Địa chỉ")
                     Spacer(modifier = Modifier.height(10.dp))
+                    SectionLabel(icon = Icons.Outlined.LocationOn, text = "Địa chỉ")
+                    Spacer(modifier = Modifier.height(6.dp))
 
-                    // Quick actions: GPS + map picker. Each is a tap-friendly chip
-                    // matching the look of Material 3 assist chips.
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -423,13 +405,12 @@ fun BookingScreen(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     OutlinedTextField(
                         value = address,
                         onValueChange = { newValue ->
                             address = newValue
-                            // Manual edits invalidate the previously captured pin.
                             if (addressLatitude != null || addressLongitude != null) {
                                 addressLatitude = null
                                 addressLongitude = null
@@ -455,10 +436,8 @@ fun BookingScreen(
                         }
                     )
 
-                    // Pin confirmation badge — surfaces that we have precise coords so
-                    // the customer feels confident the worker will land at the door.
                     if (addressLatitude != null && addressLongitude != null) {
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -504,16 +483,16 @@ fun BookingScreen(
                 }
             }
 
-            // Contact info card
+            // Card 3: Thông tin liên hệ & Ghi chú (Contact + Notes)
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    SectionLabel(icon = Icons.Outlined.ContactPhone, text = "Thông tin liên hệ")
-                    Spacer(modifier = Modifier.height(10.dp))
+                Column(modifier = Modifier.padding(12.dp)) {
+                    SectionLabel(icon = Icons.Outlined.ContactPhone, text = "Thông tin liên hệ & Ghi chú")
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     OutlinedTextField(
                         value = fullName,
@@ -528,7 +507,7 @@ fun BookingScreen(
                         }
                     )
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     OutlinedTextField(
                         value = phoneNumber,
@@ -543,25 +522,15 @@ fun BookingScreen(
                             Icon(Icons.Outlined.Phone, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                         }
                     )
-                }
-            }
 
-            // Notes card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    SectionLabel(icon = Icons.Outlined.Notes, text = "Ghi chú thêm (tuỳ chọn)")
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     OutlinedTextField(
                         value = notes,
                         onValueChange = { notes = it },
                         placeholder = {
                             Text(
-                                "Ví dụ: Số căn hộ, tầng, tình trạng thiết bị...",
+                                "Ví dụ: Số căn hộ, tầng, tình trạng thiết bị... (tuỳ chọn)",
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                             )
                         },

@@ -21,8 +21,9 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun BookingSuccessScreen(
+    bookingId: String,
     onExploreOtherServicesClick: () -> Unit,
-    onHomeClick: () -> Unit
+    onViewDetailClick: (String) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -83,7 +84,7 @@ fun BookingSuccessScreen(
 
         // Primary: View my orders
         Button(
-            onClick = onHomeClick,
+            onClick = { onViewDetailClick(bookingId) },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp),
@@ -93,7 +94,7 @@ fun BookingSuccessScreen(
             Icon(Icons.Outlined.History, null, modifier = Modifier.size(20.dp))
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                "Xem đơn của tôi",
+                "Xem đơn vừa đặt",
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp
             )
