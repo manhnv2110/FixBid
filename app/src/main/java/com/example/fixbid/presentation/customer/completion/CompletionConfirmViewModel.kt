@@ -6,10 +6,12 @@ import androidx.lifecycle.viewModelScope
 import com.example.fixbid.domain.model.Booking
 import com.example.fixbid.domain.model.Payment
 import com.example.fixbid.domain.model.Resource
+import com.example.fixbid.domain.notification.NotificationContentFactory
 import com.example.fixbid.domain.repository.BookingRepository
 import com.example.fixbid.domain.repository.PaymentRepository
 import com.example.fixbid.domain.usecase.customer.ConfirmCompletionUseCase
 import com.example.fixbid.domain.usecase.customer.ReleaseEscrowUseCase
+import com.example.fixbid.domain.usecase.shared.SendNotificationUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,7 +44,8 @@ class CompletionConfirmViewModel @Inject constructor(
     private val bookingRepository: BookingRepository,
     private val paymentRepository: PaymentRepository,
     private val confirmCompletionUseCase: ConfirmCompletionUseCase,
-    private val releaseEscrowUseCase: ReleaseEscrowUseCase
+    private val releaseEscrowUseCase: ReleaseEscrowUseCase,
+    private val sendNotification: SendNotificationUseCase
 ) : ViewModel() {
 
     private val bookingId: String = savedStateHandle.get<String>("bookingId") ?: ""
@@ -88,6 +91,7 @@ class CompletionConfirmViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isSubmitting = true)
             when (val result = confirmCompletionUseCase.confirm(bookingId)) {
                 is Resource.Success -> {
+                    notifyWorkerCompletionConfirmed()
                     // Release escrow - chuyển tiền cho thợ
                     when (val escrowResult = releaseEscrowUseCase(bookingId)) {
                         is Resource.Success -> {
@@ -138,6 +142,7 @@ class CompletionConfirmViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isSubmitting = true)
             when (val result = confirmCompletionUseCase.reject(bookingId, reason)) {
                 is Resource.Success -> {
+                    notifyWorkerCompletionRejected(reason)
                     _uiState.value = _uiState.value.copy(
                         isSubmitting = false,
                         showRejectDialog = false
@@ -152,5 +157,29 @@ class CompletionConfirmViewModel @Inject constructor(
                 is Resource.Loading -> {}
             }
         }
+    }
+
+    private suspend fun notifyWorkerCompletionConfirmed() {
+        val booking = _uiState.value.booking ?: return
+        val workerId = booking.workerId.takeIf { it.isNotBlank() } ?: return
+        sendNotification(
+            NotificationContentFactory.completionConfirmedForWorker(
+                workerId = workerId,
+                bookingId = booking.id,
+                categoryName = booking.category.displayName
+            )
+        )
+    }
+
+    private suspend fun notifyWorkerCompletionRejected(reason: String) {
+        val booking = _uiState.value.booking ?: return
+        val workerId = booking.workerId.takeIf { it.isNotBlank() } ?: return
+        sendNotification(
+            NotificationContentFactory.completionRejectedForWorker(
+                workerId = workerId,
+                bookingId = booking.id,
+                reason = reason
+            )
+        )
     }
 }

@@ -1,0 +1,177 @@
+package com.example.fixbid.domain.notification
+
+import com.example.fixbid.domain.model.NotificationContent
+import com.example.fixbid.domain.model.NotificationType
+
+/**
+ * Single source of truth for notification copy (tiếng Việt). Keeping the strings
+ * here means every place that emits a notification — customer flows, worker
+ * flows, schedulers — renders consistent, production-quality wording.
+ */
+object NotificationContentFactory {
+
+    private const val APP = "FixBid"
+
+    /** Thợ nhận được một yêu cầu công việc mới (đặt trực tiếp hoặc mời thầu). */
+    fun bookingRequestForWorker(
+        workerId: String,
+        bookingId: String,
+        categoryName: String
+    ) = NotificationContent(
+        recipientUserId = workerId,
+        title = "Yêu cầu công việc mới",
+        body = "Bạn có một yêu cầu \"$categoryName\" mới. Xem chi tiết và phản hồi ngay.",
+        type = NotificationType.BOOKING_REQUEST,
+        referenceId = bookingId
+    )
+
+    /** Khách được báo thợ đã xác nhận / booking đã được xác nhận. */
+    fun bookingConfirmedForCustomer(
+        customerId: String,
+        bookingId: String,
+        categoryName: String
+    ) = NotificationContent(
+        recipientUserId = customerId,
+        title = "Đặt lịch đã được xác nhận",
+        body = "Dịch vụ \"$categoryName\" của bạn đã được xác nhận. Thợ sẽ đến đúng lịch hẹn.",
+        type = NotificationType.BOOKING_CONFIRMED,
+        referenceId = bookingId
+    )
+
+    fun bookingCancelledForUser(
+        userId: String,
+        bookingId: String,
+        categoryName: String,
+        reason: String?
+    ) = NotificationContent(
+        recipientUserId = userId,
+        title = "Lịch hẹn đã bị hủy",
+        body = buildString {
+            append("Dịch vụ \"$categoryName\" đã bị hủy.")
+            if (!reason.isNullOrBlank()) append(" Lý do: $reason")
+        },
+        type = NotificationType.BOOKING_CANCELLED,
+        referenceId = bookingId
+    )
+
+    /** Nhắc lịch hẹn sắp tới (cleaning schedule reminder). */
+    fun bookingReminderForUser(
+        userId: String,
+        bookingId: String,
+        categoryName: String,
+        whenLabel: String
+    ) = NotificationContent(
+        recipientUserId = userId,
+        title = "Nhắc lịch hẹn sắp tới",
+        body = "Dịch vụ \"$categoryName\" của bạn sẽ bắt đầu $whenLabel. Hãy chuẩn bị sẵn sàng nhé.",
+        type = NotificationType.BOOKING_REMINDER,
+        referenceId = bookingId
+    )
+
+    /** Khách nhận được một báo giá mới từ thợ. */
+    fun bidReceivedForCustomer(
+        customerId: String,
+        bookingId: String,
+        workerName: String,
+        priceLabel: String
+    ) = NotificationContent(
+        recipientUserId = customerId,
+        title = "Báo giá mới",
+        body = "$workerName vừa gửi báo giá $priceLabel cho yêu cầu của bạn. Xem và chọn thợ ngay.",
+        type = NotificationType.BID_RECEIVED,
+        referenceId = bookingId
+    )
+
+    /** Thợ được báo báo giá của mình đã được khách chọn. */
+    fun bidAcceptedForWorker(
+        workerId: String,
+        bookingId: String,
+        categoryName: String
+    ) = NotificationContent(
+        recipientUserId = workerId,
+        title = "Báo giá được chấp nhận",
+        body = "Chúc mừng! Báo giá của bạn cho công việc \"$categoryName\" đã được chọn.",
+        type = NotificationType.BID_ACCEPTED,
+        referenceId = bookingId
+    )
+
+    /** Khách được báo thợ đang trên đường đến. */
+    fun workerOnTheWayForCustomer(
+        customerId: String,
+        bookingId: String,
+        workerName: String
+    ) = NotificationContent(
+        recipientUserId = customerId,
+        title = "Thợ đang trên đường",
+        body = "$workerName đang di chuyển đến địa chỉ của bạn.",
+        type = NotificationType.WORKER_ON_THE_WAY,
+        referenceId = bookingId
+    )
+
+    /** Khách được báo thợ đã bắt đầu công việc. */
+    fun jobStartedForCustomer(
+        customerId: String,
+        bookingId: String,
+        categoryName: String
+    ) = NotificationContent(
+        recipientUserId = customerId,
+        title = "Đã bắt đầu công việc",
+        body = "Thợ đã bắt đầu thực hiện dịch vụ \"$categoryName\".",
+        type = NotificationType.JOB_STARTED,
+        referenceId = bookingId
+    )
+
+    /** Khách được báo thợ đã hoàn thành công việc, chờ xác nhận. */
+    fun jobCompletedForCustomer(
+        customerId: String,
+        bookingId: String,
+        categoryName: String
+    ) = NotificationContent(
+        recipientUserId = customerId,
+        title = "Công việc đã hoàn thành",
+        body = "Thợ báo đã hoàn thành \"$categoryName\". Vui lòng kiểm tra và xác nhận.",
+        type = NotificationType.JOB_COMPLETED,
+        referenceId = bookingId
+    )
+
+    /** Thợ được báo khách đã xác nhận hoàn thành. */
+    fun completionConfirmedForWorker(
+        workerId: String,
+        bookingId: String,
+        categoryName: String
+    ) = NotificationContent(
+        recipientUserId = workerId,
+        title = "Khách đã xác nhận hoàn thành",
+        body = "Khách hàng đã xác nhận hoàn thành \"$categoryName\". Cảm ơn bạn đã làm việc tốt!",
+        type = NotificationType.JOB_COMPLETED,
+        referenceId = bookingId
+    )
+
+    /** Thợ được báo khách yêu cầu làm lại (từ chối hoàn thành). */
+    fun completionRejectedForWorker(
+        workerId: String,
+        bookingId: String,
+        reason: String?
+    ) = NotificationContent(
+        recipientUserId = workerId,
+        title = "Khách yêu cầu làm lại",
+        body = buildString {
+            append("Khách hàng chưa hài lòng và yêu cầu tiếp tục công việc.")
+            if (!reason.isNullOrBlank()) append(" Lý do: $reason")
+        },
+        type = NotificationType.JOB_STARTED,
+        referenceId = bookingId
+    )
+
+    fun paymentReceivedForWorker(
+        workerId: String,
+        bookingId: String,
+        amountLabel: String
+    ) = NotificationContent(
+        recipientUserId = workerId,
+        title = "Đã nhận thanh toán",
+        body = "Bạn đã nhận được $amountLabel cho công việc vừa hoàn thành.",
+        type = NotificationType.PAYMENT_RECEIVED,
+        referenceId = bookingId
+    )
+}

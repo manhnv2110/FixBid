@@ -5,8 +5,10 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -34,7 +36,9 @@ import com.example.fixbid.presentation.customer.booking.BookingSuccessScreen
 import com.example.fixbid.presentation.customer.chat.ChatScreen
 import com.example.fixbid.presentation.customer.home.HomeScreen
 import com.example.fixbid.presentation.worker.home.WorkerHomeScreen
+import com.example.fixbid.presentation.notification.AppNotificationsViewModel
 import com.example.fixbid.presentation.notification.NotificationListScreen
+import com.example.fixbid.presentation.notification.NotificationSettingsScreen
 import com.example.fixbid.presentation.auth.AuthLogo
 import com.example.fixbid.ui.theme.FixBidTheme
 import com.example.fixbid.ui.theme.PrimaryBlue
@@ -99,6 +103,25 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
 
     val navController = rememberNavController()
     val context = LocalContext.current
+
+    // Session-scoped notification coordinator: drives the unread badge and posts
+    // system notifications for incoming realtime events.
+    val appNotificationsViewModel: AppNotificationsViewModel = hiltViewModel()
+    val unreadNotificationCount by appNotificationsViewModel.unreadCount.collectAsState()
+
+    // Ask for POST_NOTIFICATIONS once, on Android 13+, after the user is in.
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { /* result handled by the system; nothing else to do */ }
+
+    LaunchedEffect(uiState.isAuthenticated) {
+        if (uiState.isAuthenticated &&
+            android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU
+        ) {
+            appNotificationsViewModel.markPermissionRequested()
+            notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -239,6 +262,7 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                     navController.navigate("booking/${category.name}")
                 },
                 onNotificationClick = { navController.navigate("notification_list") },
+                unreadNotificationCount = unreadNotificationCount,
                 onBookingClick = { bookingId ->
                     navController.navigate("customer_booking_detail/$bookingId")
                 },
@@ -260,7 +284,8 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                 onChatConversationClick = { conversationId, workerId, workerName ->
                     val encodedName = java.net.URLEncoder.encode(workerName, "UTF-8")
                     navController.navigate("chat/$conversationId/$workerId/$encodedName")
-                }
+                },
+                onNotificationSettingsClick = { navController.navigate("notification_settings") }
             )
         }
 
@@ -272,6 +297,7 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
             }
             WorkerHomeScreen(
                 onNotificationClick = { navController.navigate("notification_list") },
+                unreadNotificationCount = unreadNotificationCount,
                 onJobClick = { bookingId ->
                     navController.navigate("worker_job_detail/$bookingId")
                 },
@@ -286,7 +312,8 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                         popUpTo(0) { inclusive = true }
                     }
                 },
-                showWorkTab = showWork
+                showWorkTab = showWork,
+                onNotificationSettingsClick = { navController.navigate("notification_settings") }
             )
         }
 
@@ -431,6 +458,21 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
 
         composable("notification_list") {
             NotificationListScreen(
+                onBackClick = { navController.popBackStack() },
+                onOpenSettings = { navController.navigate("notification_settings") },
+                onNotificationClick = { type, referenceId ->
+                    handleNotificationClick(
+                        navController = navController,
+                        type = type,
+                        referenceId = referenceId,
+                        isWorker = uiState.userRole == UserRole.WORKER
+                    )
+                }
+            )
+        }
+
+        composable("notification_settings") {
+            NotificationSettingsScreen(
                 onBackClick = { navController.popBackStack() }
             )
         }
@@ -448,5 +490,46 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                 onBackClick = { navController.popBackStack() }
             )
         }
+    }
+}
+
+/**
+ * Routes a tapped notification to the most relevant screen based on its type and
+ * reference id (usually a bookingId). Falls back to staying on the list when the
+ * destination can't be resolved.
+ */
+private fun handleNotificationClick(
+    navController: androidx.navigation.NavController,
+    type: com.example.fixbid.domain.model.NotificationType,
+    referenceId: String?,
+    isWorker: Boolean
+) {
+    if (referenceId.isNullOrBlank()) return
+    val route = when (type) {
+        com.example.fixbid.domain.model.NotificationType.BOOKING_REQUEST,
+        com.example.fixbid.domain.model.NotificationType.BID_ACCEPTED,
+        com.example.fixbid.domain.model.NotificationType.WORKER_ON_THE_WAY,
+        com.example.fixbid.domain.model.NotificationType.JOB_STARTED ->
+            if (isWorker) "worker_job_detail/$referenceId"
+            else "customer_booking_detail/$referenceId"
+
+        com.example.fixbid.domain.model.NotificationType.BID_RECEIVED ->
+            "bidding_workers/$referenceId"
+
+        com.example.fixbid.domain.model.NotificationType.JOB_COMPLETED ->
+            if (isWorker) "worker_job_detail/$referenceId"
+            else "completion_confirm/$referenceId"
+
+        com.example.fixbid.domain.model.NotificationType.BOOKING_CONFIRMED,
+        com.example.fixbid.domain.model.NotificationType.BOOKING_CANCELLED,
+        com.example.fixbid.domain.model.NotificationType.BOOKING_REMINDER,
+        com.example.fixbid.domain.model.NotificationType.PAYMENT_RECEIVED ->
+            if (isWorker) "worker_job_detail/$referenceId"
+            else "customer_booking_detail/$referenceId"
+
+        else -> null
+    }
+    route?.let {
+        runCatching { navController.navigate(it) }
     }
 }

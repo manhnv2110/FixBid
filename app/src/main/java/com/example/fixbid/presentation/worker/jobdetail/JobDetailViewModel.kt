@@ -6,7 +6,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.fixbid.domain.model.BookingStatus
 import com.example.fixbid.domain.model.Resource
+import com.example.fixbid.domain.notification.NotificationContentFactory
 import com.example.fixbid.domain.repository.BookingRepository
+import com.example.fixbid.domain.usecase.shared.SendNotificationUseCase
 import com.example.fixbid.domain.usecase.worker.GetJobDetailUseCase
 import com.example.fixbid.domain.usecase.worker.JobDetailData
 import com.example.fixbid.domain.usecase.worker.PlaceBidUseCase
@@ -56,7 +58,8 @@ class JobDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val getJobDetailUseCase: GetJobDetailUseCase,
     private val placeBidUseCase: PlaceBidUseCase,
-    private val bookingRepository: BookingRepository
+    private val bookingRepository: BookingRepository,
+    private val sendNotification: SendNotificationUseCase
 ) : ViewModel() {
 
     private val bookingId: String = savedStateHandle.get<String>("bookingId") ?: ""
@@ -253,6 +256,17 @@ class JobDetailViewModel @Inject constructor(
             val note = form.note.trim().ifBlank { null }
             when (val result = bookingRepository.submitJobCompletion(bookingId, note, uploadedUrls)) {
                 is Resource.Success -> {
+                    // Notify the customer that the job is done and awaiting confirmation.
+                    val booking = result.data
+                    booking.customerId.takeIf { it.isNotBlank() }?.let { customerId ->
+                        sendNotification(
+                            NotificationContentFactory.jobCompletedForCustomer(
+                                customerId = customerId,
+                                bookingId = booking.id,
+                                categoryName = booking.category.displayName
+                            )
+                        )
+                    }
                     _uiState.update {
                         it.copy(
                             showCompletionDialog = false,

@@ -12,8 +12,12 @@ object NotificationIconMapper {
         NotificationType.BOOKING_REQUEST   -> Icons.AutoMirrored.Outlined.Assignment
         NotificationType.BOOKING_CONFIRMED -> Icons.Outlined.CheckCircle
         NotificationType.BOOKING_CANCELLED -> Icons.Outlined.Cancel
+        NotificationType.BOOKING_REMINDER  -> Icons.Outlined.Alarm
         NotificationType.BID_RECEIVED      -> Icons.Outlined.Gavel
         NotificationType.BID_ACCEPTED      -> Icons.Outlined.ThumbUp
+        NotificationType.WORKER_ON_THE_WAY -> Icons.Outlined.DirectionsCar
+        NotificationType.JOB_STARTED       -> Icons.Outlined.PlayCircle
+        NotificationType.JOB_COMPLETED     -> Icons.Outlined.TaskAlt
         NotificationType.PAYMENT_RECEIVED  -> Icons.Outlined.Payments
         NotificationType.NEW_MESSAGE       -> Icons.Outlined.Chat
         NotificationType.NEW_REVIEW        -> Icons.Outlined.Star
@@ -24,8 +28,12 @@ object NotificationIconMapper {
         NotificationType.BOOKING_REQUEST,
         NotificationType.BOOKING_CONFIRMED  -> 0xFF1565C0
         NotificationType.BOOKING_CANCELLED  -> 0xFFC62828
+        NotificationType.BOOKING_REMINDER   -> 0xFFEF6C00
         NotificationType.BID_RECEIVED,
         NotificationType.BID_ACCEPTED       -> 0xFF6A1B9A
+        NotificationType.WORKER_ON_THE_WAY  -> 0xFF00838F
+        NotificationType.JOB_STARTED        -> 0xFF1E88E5
+        NotificationType.JOB_COMPLETED      -> 0xFF2E7D32
         NotificationType.PAYMENT_RECEIVED   -> 0xFF2E7D32
         NotificationType.NEW_MESSAGE        -> 0xFF00838F
         NotificationType.NEW_REVIEW         -> 0xFFF57F17
@@ -36,11 +44,32 @@ object NotificationIconMapper {
         NotificationType.BOOKING_REQUEST,
         NotificationType.BOOKING_CONFIRMED  -> 0xFFE3F0FF
         NotificationType.BOOKING_CANCELLED  -> 0xFFFFEBEE
+        NotificationType.BOOKING_REMINDER   -> 0xFFFFF3E0
         NotificationType.BID_RECEIVED,
         NotificationType.BID_ACCEPTED       -> 0xFFF3E5F5
+        NotificationType.WORKER_ON_THE_WAY  -> 0xFFE0F7FA
+        NotificationType.JOB_STARTED        -> 0xFFE3F2FD
+        NotificationType.JOB_COMPLETED      -> 0xFFE8F5E9
         NotificationType.PAYMENT_RECEIVED   -> 0xFFE8F5E9
         NotificationType.NEW_MESSAGE        -> 0xFFE0F7FA
         NotificationType.NEW_REVIEW         -> 0xFFFFFDE7
         NotificationType.SYSTEM             -> 0xFFECEFF1
+    }
+
+    /** Nhãn loại thông báo bằng tiếng Việt, hiển thị trên card. */
+    fun getLabel(type: NotificationType): String = when (type) {
+        NotificationType.BOOKING_REQUEST   -> "Yêu cầu mới"
+        NotificationType.BOOKING_CONFIRMED -> "Đã xác nhận"
+        NotificationType.BOOKING_CANCELLED -> "Đã hủy"
+        NotificationType.BOOKING_REMINDER  -> "Nhắc lịch"
+        NotificationType.BID_RECEIVED      -> "Báo giá mới"
+        NotificationType.BID_ACCEPTED      -> "Được chọn"
+        NotificationType.WORKER_ON_THE_WAY -> "Thợ đang đến"
+        NotificationType.JOB_STARTED       -> "Bắt đầu"
+        NotificationType.JOB_COMPLETED     -> "Hoàn thành"
+        NotificationType.PAYMENT_RECEIVED  -> "Thanh toán"
+        NotificationType.NEW_MESSAGE       -> "Tin nhắn"
+        NotificationType.NEW_REVIEW        -> "Đánh giá"
+        NotificationType.SYSTEM            -> "Hệ thống"
     }
 }

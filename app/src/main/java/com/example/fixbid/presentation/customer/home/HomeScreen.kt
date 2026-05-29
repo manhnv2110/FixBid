@@ -23,6 +23,7 @@ import com.example.fixbid.core.utils.ServiceCategoryMapper
 import com.example.fixbid.domain.model.ServiceCategory
 import com.example.fixbid.core.components.BottomNavbar
 import com.example.fixbid.core.components.CategoryGrid
+import com.example.fixbid.core.components.NotificationBell
 import com.example.fixbid.core.components.NotificationCard
 import com.example.fixbid.core.components.PromoBanner
 import com.example.fixbid.core.components.SearchBar
@@ -36,6 +37,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 fun HomeScreen(
     onCategoryClick: (ServiceCategory) -> Unit = {},
     onNotificationClick: () -> Unit = {},
+    unreadNotificationCount: Int = 0,
     onBookingClick: (String) -> Unit = {},
     onBiddingWorkersClick: (String) -> Unit = {},
     onCompletionConfirmClick: (String) -> Unit = {},
@@ -43,6 +45,7 @@ fun HomeScreen(
     onSignOut: () -> Unit = {},
     showHistoryTab: Boolean = false,
     onChatConversationClick: (conversationId: String, workerId: String, workerName: String) -> Unit = { _, _, _ -> },
+    onNotificationSettingsClick: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
     chatListViewModel: ConversationListViewModel = hiltViewModel()
 ) {
@@ -86,7 +89,10 @@ fun HomeScreen(
                 )
             }
             3 -> Box(modifier = Modifier.padding(innerPadding)) {
-                ProfileScreen(onSignOut = onSignOut)
+                ProfileScreen(
+                    onSignOut = onSignOut,
+                    onNotificationSettingsClick = onNotificationSettingsClick
+                )
             }
             else -> Column(
                 modifier = Modifier.fillMaxSize()
@@ -94,7 +100,8 @@ fun HomeScreen(
                 HomeHeader(
                     searchQuery = uiState.searchQuery,
                     onSearchChange = viewModel::onSearchQueryChange,
-                    onNotificationClick = onNotificationClick
+                    onNotificationClick = onNotificationClick,
+                    unreadNotificationCount = unreadNotificationCount
                 )
                 Column(
                     modifier = Modifier
@@ -124,6 +131,7 @@ private fun HomeHeader(
     searchQuery: String,
     onSearchChange: (String) -> Unit,
     onNotificationClick: () -> Unit,
+    unreadNotificationCount: Int = 0,
 ) {
     Column(
         modifier = Modifier
@@ -153,13 +161,11 @@ private fun HomeHeader(
                     fontSize = 16.sp
                 )
             }
-            IconButton(onClick = onNotificationClick) {
-                Icon(
-                    imageVector = Icons.Outlined.Notifications,
-                    contentDescription = "Thông báo",
-                    tint = MaterialTheme.colorScheme.onPrimary
-                )
-            }
+            NotificationBell(
+                unreadCount = unreadNotificationCount,
+                onClick = onNotificationClick,
+                tint = MaterialTheme.colorScheme.onPrimary
+            )
         }
 
         Spacer(modifier = Modifier.height(12.dp))

@@ -30,6 +30,7 @@ import com.example.fixbid.domain.model.UserRole
 @Composable
 fun ProfileScreen(
     onSignOut: () -> Unit,
+    onNotificationSettingsClick: () -> Unit = {},
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -364,7 +365,8 @@ fun ProfileScreen(
                             ProfileMenuItem(
                                 icon = Icons.Outlined.Notifications,
                                 title = "Thông báo",
-                                subtitle = "Cài đặt thông báo"
+                                subtitle = "Cài đặt thông báo",
+                                onClick = onNotificationSettingsClick
                             )
                             HorizontalDivider(
                                 modifier = Modifier.padding(horizontal = 20.dp),
@@ -456,11 +458,13 @@ private fun ProfileInfoRow(
 private fun ProfileMenuItem(
     icon: ImageVector,
     title: String,
-    subtitle: String
+    subtitle: String,
+    onClick: (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 20.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

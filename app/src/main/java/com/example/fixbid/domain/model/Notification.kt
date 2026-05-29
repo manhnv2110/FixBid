@@ -15,10 +15,23 @@ enum class NotificationType {
     BOOKING_REQUEST,       // thợ nhận được yêu cầu đặt lịch
     BOOKING_CONFIRMED,     // khách được thông báo thợ đã confirm
     BOOKING_CANCELLED,
+    BOOKING_REMINDER,      // nhắc lịch hẹn sắp tới (cleaning schedule reminder)
     BID_RECEIVED,          // khách nhận được bid từ thợ
     BID_ACCEPTED,          // thợ được thông báo bid được chọn
+    WORKER_ON_THE_WAY,     // khách: thợ đang trên đường tới
+    JOB_STARTED,           // khách: thợ đã bắt đầu công việc
+    JOB_COMPLETED,         // khách: thợ báo đã hoàn thành, chờ xác nhận
     PAYMENT_RECEIVED,
     NEW_MESSAGE,
     NEW_REVIEW,
-    SYSTEM
+    SYSTEM;
+
+    companion object {
+        /** Parse an toàn từ chuỗi (snake_case từ DB) — fallback về SYSTEM. */
+        fun fromRaw(raw: String): NotificationType =
+            runCatching { valueOf(raw.uppercase()) }.getOrDefault(SYSTEM)
+    }
+
+    /** Giá trị lưu xuống cột enum `notification_type` của Postgres. */
+    val dbValue: String get() = name.lowercase()
 }

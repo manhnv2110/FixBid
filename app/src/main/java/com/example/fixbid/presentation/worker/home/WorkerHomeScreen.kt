@@ -38,11 +38,13 @@ import com.example.fixbid.ui.theme.*
 @Composable
 fun WorkerHomeScreen(
     onNotificationClick: () -> Unit = {},
+    unreadNotificationCount: Int = 0,
     onJobClick: (String) -> Unit = {},
     onJobRequestClick: (String) -> Unit = {},
     onBrowseAllRequestsClick: () -> Unit = {},
     onSignOut: () -> Unit = {},
     showWorkTab: Boolean = false,
+    onNotificationSettingsClick: () -> Unit = {},
     viewModel: WorkerHomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -72,12 +74,16 @@ fun WorkerHomeScreen(
                 )
             }
             2 -> Box(modifier = Modifier.padding(innerPadding)) {
-                ProfileScreen(onSignOut = onSignOut)
+                ProfileScreen(
+                    onSignOut = onSignOut,
+                    onNotificationSettingsClick = onNotificationSettingsClick
+                )
             }
             else -> WorkerDashboard(
                 uiState = uiState,
                 bottomPadding = innerPadding.calculateBottomPadding(),
                 onNotificationClick = onNotificationClick,
+                unreadNotificationCount = unreadNotificationCount,
                 onToggleAvailability = viewModel::toggleAvailability,
                 onRetry = viewModel::loadDashboard,
                 onJobClick = onJobClick,
@@ -98,6 +104,7 @@ private fun WorkerDashboard(
     uiState: WorkerHomeUiState,
     bottomPadding: androidx.compose.ui.unit.Dp,
     onNotificationClick: () -> Unit,
+    unreadNotificationCount: Int,
     onToggleAvailability: () -> Unit,
     onRetry: () -> Unit,
     onJobClick: (String) -> Unit,
@@ -113,7 +120,8 @@ private fun WorkerDashboard(
             isAvailable = uiState.isAvailable,
             isToggling = uiState.isTogglingAvailability,
             onToggleAvailability = onToggleAvailability,
-            onNotificationClick = onNotificationClick
+            onNotificationClick = onNotificationClick,
+            unreadNotificationCount = unreadNotificationCount
         )
 
         when {
@@ -186,7 +194,8 @@ private fun DashboardHeader(
     isAvailable: Boolean,
     isToggling: Boolean,
     onToggleAvailability: () -> Unit,
-    onNotificationClick: () -> Unit
+    onNotificationClick: () -> Unit,
+    unreadNotificationCount: Int = 0
 ) {
     Column(
         modifier = Modifier
@@ -216,13 +225,11 @@ private fun DashboardHeader(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            IconButton(onClick = onNotificationClick) {
-                Icon(
-                    imageVector = Icons.Outlined.Notifications,
-                    contentDescription = "Thông báo",
-                    tint = MaterialTheme.colorScheme.onPrimary
-                )
-            }
+            com.example.fixbid.core.components.NotificationBell(
+                unreadCount = unreadNotificationCount,
+                onClick = onNotificationClick,
+                tint = MaterialTheme.colorScheme.onPrimary
+            )
         }
 
         Spacer(modifier = Modifier.height(14.dp))

@@ -1,15 +1,21 @@
 package com.example.fixbid.domain.usecase.worker
 
+import com.example.fixbid.core.utils.formatCurrencyVnd
 import com.example.fixbid.domain.model.Bid
 import com.example.fixbid.domain.model.BidStatus
 import com.example.fixbid.domain.model.Resource
+import com.example.fixbid.domain.notification.NotificationContentFactory
 import com.example.fixbid.domain.repository.AuthRepository
 import com.example.fixbid.domain.repository.BidRepository
+import com.example.fixbid.domain.repository.BookingRepository
+import com.example.fixbid.domain.usecase.shared.SendNotificationUseCase
 import javax.inject.Inject
 
 class PlaceBidUseCase @Inject constructor(
     private val bidRepository: BidRepository,
-    private val authRepository: AuthRepository
+    private val bookingRepository: BookingRepository,
+    private val authRepository: AuthRepository,
+    private val sendNotification: SendNotificationUseCase
 ) {
     /**
      * Đặt thầu cho một booking. Worker được lấy tự động từ phiên hiện tại.
@@ -41,6 +47,21 @@ class PlaceBidUseCase @Inject constructor(
             status = BidStatus.PENDING,
             createdAt = now
         )
-        return bidRepository.placeBid(bid)
+        val result = bidRepository.placeBid(bid)
+
+        // Notify the customer that a new bid arrived. Non-fatal on failure.
+        if (result is Resource.Success) {
+            (bookingRepository.getBookingById(bookingId) as? Resource.Success)?.data?.let { booking ->
+                sendNotification(
+                    NotificationContentFactory.bidReceivedForCustomer(
+                        customerId = booking.customerId,
+                        bookingId = bookingId,
+                        workerName = user.fullName,
+                        priceLabel = formatCurrencyVnd(proposedPrice)
+                    )
+                )
+            }
+        }
+        return result
     }
 }

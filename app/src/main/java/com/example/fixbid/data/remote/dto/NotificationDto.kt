@@ -22,11 +22,23 @@ data class NotificationDto(
         userId      = userId,
         title       = title,
         body        = body,
-        type        = runCatching {
-            NotificationType.valueOf(type.uppercase())
-        }.getOrDefault(NotificationType.SYSTEM),
-        referenceId = if (referenceId != null) referenceId else null,
+        type        = NotificationType.fromRaw(type),
+        referenceId = referenceId,
         isRead      = isRead,
         createdAt   = createdAt.toEpochMillis()
     )
 }
+
+/**
+ * Payload sent to Postgrest when creating a notification. Server-managed columns
+ * (`id`, `is_read`, `created_at`) are intentionally omitted so their DB defaults
+ * apply.
+ */
+@Serializable
+data class NewNotificationDto(
+    @SerialName("user_id")      val userId: String,
+    val title: String,
+    val body: String,
+    val type: String,
+    @SerialName("reference_id") val referenceId: String? = null
+)
