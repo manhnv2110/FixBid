@@ -41,6 +41,7 @@ fun BookingHistoryScreen(
     onBiddingWorkersClick: (String) -> Unit,
     onCompletionConfirmClick: (String) -> Unit = {},
     onPaymentClick: (String) -> Unit = {},
+    onReviewClick: (String) -> Unit = {},
     viewModel: BookingHistoryViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -202,7 +203,8 @@ fun BookingHistoryScreen(
                                     onClick = { onBookingClick(booking.id) },
                                     onBiddingWorkersClick = { onBiddingWorkersClick(booking.id) },
                                     onPaymentClick = { onPaymentClick(booking.id) },
-                                    onCompletionConfirmClick = { onCompletionConfirmClick(booking.id) }
+                                    onCompletionConfirmClick = { onCompletionConfirmClick(booking.id) },
+                                    onReviewClick = { onReviewClick(booking.id) }
                                 )
                             }
                             // Bottom spacing
@@ -250,7 +252,8 @@ private fun BookingCard(
     onClick: () -> Unit,
     onBiddingWorkersClick: () -> Unit,
     onPaymentClick: () -> Unit,
-    onCompletionConfirmClick: () -> Unit
+    onCompletionConfirmClick: () -> Unit,
+    onReviewClick: () -> Unit = {}
 ) {
     val statusInfo = getStatusInfo(booking.status)
 
@@ -493,6 +496,31 @@ private fun BookingCard(
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            // Review CTA for completed bookings that have an assigned worker
+            if (booking.status == BookingStatus.COMPLETED && booking.workerId.isNotBlank()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = onReviewClick,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+                ) {
+                    Icon(
+                        Icons.Outlined.StarRate,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Đánh giá thợ",
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp
                     )
                 }
             }

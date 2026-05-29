@@ -3,6 +3,7 @@ package com.example.fixbid.presentation.worker.analytics
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -39,6 +40,7 @@ import kotlin.math.abs
 @Composable
 fun WorkerAnalyticsScreen(
     onBackClick: () -> Unit = {},
+    onReviewsClick: () -> Unit = {},
     viewModel: WorkerAnalyticsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -76,7 +78,7 @@ fun WorkerAnalyticsScreen(
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         item { EarningsSummaryCard(data) }
-                        item { KpiGrid(data) }
+                        item { KpiGrid(data, onReviewsClick = onReviewsClick) }
                         item { EarningsChartCard(data.monthlySeries) }
                         if (data.categoryBreakdown.isNotEmpty()) {
                             item { CategoryBreakdownCard(data.categoryBreakdown) }
@@ -186,7 +188,7 @@ private fun ThisMonthBlock(
 }
 
 @Composable
-private fun KpiGrid(data: WorkerAnalytics) {
+private fun KpiGrid(data: WorkerAnalytics, onReviewsClick: () -> Unit = {}) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             KpiCard(
@@ -210,7 +212,8 @@ private fun KpiGrid(data: WorkerAnalytics) {
                 icon = Icons.Outlined.Star,
                 tint = StatusGold,
                 value = if (data.averageRating > 0) "%.1f".format(data.averageRating) else "—",
-                label = "${data.totalReviews} đánh giá"
+                label = "${data.totalReviews} đánh giá",
+                onClick = onReviewsClick
             )
             KpiCard(
                 modifier = Modifier.weight(1f),
@@ -229,10 +232,11 @@ private fun KpiCard(
     icon: ImageVector,
     tint: Color,
     value: String,
-    label: String
+    label: String,
+    onClick: (() -> Unit)? = null
 ) {
     Card(
-        modifier = modifier,
+        modifier = if (onClick != null) modifier.clickable(onClick = onClick) else modifier,
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
