@@ -6,11 +6,13 @@ import androidx.lifecycle.viewModelScope
 import com.example.fixbid.domain.model.Bid
 import com.example.fixbid.domain.model.Resource
 import com.example.fixbid.domain.model.WorkerProfile
+import com.example.fixbid.domain.notification.NotificationContentFactory
 import com.example.fixbid.domain.repository.AuthRepository
 import com.example.fixbid.domain.repository.BidRepository
 import com.example.fixbid.domain.repository.BookingRepository
 import com.example.fixbid.domain.repository.ChatRepository
 import com.example.fixbid.domain.repository.WorkerRepository
+import com.example.fixbid.domain.usecase.shared.SendNotificationUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,6 +46,7 @@ class BiddingViewModel @Inject constructor(
     private val workerRepository: WorkerRepository,
     private val chatRepository: ChatRepository,
     private val authRepository: AuthRepository,
+    private val sendNotification: SendNotificationUseCase,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -117,6 +120,17 @@ class BiddingViewModel @Inject constructor(
         viewModelScope.launch {
             when (val result = bidRepository.acceptBid(bidId)) {
                 is Resource.Success -> {
+                    // Notify the chosen worker their bid was accepted. Non-fatal.
+                    val acceptedBid = result.data
+                    val categoryName = (bookingRepository.getBookingById(bookingId) as? Resource.Success)
+                        ?.data?.category?.displayName ?: "công việc"
+                    sendNotification(
+                        NotificationContentFactory.bidAcceptedForWorker(
+                            workerId = acceptedBid.workerId,
+                            bookingId = bookingId,
+                            categoryName = categoryName
+                        )
+                    )
                     _events.emit(BiddingEvent.Toast("Đã chọn thợ! Vui lòng tiến hành thanh toán."))
                     _events.emit(BiddingEvent.NavigateToPayment(bookingId))
                 }
