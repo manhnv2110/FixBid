@@ -275,6 +275,9 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                 onPaymentClick = { bookingId ->
                     navController.navigate("payment/$bookingId")
                 },
+                onReviewClick = { bookingId ->
+                    navController.navigate("review/$bookingId")
+                },
                 onSignOut = {
                     navController.navigate(AuthRoutes.Welcome) {
                         popUpTo(0) { inclusive = true }
@@ -331,6 +334,13 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
 
         composable("worker_analytics") {
             com.example.fixbid.presentation.worker.analytics.WorkerAnalyticsScreen(
+                onBackClick = { navController.popBackStack() },
+                onReviewsClick = { navController.navigate("worker_reviews") }
+            )
+        }
+
+        composable("worker_reviews") {
+            com.example.fixbid.presentation.worker.reviews.WorkerReviewsScreen(
                 onBackClick = { navController.popBackStack() }
             )
         }
@@ -460,8 +470,26 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
             com.example.fixbid.presentation.customer.completion.CompletionConfirmScreen(
                 onBackClick = { navController.popBackStack() },
                 onCompleted = {
-                    navController.popBackStack("home", inclusive = false)
+                    val bId = it.arguments?.getString("bookingId") ?: ""
+                    // After confirming completion, go straight to leaving a review.
+                    if (bId.isNotBlank()) {
+                        navController.navigate("review/$bId") {
+                            popUpTo("home") { inclusive = false }
+                        }
+                    } else {
+                        navController.popBackStack("home", inclusive = false)
+                    }
                 }
+            )
+        }
+
+        composable(
+            route = "review/{bookingId}",
+            arguments = listOf(navArgument("bookingId") { type = NavType.StringType })
+        ) {
+            com.example.fixbid.presentation.customer.review.ReviewScreen(
+                onBackClick = { navController.popBackStack() },
+                onDone = { navController.popBackStack("home", inclusive = false) }
             )
         }
 
@@ -535,6 +563,9 @@ private fun handleNotificationClick(
         com.example.fixbid.domain.model.NotificationType.PAYMENT_RECEIVED ->
             if (isWorker) "worker_job_detail/$referenceId"
             else "customer_booking_detail/$referenceId"
+
+        com.example.fixbid.domain.model.NotificationType.NEW_REVIEW ->
+            if (isWorker) "worker_reviews" else "customer_booking_detail/$referenceId"
 
         else -> null
     }

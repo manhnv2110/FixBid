@@ -174,4 +174,22 @@ object NotificationContentFactory {
         type = NotificationType.PAYMENT_RECEIVED,
         referenceId = bookingId
     )
+
+    /** Thợ được báo khách vừa để lại một đánh giá mới. */
+    fun newReviewForWorker(
+        workerId: String,
+        bookingId: String,
+        rating: Int,
+        customerName: String?
+    ) = NotificationContent(
+        recipientUserId = workerId,
+        title = "Bạn nhận được đánh giá mới",
+        body = buildString {
+            append(customerName?.takeIf { it.isNotBlank() } ?: "Khách hàng")
+            append(" đã đánh giá $rating★")
+            append(" cho công việc của bạn.")
+        },
+        type = NotificationType.NEW_REVIEW,
+        referenceId = bookingId
+    )
 }
