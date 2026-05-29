@@ -307,6 +307,9 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                 onBrowseAllRequestsClick = {
                     navController.navigate("worker_requests")
                 },
+                onAnalyticsClick = {
+                    navController.navigate("worker_analytics")
+                },
                 onSignOut = {
                     navController.navigate(AuthRoutes.Welcome) {
                         popUpTo(0) { inclusive = true }
@@ -323,6 +326,12 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                 onJobClick = { bookingId ->
                     navController.navigate("worker_job_detail/$bookingId")
                 }
+            )
+        }
+
+        composable("worker_analytics") {
+            com.example.fixbid.presentation.worker.analytics.WorkerAnalyticsScreen(
+                onBackClick = { navController.popBackStack() }
             )
         }
 

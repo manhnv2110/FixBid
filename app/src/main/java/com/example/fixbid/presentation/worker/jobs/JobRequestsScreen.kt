@@ -41,7 +41,7 @@ import com.example.fixbid.ui.theme.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun JobRequestsScreen(
-    onBackClick: () -> Unit = {},
+    onBackClick: (() -> Unit)? = {},
     onJobClick: (String) -> Unit = {},
     viewModel: JobRequestsViewModel = hiltViewModel()
 ) {
@@ -53,7 +53,7 @@ fun JobRequestsScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         AppHeader(
-            title = "Yêu cầu mở",
+            title = "Tìm việc",
             onBackClick = onBackClick,
             trailing = {
                 SortMenuButton(
