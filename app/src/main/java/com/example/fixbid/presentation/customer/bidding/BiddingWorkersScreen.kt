@@ -181,7 +181,6 @@ fun BiddingWorkersScreen(
                                             clickedBid = bid
                                             viewModel.loadWorkerProfile(bid.workerId)
                                             showBottomSheet = true
-                                            onWorkerClick(bid.workerId)
                                         },
                                         onAccept = { viewModel.acceptBid(bid.id) }
                                     )
@@ -216,6 +215,13 @@ fun BiddingWorkersScreen(
                             clickedBid?.let {
                                 val name = it.worker?.fullName ?: "Thợ"
                                 viewModel.openChatWithWorker(it.workerId, name)
+                            }
+                        },
+                        onViewFullProfile = {
+                            clickedBid?.let {
+                                showBottomSheet = false
+                                viewModel.clearSelectedWorkerProfile()
+                                onWorkerClick(it.workerId)
                             }
                         }
                     )
@@ -397,7 +403,8 @@ private fun WorkerProfileBottomSheetContent(
     profile: WorkerProfile?,
     isLoading: Boolean,
     onAccept: () -> Unit,
-    onChat: () -> Unit = {}
+    onChat: () -> Unit = {},
+    onViewFullProfile: () -> Unit = {}
 ) {
     if (isLoading) {
         Box(
@@ -581,6 +588,24 @@ private fun WorkerProfileBottomSheetContent(
         }
 
         Spacer(modifier = Modifier.height(32.dp))
+
+        // View full public profile (bio, all reviews, ratings)
+        OutlinedButton(
+            onClick = onViewFullProfile,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Star,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text("Xem hồ sơ đầy đủ & đánh giá", fontWeight = FontWeight.SemiBold)
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
 
         // Action buttons row: Chat + Accept
         Row(
