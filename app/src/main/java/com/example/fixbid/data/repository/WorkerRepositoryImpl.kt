@@ -2,6 +2,7 @@ package com.example.fixbid.data.repository
 
 import com.example.fixbid.data.remote.dto.WorkerProfileDto
 import com.example.fixbid.data.remote.supabase.Tables
+import com.example.fixbid.data.remote.supabase.liveFlow
 import com.example.fixbid.domain.model.Resource
 import com.example.fixbid.domain.model.ServiceCategory
 import com.example.fixbid.domain.model.WorkerProfile
@@ -127,7 +128,7 @@ class WorkerRepositoryImpl @Inject constructor(
 
     override fun observeWorkerProfile(workerId: String): Flow<WorkerProfile?> {
         val channel = client.realtime.channel("worker_profile_$workerId")
-        return channel
+        val changes = channel
             .postgresChangeFlow<PostgresAction.Update>(schema = "public") {
                 table = Tables.WORKER_PROFILES
                 filter("user_id", FilterOperator.EQ, workerId)
@@ -137,5 +138,6 @@ class WorkerRepositoryImpl @Inject constructor(
                     action.decodeRecord<WorkerProfileDto>().toDomain()
                 }.getOrNull()
             }
+        return channel.liveFlow(changes)
     }
 }

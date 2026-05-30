@@ -1,4 +1,4 @@
-package com.example.fixbid.domain.model
+    package com.example.fixbid.domain.model
 
 data class WorkerProfile(
     val userId: String,
