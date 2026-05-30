@@ -54,6 +54,7 @@ fun WorkerHomeScreen(
     onJobRequestClick: (String) -> Unit = {},
     onBrowseAllRequestsClick: () -> Unit = {},
     onAnalyticsClick: () -> Unit = {},
+    onMyBidsClick: () -> Unit = {},
     onSignOut: () -> Unit = {},
     showWorkTab: Boolean = false,
     onNotificationSettingsClick: () -> Unit = {},
@@ -111,6 +112,8 @@ fun WorkerHomeScreen(
                 onJobRequestClick = onJobRequestClick,
                 onBrowseAllRequests = { selectedNavIndex = 1 },
                 onAnalyticsClick = onAnalyticsClick,
+                onMyBidsClick = onMyBidsClick,
+                onEditProfileClick = onWorkerProfileEditClick,
                 onSeeAllWork = { selectedNavIndex = 2 },
                 onStartJob = viewModel::startJob,
                 onCompleteJob = viewModel::completeJob
@@ -133,6 +136,8 @@ private fun WorkerDashboard(
     onJobRequestClick: (String) -> Unit,
     onBrowseAllRequests: () -> Unit,
     onAnalyticsClick: () -> Unit,
+    onMyBidsClick: () -> Unit,
+    onEditProfileClick: () -> Unit,
     onSeeAllWork: () -> Unit,
     onStartJob: (String) -> Unit,
     onCompleteJob: (String) -> Unit
@@ -169,6 +174,12 @@ private fun WorkerDashboard(
                 }
             }
             else -> {
+                // The single "next action" job — shown in the hero focus card and
+                // excluded from the list below so the same job never appears twice.
+                val focusJob = uiState.activeJobs.firstOrNull { it.status == BookingStatus.IN_PROGRESS }
+                    ?: uiState.pendingJobs.firstOrNull { it.status == BookingStatus.CONFIRMED }
+                    ?: uiState.activeJobs.firstOrNull { it.status == BookingStatus.PENDING_COMPLETION }
+
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -179,13 +190,13 @@ private fun WorkerDashboard(
                 ) {
                     // 1. Today focus — the single most important next action
                     FocusTaskCard(
-                        uiState = uiState,
+                        focus = focusJob,
                         onJobClick = onJobClick,
                         onStartJob = onStartJob,
                         onBrowseRequests = onBrowseAllRequests
                     )
 
-                    // 2. Quick stats strip → opens analytics
+                    // 2. Earnings + stats snapshot → opens analytics
                     QuickStatsRow(
                         monthlyEarnings = uiState.monthlyEarnings,
                         activeCount = uiState.activeJobs.size + uiState.pendingJobs.size,
@@ -193,17 +204,19 @@ private fun WorkerDashboard(
                         onClick = onAnalyticsClick
                     )
 
-                    // 3. Quick actions
-                    QuickActionsRow(
-                        onFindJobs = onBrowseAllRequests,
-                        onMyWork = onSeeAllWork,
-                        onAnalytics = onAnalyticsClick
+                    // 3. Secondary shortcuts (not duplicated by the bottom nav)
+                    SecondaryShortcuts(
+                        pendingBidCount = uiState.openRequests.size,
+                        needsProfileSetup = uiState.profile?.skills.isNullOrEmpty(),
+                        onMyBids = onMyBidsClick,
+                        onEditProfile = onEditProfileClick
                     )
 
-                    // 4. Active work
+                    // 4. Other active work (excluding the focus job above)
                     ActiveWorkSection(
                         activeJobs = uiState.activeJobs,
                         pendingJobs = uiState.pendingJobs,
+                        excludeId = focusJob?.id,
                         onJobClick = onJobClick,
                         onStartJob = onStartJob,
                         onSeeAll = onSeeAllWork
@@ -342,17 +355,11 @@ private fun greeting(): String {
 
 @Composable
 private fun FocusTaskCard(
-    uiState: WorkerHomeUiState,
+    focus: Booking?,
     onJobClick: (String) -> Unit,
     onStartJob: (String) -> Unit,
     onBrowseRequests: () -> Unit
 ) {
-    val inProgress = uiState.activeJobs.firstOrNull { it.status == BookingStatus.IN_PROGRESS }
-    val confirmed = uiState.pendingJobs.firstOrNull { it.status == BookingStatus.CONFIRMED }
-    val pendingCompletion = uiState.activeJobs.firstOrNull { it.status == BookingStatus.PENDING_COMPLETION }
-
-    val focus = inProgress ?: confirmed ?: pendingCompletion
-
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -612,76 +619,77 @@ private fun CellDivider() {
     )
 }
 
-// ─── Quick actions ───────────────────────────────────────────────────────────
+// ─── Secondary shortcuts (only destinations not already in the bottom nav) ─────
 
 @Composable
-private fun QuickActionsRow(
-    onFindJobs: () -> Unit,
-    onMyWork: () -> Unit,
-    onAnalytics: () -> Unit
+private fun SecondaryShortcuts(
+    pendingBidCount: Int,
+    needsProfileSetup: Boolean,
+    onMyBids: () -> Unit,
+    onEditProfile: () -> Unit
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        QuickAction(
+        ShortcutCard(
             modifier = Modifier.weight(1f),
-            icon = Icons.Outlined.Search,
-            label = "Tìm việc",
-            onClick = onFindJobs
+            icon = Icons.Outlined.Gavel,
+            title = "Báo giá của tôi",
+            subtitle = "Theo dõi báo giá đã gửi",
+            onClick = onMyBids
         )
-        QuickAction(
+        ShortcutCard(
             modifier = Modifier.weight(1f),
-            icon = Icons.Outlined.WorkOutline,
-            label = "Việc của tôi",
-            onClick = onMyWork
-        )
-        QuickAction(
-            modifier = Modifier.weight(1f),
-            icon = Icons.Outlined.BarChart,
-            label = "Thống kê",
-            onClick = onAnalytics
+            icon = Icons.Outlined.ManageAccounts,
+            title = "Hồ sơ nghề nghiệp",
+            subtitle = if (needsProfileSetup) "Hoàn thiện để nhận việc" else "Kỹ năng, giá, kinh nghiệm",
+            highlight = needsProfileSetup,
+            onClick = onEditProfile
         )
     }
 }
 
 @Composable
-private fun QuickAction(
+private fun ShortcutCard(
     modifier: Modifier = Modifier,
     icon: ImageVector,
-    label: String,
+    title: String,
+    subtitle: String,
+    highlight: Boolean = false,
     onClick: () -> Unit
 ) {
     Card(
         modifier = modifier.clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(
+            containerColor = if (highlight) MaterialTheme.colorScheme.primaryContainer
+            else MaterialTheme.colorScheme.surface
+        ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(22.dp)
-                )
-            }
-            Spacer(Modifier.height(8.dp))
+        Column(modifier = Modifier.padding(16.dp)) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = if (highlight) MaterialTheme.colorScheme.onPrimaryContainer
+                else MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(Modifier.height(10.dp))
             Text(
-                text = label,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface,
+                text = title,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = if (highlight) MaterialTheme.colorScheme.onPrimaryContainer
+                else MaterialTheme.colorScheme.onSurface,
                 maxLines = 1
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = subtitle,
+                fontSize = 11.sp,
+                color = if (highlight) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                lineHeight = 14.sp
             )
         }
     }
@@ -693,26 +701,29 @@ private fun QuickAction(
 private fun ActiveWorkSection(
     activeJobs: List<Booking>,
     pendingJobs: List<Booking>,
+    excludeId: String? = null,
     onJobClick: (String) -> Unit,
     onStartJob: (String) -> Unit,
     onSeeAll: () -> Unit
 ) {
-    val total = activeJobs.size + pendingJobs.size
-    if (total == 0) return
+    val totalAll = activeJobs.size + pendingJobs.size
+    val remaining = (activeJobs + pendingJobs).filter { it.id != excludeId }
+    if (remaining.isEmpty()) return
 
     Column {
         SectionHeader(
-            title = "Việc đang chạy ($total)",
+            title = "Việc đang chạy ($totalAll)",
             actionLabel = "Xem tất cả",
             onActionClick = onSeeAll
         )
         Spacer(modifier = Modifier.height(8.dp))
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            val pendingCompletion = activeJobs.filter { it.status == BookingStatus.PENDING_COMPLETION }
-            val inProgress = activeJobs.filter { it.status == BookingStatus.IN_PROGRESS }
+            val pendingCompletion = remaining.filter { it.status == BookingStatus.PENDING_COMPLETION }
+            val inProgress = remaining.filter { it.status == BookingStatus.IN_PROGRESS }
+            val confirmed = remaining.filter { it.status == BookingStatus.CONFIRMED }
 
-            (inProgress + pendingCompletion + pendingJobs).take(2).forEach { booking ->
+            (inProgress + pendingCompletion + confirmed).take(3).forEach { booking ->
                 when (booking.status) {
                     BookingStatus.IN_PROGRESS -> WorkerJobCard(
                         booking = booking,
