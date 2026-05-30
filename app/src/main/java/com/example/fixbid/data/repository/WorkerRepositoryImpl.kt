@@ -1,7 +1,6 @@
 package com.example.fixbid.data.repository
 
 import com.example.fixbid.data.remote.dto.WorkerProfileDto
-import com.example.fixbid.data.remote.dto.toDto
 import com.example.fixbid.data.remote.supabase.Tables
 import com.example.fixbid.domain.model.Resource
 import com.example.fixbid.domain.model.ServiceCategory
@@ -20,6 +19,8 @@ import io.github.jan.supabase.realtime.postgresChangeFlow
 import io.github.jan.supabase.realtime.realtime
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import javax.inject.Inject
@@ -62,21 +63,56 @@ class WorkerRepositoryImpl @Inject constructor(
 
     override suspend fun getWorkerById(workerId: String): Resource<WorkerProfile> =
         runCatching {
-            val result = client.postgrest[Tables.WORKER_PROFILES]
+            // decodeSingleOrNull avoids throwing when the worker has no
+            // worker_profiles row yet (common: row isn't created at signup). In
+            // that case we return a sensible empty profile so both the worker's
+            // own screen and the customer-facing profile render gracefully
+            // instead of showing "không thể hiển thị thông tin".
+            val dto = client.postgrest[Tables.WORKER_PROFILES]
                 .select(Columns.ALL) { filter { eq("user_id", workerId) } }
-                .decodeSingle<WorkerProfileDto>()
-            Resource.Success(result.toDomain())
+                .decodeSingleOrNull<WorkerProfileDto>()
+            Resource.Success(dto?.toDomain() ?: emptyProfile(workerId))
         }.getOrElse { Resource.Error(it.message ?: "Không tìm thấy thợ") }
 
     override suspend fun updateWorkerProfile(
         profile: WorkerProfile
     ): Resource<WorkerProfile> = runCatching {
+        // Build an explicit payload and upsert so:
+        //  - the first save creates the row if it doesn't exist (onConflict user_id),
+        //  - editing a field back to a "default" value (0, "") still persists
+        //    (the serializer's encodeDefaults=false would otherwise drop it),
+        //  - server-managed columns (average_rating, total_reviews, total_jobs_done,
+        //    identity_verified) are never overwritten by the client.
+        val payload = buildJsonObject {
+            put("user_id", profile.userId)
+            put("bio", profile.bio)
+            put("skills", JsonArray(profile.skills.map { JsonPrimitive(it.name.lowercase()) }))
+            put("experience_years", profile.experienceYears)
+            put("price_per_hour", profile.pricePerHour)
+            put("location", profile.location)
+            put("is_available", profile.isAvailable)
+            put("updated_at", java.time.Instant.now().toString())
+        }
         client.postgrest[Tables.WORKER_PROFILES]
-            .update(profile.toDto()) {
-                filter { eq("user_id", profile.userId) }
-            }
+            .upsert(payload) { onConflict = "user_id" }
         Resource.Success(profile)
     }.getOrElse { Resource.Error(it.message ?: "Cập nhật thất bại") }
+
+    private fun emptyProfile(workerId: String) = WorkerProfile(
+        userId = workerId,
+        bio = "",
+        skills = emptyList(),
+        experienceYears = 0,
+        pricePerHour = 0.0,
+        location = "",
+        latitude = null,
+        longitude = null,
+        isAvailable = true,
+        averageRating = 0.0,
+        totalReviews = 0,
+        totalJobsDone = 0,
+        identityVerified = false
+    )
 
     override suspend fun setAvailability(isAvailable: Boolean): Resource<Unit> =
         runCatching {
