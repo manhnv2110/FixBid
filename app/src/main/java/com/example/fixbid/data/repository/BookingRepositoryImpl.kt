@@ -3,6 +3,7 @@ package com.example.fixbid.data.repository
 import com.example.fixbid.data.remote.dto.BookingDto
 import com.example.fixbid.data.remote.dto.toDto
 import com.example.fixbid.data.remote.supabase.Tables
+import com.example.fixbid.data.remote.supabase.liveFlow
 import com.example.fixbid.domain.model.Booking
 import com.example.fixbid.domain.model.BookingStatus
 import com.example.fixbid.domain.model.Resource
@@ -243,12 +244,13 @@ class BookingRepositoryImpl @Inject constructor(
     override fun observeBooking(bookingId: String): Flow<Booking?> {
         val channel = client.realtime.channel("booking_updates_$bookingId")
 
-        return channel.postgresChangeFlow<PostgresAction.Update>(schema = "public") {
+        val changes = channel.postgresChangeFlow<PostgresAction.Update>(schema = "public") {
             table = Tables.BOOKINGS
             filter("id", FilterOperator.EQ, bookingId)
         }.map { action ->
             runCatching { action.decodeRecord<BookingDto>().toDomain() }.getOrNull()
         }
+        return channel.liveFlow(changes)
     }
 
     override suspend fun deleteBooking(bookingId: String): Resource<Unit> =

@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.fixbid.core.components.ChatBell
 import com.example.fixbid.core.components.NotificationBell
 import com.example.fixbid.core.components.SectionHeader
 import com.example.fixbid.core.utils.formatCurrencyVnd
@@ -55,13 +56,16 @@ fun WorkerHomeScreen(
     onBrowseAllRequestsClick: () -> Unit = {},
     onAnalyticsClick: () -> Unit = {},
     onMyBidsClick: () -> Unit = {},
+    onChatClick: () -> Unit = {},
     onSignOut: () -> Unit = {},
     showWorkTab: Boolean = false,
     onNotificationSettingsClick: () -> Unit = {},
     onWorkerProfileEditClick: () -> Unit = {},
-    viewModel: WorkerHomeViewModel = hiltViewModel()
+    viewModel: WorkerHomeViewModel = hiltViewModel(),
+    chatListViewModel: com.example.fixbid.presentation.customer.chat.ConversationListViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val chatUnreadCount by chatListViewModel.unreadCount.collectAsState()
     var selectedNavIndex by rememberSaveable { mutableIntStateOf(0) }
 
     LaunchedEffect(showWorkTab) {
@@ -106,6 +110,8 @@ fun WorkerHomeScreen(
                 bottomPadding = innerPadding.calculateBottomPadding(),
                 onNotificationClick = onNotificationClick,
                 unreadNotificationCount = unreadNotificationCount,
+                chatUnreadCount = chatUnreadCount,
+                onChatClick = onChatClick,
                 onToggleAvailability = viewModel::toggleAvailability,
                 onRetry = viewModel::loadDashboard,
                 onJobClick = onJobClick,
@@ -130,6 +136,8 @@ private fun WorkerDashboard(
     bottomPadding: androidx.compose.ui.unit.Dp,
     onNotificationClick: () -> Unit,
     unreadNotificationCount: Int,
+    chatUnreadCount: Int,
+    onChatClick: () -> Unit,
     onToggleAvailability: () -> Unit,
     onRetry: () -> Unit,
     onJobClick: (String) -> Unit,
@@ -149,7 +157,9 @@ private fun WorkerDashboard(
             isToggling = uiState.isTogglingAvailability,
             onToggleAvailability = onToggleAvailability,
             onNotificationClick = onNotificationClick,
-            unreadNotificationCount = unreadNotificationCount
+            unreadNotificationCount = unreadNotificationCount,
+            chatUnreadCount = chatUnreadCount,
+            onChatClick = onChatClick
         )
 
         when {
@@ -247,7 +257,9 @@ private fun DashboardHeader(
     isToggling: Boolean,
     onToggleAvailability: () -> Unit,
     onNotificationClick: () -> Unit,
-    unreadNotificationCount: Int = 0
+    unreadNotificationCount: Int = 0,
+    chatUnreadCount: Int = 0,
+    onChatClick: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -277,11 +289,18 @@ private fun DashboardHeader(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            NotificationBell(
-                unreadCount = unreadNotificationCount,
-                onClick = onNotificationClick,
-                tint = MaterialTheme.colorScheme.onPrimary
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ChatBell(
+                    unreadCount = chatUnreadCount,
+                    onClick = onChatClick,
+                    tint = MaterialTheme.colorScheme.onPrimary
+                )
+                NotificationBell(
+                    unreadCount = unreadNotificationCount,
+                    onClick = onNotificationClick,
+                    tint = MaterialTheme.colorScheme.onPrimary
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(14.dp))

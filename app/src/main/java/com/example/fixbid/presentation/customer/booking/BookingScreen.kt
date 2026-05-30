@@ -44,6 +44,7 @@ fun BookingScreen(
     initialCategoryName: String?,
     onBackClick: () -> Unit,
     onSubmitSuccess: (String) -> Unit,
+    directWorkerId: String? = null,
     viewModel: BookingViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -609,6 +610,7 @@ fun BookingScreen(
                             ?: System.currentTimeMillis(),
                         latitude = addressLatitude,
                         longitude = addressLongitude,
+                        directWorkerId = directWorkerId,
                         imageResolver = { uri ->
                             runCatching {
                                 context.contentResolver.openInputStream(uri)?.use { it.readBytes() }

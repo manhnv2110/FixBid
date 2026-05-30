@@ -3,6 +3,7 @@ package com.example.fixbid.data.repository
 import com.example.fixbid.data.remote.dto.BidDto
 import com.example.fixbid.data.remote.dto.toDto
 import com.example.fixbid.data.remote.supabase.Tables
+import com.example.fixbid.data.remote.supabase.liveFlow
 import com.example.fixbid.domain.model.Bid
 import com.example.fixbid.domain.model.Resource
 import com.example.fixbid.domain.repository.BidRepository
@@ -82,7 +83,7 @@ class BidRepositoryImpl @Inject constructor(
 
     override fun observeBidsForBooking(bookingId: String): Flow<List<Bid>> {
         val channel = client.realtime.channel("bids_$bookingId")
-        return channel
+        val changes = channel
             .postgresChangeFlow<PostgresAction>(schema = "public") {
                 table = Tables.BIDS
                 filter("booking_id", FilterOperator.EQ, bookingId)
@@ -90,5 +91,6 @@ class BidRepositoryImpl @Inject constructor(
             .map {
                 (getBidsForBooking(bookingId) as? Resource.Success)?.data ?: emptyList()
             }
+        return channel.liveFlow(changes)
     }
 }

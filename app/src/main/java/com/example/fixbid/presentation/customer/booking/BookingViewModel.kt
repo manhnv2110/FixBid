@@ -9,8 +9,10 @@ import com.example.fixbid.domain.model.BookingStatus
 import com.example.fixbid.domain.model.BookingType
 import com.example.fixbid.domain.model.Resource
 import com.example.fixbid.domain.model.ServiceCategory
+import com.example.fixbid.domain.notification.NotificationContentFactory
 import com.example.fixbid.domain.repository.AuthRepository
 import com.example.fixbid.domain.repository.BookingRepository
+import com.example.fixbid.domain.usecase.shared.SendNotificationUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,7 +33,8 @@ class BookingViewModel @Inject constructor(
     private val bookingRepository: BookingRepository,
     private val authRepository: AuthRepository,
     private val geocoderRepository: GeocoderRepository,
-    private val locationRepository: com.example.fixbid.data.location.LocationRepository
+    private val locationRepository: com.example.fixbid.data.location.LocationRepository,
+    private val sendNotification: SendNotificationUseCase
 ) : ViewModel() {
 
     // Exposed for the address picker sheet (UI-only consumer).
@@ -81,6 +84,7 @@ class BookingViewModel @Inject constructor(
         scheduledAtMillis: Long,
         latitude: Double? = null,
         longitude: Double? = null,
+        directWorkerId: String? = null,
         imageResolver: (Uri) -> ByteArray?
     ) {
         viewModelScope.launch {
@@ -109,11 +113,12 @@ class BookingViewModel @Inject constructor(
                 if (notes.isNotBlank()) append("\nGhi chú: $notes")
             }
 
+            val isDirect = !directWorkerId.isNullOrBlank()
             val now = System.currentTimeMillis()
             val booking = Booking(
                 id = UUID.randomUUID().toString(),
                 customerId = currentUser.id,
-                workerId = "",  // empty → toDto() sẽ convert thành null
+                workerId = directWorkerId ?: "",  // empty → toDto() sẽ convert thành null
                 category = category,
                 description = description,
                 address = address,
@@ -121,8 +126,8 @@ class BookingViewModel @Inject constructor(
                 longitude = resolvedLng,
                 scheduledAt = scheduledAtMillis,
                 estimatedDurationHours = 1.0,
-                status = BookingStatus.BIDDING,
-                type = BookingType.BIDDING,
+                status = if (isDirect) BookingStatus.PENDING else BookingStatus.BIDDING,
+                type = if (isDirect) BookingType.DIRECT else BookingType.BIDDING,
                 agreedPrice = null,
                 customerNote = customerNote,
                 workerNote = null,
@@ -130,9 +135,15 @@ class BookingViewModel @Inject constructor(
                 updatedAt = now
             )
 
-            when (val result = bookingRepository.createBiddingBooking(booking)) {
+            val createResult = if (isDirect) {
+                bookingRepository.createDirectBooking(booking)
+            } else {
+                bookingRepository.createBiddingBooking(booking)
+            }
+
+            when (createResult) {
                 is Resource.Success -> {
-                    val createdBooking = result.data
+                    val createdBooking = createResult.data
                     val selectedUris = _descriptionImageUris.value
 
                     // Upload ảnh mô tả (nếu có)
@@ -160,10 +171,21 @@ class BookingViewModel @Inject constructor(
                         }
                     }
 
+                    // Notify the chosen worker about the direct request.
+                    if (isDirect && directWorkerId != null) {
+                        sendNotification(
+                            NotificationContentFactory.bookingRequestForWorker(
+                                workerId = directWorkerId,
+                                bookingId = createdBooking.id,
+                                categoryName = category.displayName
+                            )
+                        )
+                    }
+
                     _uiState.value = BookingUiState.Success(createdBooking.id)
                 }
                 is Resource.Error -> {
-                    _uiState.value = BookingUiState.Error(result.message)
+                    _uiState.value = BookingUiState.Error(createResult.message)
                 }
                 is Resource.Loading -> {}
             }

@@ -291,7 +291,8 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                     val encodedName = java.net.URLEncoder.encode(workerName, "UTF-8")
                     navController.navigate("chat/$conversationId/$workerId/$encodedName")
                 },
-                onNotificationSettingsClick = { navController.navigate("notification_settings") }
+                onNotificationSettingsClick = { navController.navigate("notification_settings") },
+                onFindWorkersClick = { navController.navigate("discover_workers") }
             )
         }
 
@@ -318,6 +319,9 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                 },
                 onMyBidsClick = {
                     navController.navigate("worker_my_bids")
+                },
+                onChatClick = {
+                    navController.navigate("worker_chat_list")
                 },
                 onSignOut = {
                     navController.navigate(AuthRoutes.Welcome) {
@@ -367,12 +371,38 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
             )
         }
 
+        composable("worker_chat_list") {
+            com.example.fixbid.presentation.customer.chat.ConversationListScreen(
+                onBackClick = { navController.popBackStack() },
+                onConversationClick = { conversationId, otherId, otherName ->
+                    val encodedName = java.net.URLEncoder.encode(otherName, "UTF-8")
+                    navController.navigate("chat/$conversationId/$otherId/$encodedName")
+                }
+            )
+        }
+
         composable(
             route = "worker_public_profile/{workerId}",
             arguments = listOf(navArgument("workerId") { type = NavType.StringType })
         ) {
             com.example.fixbid.presentation.customer.worker.WorkerPublicProfileScreen(
-                onBackClick = { navController.popBackStack() }
+                onBackClick = { navController.popBackStack() },
+                onBookDirect = { workerId, categoryName ->
+                    navController.navigate("booking/$categoryName/$workerId")
+                },
+                onOpenChat = { conversationId, workerId, workerName ->
+                    val encodedName = java.net.URLEncoder.encode(workerName, "UTF-8")
+                    navController.navigate("chat/$conversationId/$workerId/$encodedName")
+                }
+            )
+        }
+
+        composable("discover_workers") {
+            com.example.fixbid.presentation.customer.worker.DiscoverWorkersScreen(
+                onBackClick = { navController.popBackStack() },
+                onWorkerClick = { workerId ->
+                    navController.navigate("worker_public_profile/$workerId")
+                }
             )
         }
 
@@ -404,6 +434,24 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
             val categoryName = backStackEntry.arguments?.getString("categoryName")
             BookingScreen(
                 initialCategoryName = categoryName,
+                onBackClick = { navController.popBackStack() },
+                onSubmitSuccess = { bookingId -> navController.navigate("booking_success/$bookingId") }
+            )
+        }
+
+        // Direct booking with a pre-selected worker (from the discover/profile flow).
+        composable(
+            route = "booking/{categoryName}/{workerId}",
+            arguments = listOf(
+                navArgument("categoryName") { type = NavType.StringType },
+                navArgument("workerId") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val categoryName = backStackEntry.arguments?.getString("categoryName")
+            val workerId = backStackEntry.arguments?.getString("workerId")
+            BookingScreen(
+                initialCategoryName = categoryName,
+                directWorkerId = workerId,
                 onBackClick = { navController.popBackStack() },
                 onSubmitSuccess = { bookingId -> navController.navigate("booking_success/$bookingId") }
             )
