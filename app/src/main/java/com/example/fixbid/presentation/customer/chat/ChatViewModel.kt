@@ -95,12 +95,26 @@ class ChatViewModel @Inject constructor(
         if (conversationId.isBlank()) return
         realtimeJob = viewModelScope.launch {
             chatRepository.observeMessages(conversationId).collect { messages ->
-                _uiState.value = _uiState.value.copy(messages = messages, isLoading = false)
+                // Realtime/DB is authoritative — but keep any optimistic message
+                // that hasn't been persisted/echoed yet so it never disappears.
+                val serverIds = messages.map { it.id }.toSet()
+                val pendingLocal = _uiState.value.messages.filter {
+                    it.id.startsWith(LOCAL_PREFIX) && messages.none { m -> m.sameContent(it) }
+                }
+                _uiState.value = _uiState.value.copy(
+                    messages = (messages + pendingLocal).sortedBy { it.createdAt },
+                    isLoading = false
+                )
                 _events.emit(ChatEvent.ScrollToBottom)
                 markAsRead()
             }
         }
     }
+
+    private fun Message.sameContent(other: Message): Boolean =
+        senderId == other.senderId &&
+            content == other.content &&
+            kotlin.math.abs(createdAt - other.createdAt) < 60_000L
 
     private fun markAsRead() {
         val uid = _uiState.value.currentUserId
@@ -120,25 +134,44 @@ class ChatViewModel @Inject constructor(
         if (text.isBlank() || state.isSending) return
         if (conversationId.isBlank() || state.currentUserId.isBlank()) return
 
-        _uiState.value = state.copy(inputText = "", isSending = true)
+        // 1. Optimistic update — show the message immediately with a local id so
+        //    sending feels instant regardless of realtime/DB round-trip latency.
+        val now = System.currentTimeMillis()
+        val optimistic = Message(
+            id             = "$LOCAL_PREFIX$now",
+            conversationId = conversationId,
+            senderId       = state.currentUserId,
+            content        = text,
+            type           = MessageType.TEXT,
+            imageUrl       = null,
+            isRead         = false,
+            createdAt      = now
+        )
+        _uiState.value = state.copy(
+            inputText = "",
+            isSending = true,
+            messages = (state.messages + optimistic).sortedBy { it.createdAt }
+        )
+        viewModelScope.launch { _events.emit(ChatEvent.ScrollToBottom) }
 
+        // 2. Persist. On success, swap the local copy for the server row; realtime
+        //    will also reconcile. On failure, drop the optimistic message.
         viewModelScope.launch {
-            val message = Message(
-                id             = "",
-                conversationId = conversationId,
-                senderId       = state.currentUserId,
-                content        = text,
-                type           = MessageType.TEXT,
-                imageUrl       = null,
-                isRead         = false,
-                createdAt      = System.currentTimeMillis()
-            )
-            when (val result = chatRepository.sendMessage(message)) {
+            when (val result = chatRepository.sendMessage(optimistic.copy(id = ""))) {
                 is Resource.Success -> {
-                    _uiState.value = _uiState.value.copy(isSending = false)
+                    _uiState.value = _uiState.value.copy(
+                        isSending = false,
+                        messages = _uiState.value.messages
+                            .map { if (it.id == optimistic.id) result.data else it }
+                            .distinctBy { it.id }
+                            .sortedBy { it.createdAt }
+                    )
                 }
                 is Resource.Error -> {
-                    _uiState.value = _uiState.value.copy(isSending = false)
+                    _uiState.value = _uiState.value.copy(
+                        isSending = false,
+                        messages = _uiState.value.messages.filterNot { it.id == optimistic.id }
+                    )
                     _events.emit(ChatEvent.Toast(result.message))
                 }
                 is Resource.Loading -> {}
@@ -149,5 +182,9 @@ class ChatViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         realtimeJob?.cancel()
+    }
+
+    private companion object {
+        const val LOCAL_PREFIX = "local_"
     }
 }

@@ -10,4 +10,11 @@ data class Conversation(
     val createdAt: Long,
     val customer: User? = null,
     val worker: User? = null
-)
+) {
+    /** Id của người đối diện so với [currentUserId] (khách ↔ thợ). */
+    fun counterpartId(currentUserId: String): String =
+        if (currentUserId == customerId) workerId else customerId
+
+    /** Thông tin người đối diện đã được enrich (tên/avatar) để hiển thị. */
+    val counterpart: User? get() = worker ?: customer
+}

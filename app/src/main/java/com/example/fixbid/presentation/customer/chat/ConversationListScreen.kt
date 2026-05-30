@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -29,6 +30,7 @@ import com.example.fixbid.domain.model.Conversation
 @Composable
 fun ConversationListScreen(
     onConversationClick: (conversationId: String, workerId: String, workerName: String) -> Unit = { _, _, _ -> },
+    onBackClick: (() -> Unit)? = null,
     viewModel: ConversationListViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -48,8 +50,20 @@ fun ConversationListScreen(
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.primary)
                     .statusBarsPadding()
-                    .padding(horizontal = 20.dp, vertical = 16.dp)
+                    .padding(horizontal = 8.dp, vertical = 16.dp)
             ) {
+                if (onBackClick != null) {
+                    IconButton(
+                        onClick = onBackClick,
+                        modifier = Modifier.align(Alignment.CenterStart)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Quay lại",
+                            tint = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                }
                 Text(
                     text = "Tin nhắn",
                     color = MaterialTheme.colorScheme.onPrimary,
@@ -93,13 +107,15 @@ fun ConversationListScreen(
                                 items = state.conversations,
                                 key = { it.id }
                             ) { conv ->
+                                val other = conv.counterpart
+                                val otherId = conv.counterpartId(state.currentUserId)
                                 ConversationItem(
                                     conversation = conv,
                                     onClick = {
                                         onConversationClick(
                                             conv.id,
-                                            conv.workerId,
-                                            conv.worker?.fullName ?: "Thợ"
+                                            otherId,
+                                            other?.fullName ?: "Người dùng"
                                         )
                                     }
                                 )
@@ -122,8 +138,8 @@ private fun ConversationItem(
     conversation: Conversation,
     onClick: () -> Unit
 ) {
-    val worker = conversation.worker
-    val initials = (worker?.fullName?.firstOrNull() ?: 'T').toString()
+    val person = conversation.counterpart
+    val initials = (person?.fullName?.firstOrNull() ?: 'U').toString()
 
     Row(
         modifier = Modifier
@@ -134,9 +150,9 @@ private fun ConversationItem(
     ) {
         // Avatar
         Box(modifier = Modifier.size(52.dp)) {
-            if (!worker?.avatarUrl.isNullOrBlank()) {
+            if (!person?.avatarUrl.isNullOrBlank()) {
                 AsyncImage(
-                    model = worker!!.avatarUrl,
+                    model = person!!.avatarUrl,
                     contentDescription = "Avatar",
                     modifier = Modifier
                         .size(52.dp)
@@ -184,7 +200,7 @@ private fun ConversationItem(
         // Name + preview
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = worker?.fullName ?: "Thợ #${conversation.workerId.take(6)}",
+                text = person?.fullName ?: "Người dùng",
                 fontWeight = if (conversation.unreadCount > 0) FontWeight.Bold else FontWeight.SemiBold,
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface,

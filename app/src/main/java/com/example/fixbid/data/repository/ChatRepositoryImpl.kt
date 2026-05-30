@@ -2,6 +2,7 @@ package com.example.fixbid.data.repository
 
 import com.example.fixbid.data.remote.dto.MessageDto
 import com.example.fixbid.data.remote.supabase.Tables
+import com.example.fixbid.data.remote.supabase.liveFlow
 import com.example.fixbid.domain.model.Conversation
 import com.example.fixbid.domain.model.Message
 import com.example.fixbid.domain.model.Resource
@@ -53,7 +54,7 @@ class ChatRepositoryImpl @Inject constructor(
 
     override fun observeMessages(conversationId: String): Flow<List<Message>> {
         val channel = client.realtime.channel("messages_$conversationId")
-        return channel
+        val changes = channel
             .postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
                 table = Tables.MESSAGES
                 filter("conversation_id", FilterOperator.EQ, conversationId)
@@ -67,18 +68,22 @@ class ChatRepositoryImpl @Inject constructor(
                     .decodeList<MessageDto>()
                     .map { it.toDomain() }
             }
+        return channel.liveFlow(changes)
     }
 
     override fun observeConversations(userId: String): Flow<List<Conversation>> {
-        val channel = client.realtime.channel("conversations_$userId")
-        return channel
+        // A new message in ANY conversation should refresh the list (last message
+        // preview + unread badge), for both customer and worker. We watch the
+        // messages table globally and re-pull the user's conversations on change.
+        val channel = client.realtime.channel("conversations_feed_$userId")
+        val changes = channel
             .postgresChangeFlow<PostgresAction>(schema = "public") {
-                table = Tables.CONVERSATIONS
-                filter("customer_id", FilterOperator.EQ, userId)
+                table = Tables.MESSAGES
             }
             .map {
                 (getConversations(userId) as? Resource.Success)?.data ?: emptyList()
             }
+        return channel.liveFlow(changes)
     }
 
     override suspend fun getOrCreateConversation(
@@ -134,14 +139,31 @@ class ChatRepositoryImpl @Inject constructor(
             val all = (asCustomer + asWorker)
                 .distinctBy { it["id"] }
                 .map { row ->
+                    val convId = row["id"] ?: ""
+                    // Pull last message + unread count for this conversation so the
+                    // list preview and badge are accurate for whoever is viewing.
+                    val messages = runCatching {
+                        client.postgrest[Tables.MESSAGES]
+                            .select(Columns.ALL) {
+                                filter { eq("conversation_id", convId) }
+                                order("created_at", Order.DESCENDING)
+                                limit(50)
+                            }
+                            .decodeList<MessageDto>()
+                            .map { it.toDomain() }
+                    }.getOrDefault(emptyList())
+
+                    val lastMessage = messages.firstOrNull()
+                    val unread = messages.count { !it.isRead && it.senderId != userId }
+
                     Conversation(
-                        id          = row["id"] ?: "",
+                        id          = convId,
                         customerId  = row["customer_id"] ?: "",
                         workerId    = row["worker_id"] ?: "",
                         bookingId   = row["booking_id"],
-                        lastMessage = null,
-                        unreadCount = 0,
-                        createdAt   = System.currentTimeMillis()
+                        lastMessage = lastMessage,
+                        unreadCount = unread,
+                        createdAt   = lastMessage?.createdAt ?: System.currentTimeMillis()
                     )
                 }
             Resource.Success(all)

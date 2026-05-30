@@ -3,6 +3,7 @@ package com.example.fixbid.data.repository
 import com.example.fixbid.data.remote.dto.NewNotificationDto
 import com.example.fixbid.data.remote.dto.NotificationDto
 import com.example.fixbid.data.remote.supabase.Tables
+import com.example.fixbid.data.remote.supabase.liveFlow
 import com.example.fixbid.domain.model.Notification
 import com.example.fixbid.domain.model.NotificationType
 import com.example.fixbid.domain.model.Resource
@@ -96,24 +97,26 @@ class NotificationRepositoryImpl @Inject constructor(
     override fun observeNotifications(userId: String): Flow<List<Notification>> {
         val channel = client.realtime.channel("notification_updates_$userId")
 
-        return channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
+        val changes = channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
             table  = Tables.NOTIFICATIONS
             filter("user_id", FilterOperator.EQ, userId)
         }.map {
             // Khi có thông báo mới, load lại toàn bộ
             (getNotifications(userId) as? Resource.Success)?.data ?: emptyList()
         }
+        return channel.liveFlow(changes)
     }
 
     override fun observeNewNotifications(userId: String): Flow<Notification> {
         val channel = client.realtime.channel("notification_push_$userId")
 
-        return channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
+        val changes = channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
             table  = Tables.NOTIFICATIONS
             filter("user_id", FilterOperator.EQ, userId)
         }.mapNotNull { action ->
             runCatching { action.decodeRecord<NotificationDto>().toDomain() }.getOrNull()
         }
+        return channel.liveFlow(changes)
     }
 
     override suspend fun saveFcmToken(userId: String, token: String): Resource<Unit> =
