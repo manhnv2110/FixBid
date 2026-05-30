@@ -8,7 +8,9 @@ import com.example.fixbid.domain.model.Booking
 import com.example.fixbid.domain.model.BookingStatus
 import com.example.fixbid.domain.model.Resource
 import com.example.fixbid.domain.model.ServiceCategory
+import com.example.fixbid.domain.notification.NotificationContentFactory
 import com.example.fixbid.domain.repository.BookingRepository
+import com.example.fixbid.domain.usecase.shared.SendNotificationUseCase
 import com.example.fixbid.data.location.GeocoderRepository
 import com.example.fixbid.data.location.LocationRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -51,7 +53,8 @@ class CustomerBookingDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val bookingRepository: BookingRepository,
     private val geocoderRepository: GeocoderRepository,
-    private val locationRepository: LocationRepository
+    private val locationRepository: LocationRepository,
+    private val sendNotification: SendNotificationUseCase
 ) : ViewModel() {
 
     val geocoder: GeocoderRepository get() = geocoderRepository
@@ -238,13 +241,25 @@ class CustomerBookingDetailViewModel @Inject constructor(
         }
     }
 
-    fun cancelBooking() {
+    fun cancelBooking(reason: String = "") {
         val booking = _uiState.value.booking ?: return
+        val finalReason = reason.trim().ifBlank { "Khách hàng hủy yêu cầu" }
         viewModelScope.launch {
             _uiState.update { it.copy(isCancelling = true) }
-            when (val result = bookingRepository.cancelBooking(booking.id, "Khách hàng hủy yêu cầu")) {
+            when (val result = bookingRepository.cancelBooking(booking.id, finalReason)) {
                 is Resource.Success -> {
                     _uiState.update { it.copy(isCancelling = false) }
+                    // Notify the assigned worker (if any) that the booking was cancelled.
+                    booking.workerId.takeIf { it.isNotBlank() }?.let { workerId ->
+                        sendNotification(
+                            NotificationContentFactory.bookingCancelledForUser(
+                                userId = workerId,
+                                bookingId = booking.id,
+                                categoryName = booking.category.displayName,
+                                reason = finalReason
+                            )
+                        )
+                    }
                     _events.trySend(CustomerBookingDetailEvent.Toast("Đã hủy yêu cầu thành công"))
                     loadBooking()
                 }

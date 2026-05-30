@@ -50,7 +50,7 @@ import com.example.fixbid.ui.theme.StatusGold
 import com.example.fixbid.ui.theme.StatusRed
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun CustomerBookingDetailScreen(
     onBackClick: () -> Unit,
@@ -66,6 +66,7 @@ fun CustomerBookingDetailScreen(
     var showAddressPicker by remember { mutableStateOf(false) }
     var isFetchingMyLocation by remember { mutableStateOf(false) }
     var showCancelDialog by remember { mutableStateOf(false) }
+    var cancelReason by remember { mutableStateOf("") }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var expandedCategoryMenu by remember { mutableStateOf(false) }
 
@@ -785,6 +786,19 @@ fun CustomerBookingDetailScreen(
                                     Text("Xác nhận thợ hoàn thành", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                                 }
                             }
+                            BookingStatus.PENDING, BookingStatus.CONFIRMED -> {
+                                // Before the worker starts, the customer may still cancel.
+                                OutlinedButton(
+                                    onClick = { showCancelDialog = true },
+                                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                                ) {
+                                    Icon(Icons.Outlined.Cancel, null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.error)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Huỷ yêu cầu", fontWeight = FontWeight.Bold)
+                                }
+                            }
                             else -> {
                                 // For other states (cancelled, in progress, completed) we don't show booking actions
                             }
@@ -810,24 +824,83 @@ fun CustomerBookingDetailScreen(
             )
         }
 
-        // Cancel confirmation dialog
+        // Cancel confirmation dialog with reason capture
         if (showCancelDialog) {
+            val presetReasons = listOf(
+                "Đổi lịch / không còn nhu cầu",
+                "Tìm được thợ khác",
+                "Giá chưa phù hợp",
+                "Đặt nhầm dịch vụ"
+            )
             AlertDialog(
-                onDismissRequest = { showCancelDialog = false },
+                onDismissRequest = {
+                    if (!uiState.isCancelling) {
+                        showCancelDialog = false
+                        cancelReason = ""
+                    }
+                },
                 title = { Text("Huỷ yêu cầu dịch vụ?", fontWeight = FontWeight.Bold) },
-                text = { Text("Bạn có chắc chắn muốn huỷ yêu cầu đặt lịch dịch vụ này không?") },
+                text = {
+                    Column {
+                        Text(
+                            "Cho chúng tôi biết lý do bạn huỷ (không bắt buộc):",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        androidx.compose.foundation.layout.FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            presetReasons.forEach { reason ->
+                                FilterChip(
+                                    selected = cancelReason == reason,
+                                    onClick = { cancelReason = reason },
+                                    label = { Text(reason, fontSize = 12.sp) }
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        OutlinedTextField(
+                            value = cancelReason,
+                            onValueChange = { cancelReason = it },
+                            placeholder = { Text("Hoặc nhập lý do khác...") },
+                            modifier = Modifier.fillMaxWidth(),
+                            minLines = 2,
+                            maxLines = 4,
+                            shape = RoundedCornerShape(10.dp),
+                            enabled = !uiState.isCancelling
+                        )
+                    }
+                },
                 confirmButton = {
                     TextButton(
+                        enabled = !uiState.isCancelling,
                         onClick = {
-                            viewModel.cancelBooking()
+                            viewModel.cancelBooking(cancelReason)
                             showCancelDialog = false
+                            cancelReason = ""
                         }
                     ) {
-                        Text("Đồng ý huỷ", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                        if (uiState.isCancelling) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        } else {
+                            Text("Đồng ý huỷ", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                        }
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showCancelDialog = false }) {
+                    TextButton(
+                        enabled = !uiState.isCancelling,
+                        onClick = {
+                            showCancelDialog = false
+                            cancelReason = ""
+                        }
+                    ) {
                         Text("Không")
                     }
                 }
