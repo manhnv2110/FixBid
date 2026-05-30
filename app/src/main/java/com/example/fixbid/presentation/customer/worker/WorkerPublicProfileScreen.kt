@@ -1,6 +1,7 @@
 package com.example.fixbid.presentation.customer.worker
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.FlowRow
@@ -11,8 +12,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.outlined.Badge
+import androidx.compose.material.icons.outlined.EventAvailable
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.RateReview
 import androidx.compose.material.icons.outlined.Star
@@ -20,6 +23,7 @@ import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -46,9 +50,23 @@ import com.example.fixbid.ui.theme.StatusGold
 @Composable
 fun WorkerPublicProfileScreen(
     onBackClick: () -> Unit = {},
+    onBookDirect: (workerId: String, categoryName: String) -> Unit = { _, _ -> },
+    onOpenChat: (conversationId: String, workerId: String, workerName: String) -> Unit = { _, _, _ -> },
     viewModel: WorkerPublicProfileViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is WorkerPublicProfileEvent.OpenChat ->
+                    onOpenChat(event.conversationId, event.workerId, event.workerName)
+                is WorkerPublicProfileEvent.Toast ->
+                    android.widget.Toast.makeText(context, event.message, android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -65,6 +83,20 @@ fun WorkerPublicProfileScreen(
                     navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
                 )
             )
+        },
+        bottomBar = {
+            val data = uiState.data
+            if (data != null) {
+                WorkerProfileActionBar(
+                    isOpeningChat = uiState.isOpeningChat,
+                    onChat = { viewModel.openChat() },
+                    onBook = {
+                        val categoryName = data.profile.skills.firstOrNull()?.name
+                            ?: com.example.fixbid.domain.model.ServiceCategory.OTHER.name
+                        onBookDirect(data.workerId, categoryName)
+                    }
+                )
+            }
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
@@ -118,6 +150,53 @@ fun WorkerPublicProfileScreen(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WorkerProfileActionBar(
+    isOpeningChat: Boolean,
+    onChat: () -> Unit,
+    onBook: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 8.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            OutlinedButton(
+                onClick = onChat,
+                enabled = !isOpeningChat,
+                modifier = Modifier.weight(1f).height(50.dp),
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+            ) {
+                if (isOpeningChat) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.primary)
+                } else {
+                    Icon(Icons.Outlined.ChatBubbleOutline, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Nhắn tin", fontWeight = FontWeight.SemiBold)
+                }
+            }
+            Button(
+                onClick = onBook,
+                modifier = Modifier.weight(1f).height(50.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+            ) {
+                Icon(Icons.Outlined.EventAvailable, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Đặt thợ này", fontWeight = FontWeight.Bold)
             }
         }
     }
