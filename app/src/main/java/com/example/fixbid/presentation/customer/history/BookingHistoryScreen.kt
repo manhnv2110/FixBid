@@ -42,6 +42,7 @@ fun BookingHistoryScreen(
     onCompletionConfirmClick: (String) -> Unit = {},
     onPaymentClick: (String) -> Unit = {},
     onReviewClick: (String) -> Unit = {},
+    onWorkerProfileClick: (String) -> Unit = {},
     viewModel: BookingHistoryViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -204,7 +205,10 @@ fun BookingHistoryScreen(
                                     onBiddingWorkersClick = { onBiddingWorkersClick(booking.id) },
                                     onPaymentClick = { onPaymentClick(booking.id) },
                                     onCompletionConfirmClick = { onCompletionConfirmClick(booking.id) },
-                                    onReviewClick = { onReviewClick(booking.id) }
+                                    onReviewClick = { onReviewClick(booking.id) },
+                                    onWorkerProfileClick = {
+                                        if (booking.workerId.isNotBlank()) onWorkerProfileClick(booking.workerId)
+                                    }
                                 )
                             }
                             // Bottom spacing
@@ -253,7 +257,8 @@ private fun BookingCard(
     onBiddingWorkersClick: () -> Unit,
     onPaymentClick: () -> Unit,
     onCompletionConfirmClick: () -> Unit,
-    onReviewClick: () -> Unit = {}
+    onReviewClick: () -> Unit = {},
+    onWorkerProfileClick: () -> Unit = {}
 ) {
     val statusInfo = getStatusInfo(booking.status)
 
@@ -467,7 +472,14 @@ private fun BookingCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     if (booking.worker != null) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable(enabled = booking.workerId.isNotBlank()) {
+                                    onWorkerProfileClick()
+                                }
+                        ) {
                             Box(
                                 modifier = Modifier
                                     .size(24.dp)
@@ -489,6 +501,14 @@ private fun BookingCard(
                                 color = MaterialTheme.colorScheme.onSurface,
                                 fontWeight = FontWeight.Medium
                             )
+                            if (booking.workerId.isNotBlank()) {
+                                Icon(
+                                    Icons.Default.ChevronRight,
+                                    contentDescription = "Xem hồ sơ thợ",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
                         }
                     }
                     Text(

@@ -43,6 +43,7 @@ fun HomeScreen(
     onCompletionConfirmClick: (String) -> Unit = {},
     onPaymentClick: (String) -> Unit = {},
     onReviewClick: (String) -> Unit = {},
+    onWorkerProfileClick: (String) -> Unit = {},
     onSignOut: () -> Unit = {},
     showHistoryTab: Boolean = false,
     onChatConversationClick: (conversationId: String, workerId: String, workerName: String) -> Unit = { _, _, _ -> },
@@ -81,7 +82,8 @@ fun HomeScreen(
                     onBiddingWorkersClick = onBiddingWorkersClick,
                     onCompletionConfirmClick = onCompletionConfirmClick,
                     onPaymentClick = onPaymentClick,
-                    onReviewClick = onReviewClick
+                    onReviewClick = onReviewClick,
+                    onWorkerProfileClick = onWorkerProfileClick
                 )
             }
             2 -> Box(modifier = Modifier.padding(innerPadding)) {

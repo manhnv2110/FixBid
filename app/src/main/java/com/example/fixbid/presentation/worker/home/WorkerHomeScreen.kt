@@ -57,6 +57,7 @@ fun WorkerHomeScreen(
     onSignOut: () -> Unit = {},
     showWorkTab: Boolean = false,
     onNotificationSettingsClick: () -> Unit = {},
+    onWorkerProfileEditClick: () -> Unit = {},
     viewModel: WorkerHomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -95,7 +96,8 @@ fun WorkerHomeScreen(
             3 -> Box(modifier = Modifier.padding(innerPadding)) {
                 ProfileScreen(
                     onSignOut = onSignOut,
-                    onNotificationSettingsClick = onNotificationSettingsClick
+                    onNotificationSettingsClick = onNotificationSettingsClick,
+                    onWorkerProfileClick = onWorkerProfileEditClick
                 )
             }
             else -> WorkerDashboard(

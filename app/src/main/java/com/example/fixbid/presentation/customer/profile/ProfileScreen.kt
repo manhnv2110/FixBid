@@ -31,6 +31,7 @@ import com.example.fixbid.domain.model.UserRole
 fun ProfileScreen(
     onSignOut: () -> Unit,
     onNotificationSettingsClick: () -> Unit = {},
+    onWorkerProfileClick: (() -> Unit)? = null,
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -345,6 +346,18 @@ fun ProfileScreen(
                         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                     ) {
                         Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                            if (onWorkerProfileClick != null && user.role == UserRole.WORKER) {
+                                ProfileMenuItem(
+                                    icon = Icons.Outlined.Work,
+                                    title = "Hồ sơ nghề nghiệp",
+                                    subtitle = "Kỹ năng, kinh nghiệm, giá dịch vụ",
+                                    onClick = onWorkerProfileClick
+                                )
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(horizontal = 20.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                                )
+                            }
                             ProfileMenuItem(
                                 icon = Icons.Outlined.Payment,
                                 title = "Thanh toán",

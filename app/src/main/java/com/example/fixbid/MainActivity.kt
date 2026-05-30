@@ -278,6 +278,9 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                 onReviewClick = { bookingId ->
                     navController.navigate("review/$bookingId")
                 },
+                onWorkerProfileClick = { workerId ->
+                    navController.navigate("worker_public_profile/$workerId")
+                },
                 onSignOut = {
                     navController.navigate(AuthRoutes.Welcome) {
                         popUpTo(0) { inclusive = true }
@@ -319,7 +322,8 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                     }
                 },
                 showWorkTab = showWork,
-                onNotificationSettingsClick = { navController.navigate("notification_settings") }
+                onNotificationSettingsClick = { navController.navigate("notification_settings") },
+                onWorkerProfileEditClick = { navController.navigate("worker_profile_edit") }
             )
         }
 
@@ -341,6 +345,21 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
 
         composable("worker_reviews") {
             com.example.fixbid.presentation.worker.reviews.WorkerReviewsScreen(
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        composable("worker_profile_edit") {
+            com.example.fixbid.presentation.worker.profile.WorkerProfileEditScreen(
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = "worker_public_profile/{workerId}",
+            arguments = listOf(navArgument("workerId") { type = NavType.StringType })
+        ) {
+            com.example.fixbid.presentation.customer.worker.WorkerPublicProfileScreen(
                 onBackClick = { navController.popBackStack() }
             )
         }
@@ -423,7 +442,7 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                 bookingId = bookingId,
                 onBackClick = { navController.popBackStack() },
                 onWorkerClick = { workerId ->
-                    /* TODO: Navigate to worker profile */
+                    navController.navigate("worker_public_profile/$workerId")
                 },
                 onNavigateToPayment = { bId ->
                     navController.navigate("payment/$bId")
