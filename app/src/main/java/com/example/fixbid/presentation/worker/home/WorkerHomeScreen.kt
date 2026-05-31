@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -57,6 +58,7 @@ fun WorkerHomeScreen(
     onAnalyticsClick: () -> Unit = {},
     onMyBidsClick: () -> Unit = {},
     onChatClick: () -> Unit = {},
+    onChatbotClick: () -> Unit = {},
     onSignOut: () -> Unit = {},
     showWorkTab: Boolean = false,
     onNotificationSettingsClick: () -> Unit = {},
@@ -80,6 +82,22 @@ fun WorkerHomeScreen(
                 onItemSelected = { selectedNavIndex = it },
                 openRequestCount = uiState.openRequests.size
             )
+        },
+        floatingActionButton = {
+            if (selectedNavIndex == 0) {
+                ExtendedFloatingActionButton(
+                    onClick = onChatbotClick,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Filled.AutoAwesome,
+                            contentDescription = null
+                        )
+                    },
+                    text = { Text("Trợ lý AI", fontWeight = FontWeight.SemiBold) }
+                )
+            }
         },
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0)

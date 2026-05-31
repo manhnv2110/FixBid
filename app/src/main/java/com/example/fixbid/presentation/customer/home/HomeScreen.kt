@@ -9,6 +9,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.PersonSearch
@@ -52,6 +53,7 @@ fun HomeScreen(
     onChatConversationClick: (conversationId: String, workerId: String, workerName: String) -> Unit = { _, _, _ -> },
     onNotificationSettingsClick: () -> Unit = {},
     onFindWorkersClick: () -> Unit = {},
+    onChatbotClick: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
     chatListViewModel: ConversationListViewModel = hiltViewModel()
 ) {
@@ -75,6 +77,22 @@ fun HomeScreen(
                 onItemSelected = { selectedNavIndex = it },
                 chatUnreadCount = chatUnreadCount
             )
+        },
+        floatingActionButton = {
+            if (selectedNavIndex == 0) {
+                ExtendedFloatingActionButton(
+                    onClick = onChatbotClick,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Filled.AutoAwesome,
+                            contentDescription = null
+                        )
+                    },
+                    text = { Text("Trợ lý AI", fontWeight = FontWeight.SemiBold) }
+                )
+            }
         },
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
