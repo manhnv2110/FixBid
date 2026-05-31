@@ -41,6 +41,9 @@ android {
         // VNPay Sandbox
         buildConfigField("String", "VNPAY_TMN_CODE", "\"${resolveProp("VNPAY_TMN_CODE")}\"")
         buildConfigField("String", "VNPAY_HASH_SECRET", "\"${resolveProp("VNPAY_HASH_SECRET")}\"")
+
+        // Groq AI (chatbot). Key lives in local.properties, never hardcoded.
+        buildConfigField("String", "GROQ_API_KEY", "\"${resolveProp("GROQ_API_KEY")}\"")
     }
 
     buildTypes {
@@ -93,6 +96,9 @@ dependencies {
     implementation("io.github.jan-tennert.supabase:realtime-kt")
 
     implementation("io.ktor:ktor-client-android:3.0.3")
+    implementation("io.ktor:ktor-client-content-negotiation:3.0.3")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.3")
+    implementation("io.ktor:ktor-client-logging:3.0.3")
 
     // Datastore
     implementation("androidx.datastore:datastore-preferences:1.1.1")
