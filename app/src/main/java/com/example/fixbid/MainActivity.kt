@@ -292,7 +292,8 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                     navController.navigate("chat/$conversationId/$workerId/$encodedName")
                 },
                 onNotificationSettingsClick = { navController.navigate("notification_settings") },
-                onFindWorkersClick = { navController.navigate("discover_workers") }
+                onFindWorkersClick = { navController.navigate("discover_workers") },
+                onChatbotClick = { navController.navigate("chatbot") }
             )
         }
 
@@ -322,6 +323,9 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                 },
                 onChatClick = {
                     navController.navigate("worker_chat_list")
+                },
+                onChatbotClick = {
+                    navController.navigate("chatbot")
                 },
                 onSignOut = {
                     navController.navigate(AuthRoutes.Welcome) {
@@ -402,6 +406,15 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                 onBackClick = { navController.popBackStack() },
                 onWorkerClick = { workerId ->
                     navController.navigate("worker_public_profile/$workerId")
+                }
+            )
+        }
+
+        composable("chatbot") {
+            com.example.fixbid.presentation.chatbot.ChatbotScreen(
+                onBackClick = { navController.popBackStack() },
+                onNavigateRoute = { route ->
+                    runCatching { navController.navigate(route) }
                 }
             )
         }
