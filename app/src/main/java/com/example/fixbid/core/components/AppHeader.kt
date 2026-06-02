@@ -17,15 +17,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/**
- * Header chuẩn cho mọi màn hình ở mức root tab (cả customer + worker).
- * - Solid PrimaryBlue
- * - Padding statusBar
- * - Tiêu đề căn giữa hoặc trái (khi có back)
- * - Slot trailing cho actions (notification, filter, ...)
- *
- * Dùng cùng style cho mọi role để bảo đảm nhất quán.
- */
 @Composable
 fun AppHeader(
     title: String,

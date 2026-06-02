@@ -74,6 +74,19 @@ class BookingViewModel @Inject constructor(
         _descriptionImageUris.value = _descriptionImageUris.value.filter { it != uri }
     }
 
+    /**
+     * Replace a previously selected description image with the result of the
+     * inline photo editor (annotations + spotlight blur baked into a new
+     * `file://` Uri pointing to the cache directory). The position is
+     * preserved so the order the user picked stays stable.
+     */
+    fun replaceDescriptionImage(old: Uri, new: Uri) {
+        if (old == new) return
+        _descriptionImageUris.value = _descriptionImageUris.value.map { uri ->
+            if (uri == old) new else uri
+        }
+    }
+
     fun createBooking(
         category: ServiceCategory,
         description: String,

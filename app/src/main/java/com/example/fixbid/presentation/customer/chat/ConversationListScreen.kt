@@ -45,34 +45,48 @@ fun ConversationListScreen(
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             // Header xanh — chuẩn design app (giống BookingHistoryScreen)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.primary)
-                    .statusBarsPadding()
-                    .padding(horizontal = 8.dp, vertical = 16.dp)
+            Surface(
+                color = MaterialTheme.colorScheme.primary,
+                shadowElevation = 2.dp,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                if (onBackClick != null) {
-                    IconButton(
-                        onClick = onBackClick,
-                        modifier = Modifier.align(Alignment.CenterStart)
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Quay lại",
-                            tint = MaterialTheme.colorScheme.onPrimary
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = 8.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (onBackClick != null) {
+                        IconButton(onClick = onBackClick) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Quay lại",
+                                tint = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.width(12.dp))
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Tin nhắn",
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp
                         )
+                        val convCount = (uiState as? ConversationListUiState.Success)
+                            ?.conversations?.size ?: 0
+                        if (convCount > 0) {
+                            Text(
+                                text = "$convCount cuộc trò chuyện",
+                                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.78f),
+                                fontSize = 11.sp
+                            )
+                        }
                     }
                 }
-                Text(
-                    text = "Tin nhắn",
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp,
-                    modifier = Modifier.align(Alignment.Center)
-                )
             }
-            HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
 
             when (val state = uiState) {
                 is ConversationListUiState.Loading -> {

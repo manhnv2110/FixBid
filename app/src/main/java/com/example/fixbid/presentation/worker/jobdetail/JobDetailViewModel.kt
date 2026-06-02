@@ -40,6 +40,7 @@ data class CompletionFormState(
 data class JobDetailUiState(
     val isLoading: Boolean = true,
     val data: JobDetailData? = null,
+    val payment: com.example.fixbid.domain.model.Payment? = null,
     val errorMessage: String? = null,
     val showBidDialog: Boolean = false,
     val bidForm: BidFormState = BidFormState(),
@@ -59,6 +60,7 @@ class JobDetailViewModel @Inject constructor(
     private val getJobDetailUseCase: GetJobDetailUseCase,
     private val placeBidUseCase: PlaceBidUseCase,
     private val bookingRepository: BookingRepository,
+    private val paymentRepository: com.example.fixbid.domain.repository.PaymentRepository,
     private val sendNotification: SendNotificationUseCase
 ) : ViewModel() {
 
@@ -78,8 +80,14 @@ class JobDetailViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             when (val result = getJobDetailUseCase(bookingId)) {
-                is Resource.Success -> _uiState.update {
-                    it.copy(isLoading = false, data = result.data)
+                is Resource.Success -> {
+                    // Pull the payment row alongside so the COMPLETED branch
+                    // can render a payout receipt without a separate spinner.
+                    val payment = (paymentRepository.getPaymentByBooking(bookingId)
+                        as? Resource.Success)?.data
+                    _uiState.update {
+                        it.copy(isLoading = false, data = result.data, payment = payment)
+                    }
                 }
                 is Resource.Error -> _uiState.update {
                     it.copy(isLoading = false, errorMessage = result.message)
@@ -210,6 +218,20 @@ class JobDetailViewModel @Inject constructor(
     fun removeCompletionImage(uri: Uri) = _uiState.update {
         it.copy(completionForm = it.completionForm.copy(
             selectedImageUris = it.completionForm.selectedImageUris - uri
+        ))
+    }
+
+    /**
+     * Replace a previously selected completion image with a new Uri (e.g.
+     * one returned from the in-app photo editor). Position in the list is
+     * preserved so the worker's chosen order stays stable.
+     */
+    fun replaceCompletionImage(old: Uri, new: Uri) = _uiState.update {
+        if (old == new) return@update it
+        it.copy(completionForm = it.completionForm.copy(
+            selectedImageUris = it.completionForm.selectedImageUris.map { uri ->
+                if (uri == old) new else uri
+            }
         ))
     }
 

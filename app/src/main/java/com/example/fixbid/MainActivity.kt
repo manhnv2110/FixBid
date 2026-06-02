@@ -321,6 +321,9 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                 onMyBidsClick = {
                     navController.navigate("worker_my_bids")
                 },
+                onWalletClick = {
+                    navController.navigate("worker_wallet")
+                },
                 onChatClick = {
                     navController.navigate("worker_chat_list")
                 },
@@ -334,7 +337,8 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                 },
                 showWorkTab = showWork,
                 onNotificationSettingsClick = { navController.navigate("notification_settings") },
-                onWorkerProfileEditClick = { navController.navigate("worker_profile_edit") }
+                onWorkerProfileEditClick = { navController.navigate("worker_profile_edit") },
+                onVerifyIdentityClick = { navController.navigate("worker_verify_identity") }
             )
         }
 
@@ -366,10 +370,25 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
             )
         }
 
+        composable("worker_verify_identity") {
+            com.example.fixbid.presentation.worker.profile.WorkerVerifyIdentityScreen(
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+
         composable("worker_my_bids") {
             com.example.fixbid.presentation.worker.bids.MyBidsScreen(
                 onBackClick = { navController.popBackStack() },
                 onJobClick = { bookingId ->
+                    navController.navigate("worker_job_detail/$bookingId")
+                }
+            )
+        }
+
+        composable("worker_wallet") {
+            com.example.fixbid.presentation.worker.wallet.WorkerWalletScreen(
+                onBackClick = { navController.popBackStack() },
+                onTransactionClick = { bookingId ->
                     navController.navigate("worker_job_detail/$bookingId")
                 }
             )
@@ -651,9 +670,14 @@ private fun handleNotificationClick(
 
         com.example.fixbid.domain.model.NotificationType.BOOKING_CONFIRMED,
         com.example.fixbid.domain.model.NotificationType.BOOKING_CANCELLED,
-        com.example.fixbid.domain.model.NotificationType.BOOKING_REMINDER,
-        com.example.fixbid.domain.model.NotificationType.PAYMENT_RECEIVED ->
+        com.example.fixbid.domain.model.NotificationType.BOOKING_REMINDER ->
             if (isWorker) "worker_job_detail/$referenceId"
+            else "customer_booking_detail/$referenceId"
+
+        com.example.fixbid.domain.model.NotificationType.PAYMENT_RECEIVED ->
+            // Worker → wallet so the deposit is the first thing they see;
+            // customer → booking detail (in case they're the one being notified).
+            if (isWorker) "worker_wallet"
             else "customer_booking_detail/$referenceId"
 
         com.example.fixbid.domain.model.NotificationType.NEW_REVIEW ->

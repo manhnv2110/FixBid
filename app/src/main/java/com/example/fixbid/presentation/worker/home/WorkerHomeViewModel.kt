@@ -10,6 +10,7 @@ import com.example.fixbid.domain.repository.AuthRepository
 import com.example.fixbid.domain.repository.WorkerRepository
 import com.example.fixbid.domain.usecase.worker.GetOpenJobRequestsUseCase
 import com.example.fixbid.domain.usecase.worker.GetWorkerDashboardUseCase
+import com.example.fixbid.domain.usecase.worker.ReleasePendingEscrowsUseCase
 import com.example.fixbid.domain.usecase.worker.UpdateJobStatusUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,6 +41,7 @@ class WorkerHomeViewModel @Inject constructor(
     private val getDashboardUseCase: GetWorkerDashboardUseCase,
     private val getOpenJobRequestsUseCase: GetOpenJobRequestsUseCase,
     private val updateJobStatusUseCase: UpdateJobStatusUseCase,
+    private val releasePendingEscrows: ReleasePendingEscrowsUseCase,
     private val workerRepository: WorkerRepository,
     private val authRepository: AuthRepository
 ) : ViewModel() {
@@ -54,6 +56,11 @@ class WorkerHomeViewModel @Inject constructor(
     fun loadDashboard() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+
+            // Belt-and-braces: clear any escrows that got stuck because a
+            // previous customer confirm-completion could not finish the
+            // release step. Idempotent and quiet.
+            val recovered = runCatching { releasePendingEscrows() }.getOrDefault(0)
 
             val user = authRepository.getCurrentUser()
             val userName = user?.fullName ?: ""
@@ -79,6 +86,14 @@ class WorkerHomeViewModel @Inject constructor(
                             completedCount = data.completedCount,
                             totalEarnings = data.totalEarnings,
                             monthlyEarnings = data.monthlyEarnings
+                        )
+                    }
+                    // Surface a soft toast / event when stuck payouts are
+                    // released — handy for both the worker and for QA.
+                    if (recovered > 0) {
+                        android.util.Log.i(
+                            "WorkerHome",
+                            "Recovered $recovered stuck escrow release(s)"
                         )
                     }
                 }

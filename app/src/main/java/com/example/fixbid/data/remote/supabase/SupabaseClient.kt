@@ -20,6 +20,8 @@ object Tables {
     const val MESSAGES        = "messages"
     const val NOTIFICATIONS   = "notifications"
     const val FCM_TOKENS      = "fcm_tokens"
+    const val WALLETS              = "wallets"
+    const val WALLET_TRANSACTIONS  = "wallet_transactions"
 }
 
 fun createFixBidSupabaseClient(): SupabaseClient = createSupabaseClient(

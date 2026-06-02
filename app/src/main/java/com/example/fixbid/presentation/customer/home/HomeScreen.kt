@@ -9,9 +9,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.outlined.LocationOn
-import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.PersonSearch
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -27,10 +25,10 @@ import com.example.fixbid.core.utils.ServiceCategoryMapper
 import com.example.fixbid.domain.model.ServiceCategory
 import com.example.fixbid.core.components.BottomNavbar
 import com.example.fixbid.core.components.CategoryGrid
+import com.example.fixbid.core.components.DraggableAiFab
 import com.example.fixbid.core.components.NotificationBell
 import com.example.fixbid.core.components.NotificationCard
 import com.example.fixbid.core.components.PromoBanner
-import com.example.fixbid.core.components.SearchBar
 import com.example.fixbid.presentation.customer.history.BookingHistoryScreen
 import com.example.fixbid.presentation.customer.profile.ProfileScreen
 import com.example.fixbid.presentation.customer.chat.ConversationListScreen
@@ -78,74 +76,73 @@ fun HomeScreen(
                 chatUnreadCount = chatUnreadCount
             )
         },
-        floatingActionButton = {
-            if (selectedNavIndex == 0) {
-                ExtendedFloatingActionButton(
-                    onClick = onChatbotClick,
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Filled.AutoAwesome,
-                            contentDescription = null
-                        )
-                    },
-                    text = { Text("Trợ lý AI", fontWeight = FontWeight.SemiBold) }
-                )
-            }
-        },
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { innerPadding ->
-        when (selectedNavIndex) {
-            1 -> Box(modifier = Modifier.padding(innerPadding)) {
-                BookingHistoryScreen(
-                    onBookingClick = onBookingClick,
-                    onBiddingWorkersClick = onBiddingWorkersClick,
-                    onCompletionConfirmClick = onCompletionConfirmClick,
-                    onPaymentClick = onPaymentClick,
-                    onReviewClick = onReviewClick,
-                    onWorkerProfileClick = onWorkerProfileClick
-                )
+        Box(modifier = Modifier.fillMaxSize()) {
+            when (selectedNavIndex) {
+                1 -> Box(modifier = Modifier.padding(innerPadding)) {
+                    BookingHistoryScreen(
+                        onBookingClick = onBookingClick,
+                        onBiddingWorkersClick = onBiddingWorkersClick,
+                        onCompletionConfirmClick = onCompletionConfirmClick,
+                        onPaymentClick = onPaymentClick,
+                        onReviewClick = onReviewClick,
+                        onWorkerProfileClick = onWorkerProfileClick
+                    )
+                }
+                2 -> Box(modifier = Modifier.padding(innerPadding)) {
+                    ConversationListScreen(
+                        onConversationClick = onChatConversationClick,
+                        viewModel = chatListViewModel
+                    )
+                }
+                3 -> Box(modifier = Modifier.padding(innerPadding)) {
+                    ProfileScreen(
+                        onSignOut = onSignOut,
+                        onNotificationSettingsClick = onNotificationSettingsClick
+                    )
+                }
+                else -> Column(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    HomeHeader(
+                        onNotificationClick = onNotificationClick,
+                        unreadNotificationCount = unreadNotificationCount
+                    )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp)
+                            .padding(top = 20.dp, bottom = innerPadding.calculateBottomPadding() + 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(20.dp)
+                    ) {
+                        PromoBanner()
+                        NotificationSection(
+                            state = uiState.notificationState,
+                            onRetry = viewModel::loadNotifications
+                        )
+                        FindWorkersCta(onClick = onFindWorkersClick)
+                        CategorySection(
+                            categories = uiState.categories,
+                            onCategoryClick = onCategoryClick
+                        )
+                    }
+                }
             }
-            2 -> Box(modifier = Modifier.padding(innerPadding)) {
-                ConversationListScreen(
-                    onConversationClick = onChatConversationClick,
-                    viewModel = chatListViewModel
-                )
-            }
-            3 -> Box(modifier = Modifier.padding(innerPadding)) {
-                ProfileScreen(
-                    onSignOut = onSignOut,
-                    onNotificationSettingsClick = onNotificationSettingsClick
-                )
-            }
-            else -> Column(
-                modifier = Modifier.fillMaxSize()
-            ) {
-                HomeHeader(
-                    searchQuery = uiState.searchQuery,
-                    onSearchChange = viewModel::onSearchQueryChange,
-                    onNotificationClick = onNotificationClick,
-                    unreadNotificationCount = unreadNotificationCount
-                )
-                Column(
+
+            // Draggable AI assistant overlay — only on the home tab so it
+            // doesn't cover other screens' primary actions.
+            if (selectedNavIndex == 0) {
+                Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp)
-                        .padding(top = 20.dp, bottom = innerPadding.calculateBottomPadding() + 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                        .padding(bottom = innerPadding.calculateBottomPadding())
                 ) {
-                    PromoBanner()
-                    NotificationSection(
-                        state = uiState.notificationState,
-                        onRetry = viewModel::loadNotifications
-                    )
-                    FindWorkersCta(onClick = onFindWorkersClick)
-                    CategorySection(
-                        categories = uiState.categories,
-                        onCategoryClick = onCategoryClick
+                    DraggableAiFab(
+                        onClick = onChatbotClick,
+                        storageKey = "customer_ai_fab"
                     )
                 }
             }
@@ -153,40 +150,54 @@ fun HomeScreen(
     }
 }
 
+/**
+ * Customer home screen header. The previous version included a search bar
+ * and a "Bạn cần giúp gì nào?" prompt that did not drive any flow, so it has
+ * been simplified to a tight one-row header that only carries the location
+ * label and the notification bell.
+ */
 @Composable
 private fun HomeHeader(
-    searchQuery: String,
-    onSearchChange: (String) -> Unit,
     onNotificationClick: () -> Unit,
     unreadNotificationCount: Int = 0,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.primary)
-            .statusBarsPadding()
-            .padding(horizontal = 20.dp)
-            .padding(top = 16.dp, bottom = 24.dp)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.primary,
+        shadowElevation = 2.dp
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(horizontal = 20.dp)
+                .padding(top = 14.dp, bottom = 16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Outlined.LocationOn,
-                    contentDescription = "Vị trí",
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Hà Nội",
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 16.sp
+                    text = "Vị trí của bạn",
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium
                 )
+                Spacer(modifier = Modifier.height(2.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Outlined.LocationOn,
+                        contentDescription = "Vị trí",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Hà Nội",
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 16.sp
+                    )
+                }
             }
             NotificationBell(
                 unreadCount = unreadNotificationCount,
@@ -194,24 +205,6 @@ private fun HomeHeader(
                 tint = MaterialTheme.colorScheme.onPrimary
             )
         }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Text(
-            text = "Bạn cần giúp gì nào?",
-            color = MaterialTheme.colorScheme.onPrimary,
-            fontWeight = FontWeight.Bold,
-            fontSize = 22.sp
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        SearchBar(
-            query = searchQuery,
-            onQueryChange = onSearchChange
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
     }
 }
 
