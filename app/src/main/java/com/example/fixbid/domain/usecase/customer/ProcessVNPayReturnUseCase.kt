@@ -15,10 +15,12 @@ import javax.inject.Inject
  * 2. Kiểm tra mã phản hồi (00 = thành công)
  * 3. Cập nhật payment status -> ESCROW (holding)
  * 4. Cập nhật booking status -> CONFIRMED
+ * 5. Hold worker_receives vào pending_balance của ví thợ
  */
 class ProcessVNPayReturnUseCase @Inject constructor(
     private val paymentRepository: PaymentRepository,
     private val bookingRepository: BookingRepository,
+    private val walletRepository: com.example.fixbid.domain.repository.WalletRepository,
     private val vnPayService: VNPayService
 ) {
     suspend operator fun invoke(params: Map<String, String>): Resource<Payment> {
@@ -47,6 +49,10 @@ class ProcessVNPayReturnUseCase @Inject constructor(
                 // 4. Cập nhật booking -> CONFIRMED (thợ có thể bắt đầu công việc)
                 val bookingId = updateResult.data.bookingId
                 bookingRepository.confirmBooking(bookingId)
+                // 5. Bơm worker_receives sang pending_balance của ví thợ.
+                //    RPC idempotent: nếu IPN + return URL chạy hai lần thì
+                //    cũng chỉ insert một dòng wallet_transactions.
+                runCatching { walletRepository.holdEscrow(updateResult.data.id) }
                 updateResult
             }
             is Resource.Error -> updateResult

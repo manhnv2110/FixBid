@@ -95,13 +95,20 @@ class CompletionConfirmViewModel @Inject constructor(
                     // Release escrow - chuyển tiền cho thợ
                     when (val escrowResult = releaseEscrowUseCase(bookingId)) {
                         is Resource.Success -> {
-                            _uiState.value = _uiState.value.copy(isSubmitting = false)
+                            // Local payment snapshot so the receipt card has
+                            // the released amount + timestamp without a refetch.
+                            _uiState.value = _uiState.value.copy(
+                                isSubmitting = false,
+                                payment = escrowResult.data
+                            )
+                            notifyWorkerPaymentReceived(escrowResult.data.workerReceives)
                             _events.emit(CompletionConfirmEvent.Toast("Đã xác nhận hoàn thành! Tiền đã được chuyển cho thợ."))
                             _events.emit(CompletionConfirmEvent.CompletionConfirmed)
                         }
                         is Resource.Error -> {
-                            // Booking đã completed nhưng escrow release failed
-                            // Vẫn emit success vì booking đã hoàn thành, escrow sẽ được xử lý sau
+                            // Booking đã completed nhưng escrow release failed.
+                            // Giữ trạng thái success cho user, hệ thống sẽ tự retry
+                            // (xem WorkerHomeViewModel.retryPendingEscrowReleases).
                             _uiState.value = _uiState.value.copy(isSubmitting = false)
                             _events.emit(CompletionConfirmEvent.Toast("Đã xác nhận hoàn thành! Tiền sẽ được chuyển cho thợ trong ít phút."))
                             _events.emit(CompletionConfirmEvent.CompletionConfirmed)
@@ -167,6 +174,22 @@ class CompletionConfirmViewModel @Inject constructor(
                 workerId = workerId,
                 bookingId = booking.id,
                 categoryName = booking.category.displayName
+            )
+        )
+    }
+
+    /**
+     * Sent the moment escrow is released so the worker sees the deposit
+     * land in their wallet without having to manually refresh.
+     */
+    private suspend fun notifyWorkerPaymentReceived(workerReceives: Double) {
+        val booking = _uiState.value.booking ?: return
+        val workerId = booking.workerId.takeIf { it.isNotBlank() } ?: return
+        sendNotification(
+            NotificationContentFactory.paymentReceivedForWorker(
+                workerId = workerId,
+                bookingId = booking.id,
+                amountLabel = com.example.fixbid.core.utils.formatCurrencyVnd(workerReceives)
             )
         )
     }
