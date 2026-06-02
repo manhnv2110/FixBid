@@ -22,7 +22,6 @@ sealed class NotificationUiState {
 
 data class HomeUiState(
     val categories: List<ServiceCategory> = ServiceCategoryMapper.homeCategories,
-    val searchQuery: String = "",
     val notificationState: NotificationUiState = NotificationUiState.Loading
 )
 
@@ -36,10 +35,6 @@ class HomeViewModel @Inject constructor(
 
     init {
         loadNotifications()
-    }
-
-    fun onSearchQueryChange(query: String) {
-        _uiState.value = _uiState.value.copy(searchQuery = query)
     }
 
     fun loadNotifications() {

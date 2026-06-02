@@ -3,11 +3,15 @@ package com.example.fixbid.core.components
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Redeem
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -45,11 +49,24 @@ fun PromoBanner(modifier: Modifier = Modifier) {
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Image(
-                        painter            = painterResource(R.drawable.gift),
-                        contentDescription = "Sale Gift",
-                        modifier           = Modifier.size(32.dp).padding(end = 6.dp)
-                    )
+                    // Use a tinted Material vector so the icon adopts the banner's
+                    // colour scheme instead of carrying a hard-coded white PNG
+                    // background that broke visual continuity.
+                    Box(
+                        modifier = Modifier
+                            .size(26.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector        = Icons.Outlined.Redeem,
+                            contentDescription = "Khuyến mãi",
+                            tint               = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier           = Modifier.size(16.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text       = "MÃ : FIXEN",
                         fontWeight = FontWeight.Bold,
@@ -60,7 +77,7 @@ fun PromoBanner(modifier: Modifier = Modifier) {
             }
 
             Box(
-                modifier        = Modifier.width(130.dp).fillMaxHeight().background(MaterialTheme.colorScheme.primaryContainer),
+                modifier        = Modifier.width(130.dp).fillMaxHeight(),
                 contentAlignment = Alignment.Center
             ) {
                 Image(
