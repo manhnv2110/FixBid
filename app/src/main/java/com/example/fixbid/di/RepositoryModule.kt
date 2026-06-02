@@ -38,4 +38,7 @@ abstract class RepositoryModule {
 
     @Binds @Singleton
     abstract fun bindAiAgentRepository(impl: AiAgentRepositoryImpl): AiAgentRepository
+
+    @Binds @Singleton
+    abstract fun bindWalletRepository(impl: WalletRepositoryImpl): WalletRepository
 }
