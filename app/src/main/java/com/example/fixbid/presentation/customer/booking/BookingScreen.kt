@@ -82,6 +82,11 @@ fun BookingScreen(
 
     val descriptionImageUris by viewModel.descriptionImageUris.collectAsState()
 
+    // Inline photo editor — when non-null, the editor occupies the screen
+    // until the user saves or cancels. Saved bitmaps replace the original
+    // selection; cancelling leaves the original intact.
+    var editingUri by remember { mutableStateOf<Uri?>(null) }
+
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 5)
     ) { uris ->
@@ -290,7 +295,10 @@ fun BookingScreen(
                                             color = MaterialTheme.colorScheme.outlineVariant,
                                             shape = RoundedCornerShape(10.dp)
                                         )
+                                        .clickable { editingUri = uri }
                                 )
+
+                                // Remove button (top-end)
                                 Box(
                                     modifier = Modifier
                                         .align(Alignment.TopEnd)
@@ -306,6 +314,34 @@ fun BookingScreen(
                                         contentDescription = "Xóa",
                                         tint = Color.White,
                                         modifier = Modifier.size(12.dp)
+                                    )
+                                }
+
+                                // Edit affordance (bottom-end). Tapping the
+                                // pill or the thumbnail itself opens the
+                                // photo editor with annotations + spotlight.
+                                Row(
+                                    modifier = Modifier
+                                        .align(Alignment.BottomCenter)
+                                        .padding(bottom = 4.dp)
+                                        .clip(RoundedCornerShape(50))
+                                        .background(MaterialTheme.colorScheme.primary)
+                                        .clickable { editingUri = uri }
+                                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.Edit,
+                                        contentDescription = "Chỉnh sửa",
+                                        tint = MaterialTheme.colorScheme.onPrimary,
+                                        modifier = Modifier.size(11.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text(
+                                        text = "Sửa",
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold
                                     )
                                 }
                             }
@@ -664,6 +700,20 @@ fun BookingScreen(
                 }
             )
         }
+    }
+
+    // Photo editor overlay — covers the whole screen when active so we don't
+    // need to plumb a navigation route. Saved bitmaps replace the original
+    // selection in-place; cancelling leaves it untouched.
+    editingUri?.let { uri ->
+        PhotoEditorScreen(
+            sourceUri = uri,
+            onCancel = { editingUri = null },
+            onSave = { savedUri ->
+                viewModel.replaceDescriptionImage(uri, savedUri)
+                editingUri = null
+            }
+        )
     }
 }
 
