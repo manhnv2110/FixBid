@@ -334,7 +334,8 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                 },
                 showWorkTab = showWork,
                 onNotificationSettingsClick = { navController.navigate("notification_settings") },
-                onWorkerProfileEditClick = { navController.navigate("worker_profile_edit") }
+                onWorkerProfileEditClick = { navController.navigate("worker_profile_edit") },
+                onVerifyIdentityClick = { navController.navigate("worker_verify_identity") }
             )
         }
 
@@ -362,6 +363,12 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
 
         composable("worker_profile_edit") {
             com.example.fixbid.presentation.worker.profile.WorkerProfileEditScreen(
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        composable("worker_verify_identity") {
+            com.example.fixbid.presentation.worker.profile.WorkerVerifyIdentityScreen(
                 onBackClick = { navController.popBackStack() }
             )
         }
