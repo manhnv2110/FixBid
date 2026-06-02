@@ -6,10 +6,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.fixbid.domain.model.Booking
 import com.example.fixbid.domain.model.BookingStatus
+import com.example.fixbid.domain.model.Payment
 import com.example.fixbid.domain.model.Resource
 import com.example.fixbid.domain.model.ServiceCategory
 import com.example.fixbid.domain.notification.NotificationContentFactory
 import com.example.fixbid.domain.repository.BookingRepository
+import com.example.fixbid.domain.repository.PaymentRepository
 import com.example.fixbid.domain.usecase.shared.SendNotificationUseCase
 import com.example.fixbid.data.location.GeocoderRepository
 import com.example.fixbid.data.location.LocationRepository
@@ -26,6 +28,7 @@ import javax.inject.Inject
 data class CustomerBookingDetailUiState(
     val isLoading: Boolean = true,
     val booking: Booking? = null,
+    val payment: Payment? = null,
     val errorMessage: String? = null,
     val isEditing: Boolean = false,
     val isSaving: Boolean = false,
@@ -52,6 +55,7 @@ sealed interface CustomerBookingDetailEvent {
 class CustomerBookingDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val bookingRepository: BookingRepository,
+    private val paymentRepository: PaymentRepository,
     private val geocoderRepository: GeocoderRepository,
     private val locationRepository: LocationRepository,
     private val sendNotification: SendNotificationUseCase
@@ -82,10 +86,15 @@ class CustomerBookingDetailViewModel @Inject constructor(
             when (val result = bookingRepository.getBookingById(bookingId)) {
                 is Resource.Success -> {
                     val booking = result.data
+                    // Payment is best-effort: missing means cash booking or
+                    // pre-payment state — don't block the UI on it.
+                    val payment = (paymentRepository.getPaymentByBooking(bookingId)
+                        as? Resource.Success)?.data
                     _uiState.update {
                         it.copy(
                             isLoading = false,
                             booking = booking,
+                            payment = payment,
                             editCategory = booking.category,
                             editDescription = booking.description,
                             editAddress = booking.address,

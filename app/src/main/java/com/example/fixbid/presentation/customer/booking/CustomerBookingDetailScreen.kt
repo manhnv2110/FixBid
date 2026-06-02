@@ -208,6 +208,14 @@ fun CustomerBookingDetailScreen(
                         }
                     }
 
+                    // Payment receipt — visible once the booking is fully
+                    // completed and the escrow has been released. Pulls
+                    // amount, fee and "received at" timestamp from the
+                    // payments table so the customer has a clear receipt.
+                    if (booking.status == BookingStatus.COMPLETED && uiState.payment != null) {
+                        CompletedPaymentCard(payment = uiState.payment!!)
+                    }
+
                     // Main info Card (View mode or Edit mode)
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -1038,5 +1046,107 @@ private fun getStatusInfo(status: BookingStatus): StatusInfo {
         BookingStatus.COMPLETED -> StatusInfo("Hoàn thành", if (isDark) Color(0xFF81C784) else Color(0xFF43A047))
         BookingStatus.CANCELLED -> StatusInfo("Đã huỷ", if (isDark) Color(0xFFCFD8DC) else Color(0xFFB0BEC5))
         BookingStatus.DISPUTED -> StatusInfo("Tranh chấp", if (isDark) Color(0xFFE57373) else Color(0xFFD32F2F))
+    }
+}
+
+// ─── Completed payment receipt ───────────────────────────────────────────────
+
+@Composable
+private fun CompletedPaymentCard(payment: com.example.fixbid.domain.model.Payment) {
+    val released = payment.escrowStatus == com.example.fixbid.domain.model.EscrowStatus.RELEASED ||
+        payment.status == com.example.fixbid.domain.model.PaymentStatus.COMPLETED
+
+    val accent = if (released)
+        com.example.fixbid.ui.theme.AccentGreen
+    else
+        com.example.fixbid.ui.theme.StatusOrange
+
+    val statusLabel = if (released)
+        "Đã thanh toán cho thợ"
+    else
+        "Đang xử lý thanh toán"
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(accent.copy(alpha = 0.16f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Outlined.Receipt,
+                        contentDescription = null,
+                        tint = accent,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Hoá đơn thanh toán",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = statusLabel,
+                        fontSize = 11.sp,
+                        color = accent
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(modifier = Modifier.height(10.dp))
+
+            ReceiptLine(
+                label = "Bạn đã thanh toán",
+                value = formatCurrencyVnd(payment.amount)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            ReceiptLine(
+                label = "Phí nền tảng (${com.example.fixbid.core.utils.PaymentConstants.PLATFORM_FEE_LABEL})",
+                value = formatCurrencyVnd(payment.platformFee)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            ReceiptLine(
+                label = "Thợ nhận được",
+                value = formatCurrencyVnd(payment.workerReceives)
+            )
+
+            if (payment.releasedAt != null && payment.releasedAt > 0L) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Chuyển cho thợ lúc ${formatRelativeTime(payment.releasedAt)}",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReceiptLine(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            value,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
     }
 }
