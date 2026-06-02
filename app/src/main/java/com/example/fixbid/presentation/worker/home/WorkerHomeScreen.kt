@@ -56,6 +56,7 @@ fun WorkerHomeScreen(
     onBrowseAllRequestsClick: () -> Unit = {},
     onAnalyticsClick: () -> Unit = {},
     onMyBidsClick: () -> Unit = {},
+    onWalletClick: () -> Unit = {},
     onChatClick: () -> Unit = {},
     onChatbotClick: () -> Unit = {},
     onSignOut: () -> Unit = {},
@@ -122,6 +123,7 @@ fun WorkerHomeScreen(
                     onBrowseAllRequests = { selectedNavIndex = 1 },
                     onAnalyticsClick = onAnalyticsClick,
                     onMyBidsClick = onMyBidsClick,
+                    onWalletClick = onWalletClick,
                     onEditProfileClick = onWorkerProfileEditClick,
                     onVerifyIdentityClick = onVerifyIdentityClick,
                     onSeeAllWork = { selectedNavIndex = 2 },
@@ -164,6 +166,7 @@ private fun WorkerDashboard(
     onBrowseAllRequests: () -> Unit,
     onAnalyticsClick: () -> Unit,
     onMyBidsClick: () -> Unit,
+    onWalletClick: () -> Unit,
     onEditProfileClick: () -> Unit,
     onVerifyIdentityClick: () -> Unit,
     onSeeAllWork: () -> Unit,
@@ -250,6 +253,7 @@ private fun WorkerDashboard(
                         pendingBidCount = uiState.openRequests.size,
                         needsProfileSetup = uiState.profile?.skills.isNullOrEmpty(),
                         onMyBids = onMyBidsClick,
+                        onWallet = onWalletClick,
                         onEditProfile = onEditProfileClick
                     )
 
@@ -897,24 +901,39 @@ private fun SecondaryShortcuts(
     pendingBidCount: Int,
     needsProfileSetup: Boolean,
     onMyBids: () -> Unit,
+    onWallet: () -> Unit,
     onEditProfile: () -> Unit
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        ShortcutCard(
-            modifier = Modifier.weight(1f),
-            icon = Icons.Outlined.Gavel,
-            title = "Báo giá của tôi",
-            subtitle = "Theo dõi báo giá đã gửi",
-            onClick = onMyBids
-        )
-        ShortcutCard(
-            modifier = Modifier.weight(1f),
-            icon = Icons.Outlined.ManageAccounts,
-            title = "Hồ sơ nghề nghiệp",
-            subtitle = if (needsProfileSetup) "Hoàn thiện để nhận việc" else "Kỹ năng, giá, kinh nghiệm",
-            highlight = needsProfileSetup,
-            onClick = onEditProfile
-        )
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            ShortcutCard(
+                modifier = Modifier.weight(1f),
+                icon = Icons.Outlined.AccountBalanceWallet,
+                title = "Ví của tôi",
+                subtitle = "Số dư & lịch sử thanh toán",
+                onClick = onWallet
+            )
+            ShortcutCard(
+                modifier = Modifier.weight(1f),
+                icon = Icons.Outlined.Gavel,
+                title = "Báo giá của tôi",
+                subtitle = "Theo dõi báo giá đã gửi",
+                onClick = onMyBids
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            ShortcutCard(
+                modifier = Modifier.weight(1f),
+                icon = Icons.Outlined.ManageAccounts,
+                title = "Hồ sơ nghề nghiệp",
+                subtitle = if (needsProfileSetup) "Hoàn thiện để nhận việc" else "Kỹ năng, giá, kinh nghiệm",
+                highlight = needsProfileSetup,
+                onClick = onEditProfile
+            )
+            // Spacer so the row keeps the same column widths even with one
+            // visible tile, keeping the dashboard rhythm consistent.
+            Box(modifier = Modifier.weight(1f))
+        }
     }
 }
 
