@@ -26,6 +26,7 @@ class UserPreferencesDataStore @Inject constructor(
         val KEY_NOTIF_ENABLED = booleanPreferencesKey("notif_enabled")
         val KEY_NOTIF_SOUND   = booleanPreferencesKey("notif_sound")
         val KEY_NOTIF_VIBRATE = booleanPreferencesKey("notif_vibrate")
+        val KEY_VERIFY_SUBMITTED_AT = stringPreferencesKey("verify_submitted_at")
     }
 
     val userRole: Flow<UserRole?> = context.dataStore.data.map { prefs ->
@@ -45,6 +46,15 @@ class UserPreferencesDataStore @Inject constructor(
 
     val notificationVibrateEnabled: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_NOTIF_VIBRATE] ?: true }
+
+    /**
+     * Timestamp (epoch millis as string) of the last identity verification
+     * submission, or `null` if the worker hasn't submitted yet. Stored
+     * locally because the backend has no submission endpoint yet — used to
+     * show a persistent "đang xét duyệt" state on the verify screen.
+     */
+    val verificationSubmittedAt: Flow<Long?> =
+        context.dataStore.data.map { it[KEY_VERIFY_SUBMITTED_AT]?.toLongOrNull() }
 
     suspend fun saveUserSession(userId: String, role: UserRole) {
         context.dataStore.edit {
@@ -75,5 +85,13 @@ class UserPreferencesDataStore @Inject constructor(
 
     suspend fun setNotificationVibrateEnabled(enabled: Boolean) {
         context.dataStore.edit { it[KEY_NOTIF_VIBRATE] = enabled }
+    }
+
+    suspend fun markVerificationSubmitted(timestamp: Long = System.currentTimeMillis()) {
+        context.dataStore.edit { it[KEY_VERIFY_SUBMITTED_AT] = timestamp.toString() }
+    }
+
+    suspend fun clearVerificationSubmission() {
+        context.dataStore.edit { it.remove(KEY_VERIFY_SUBMITTED_AT) }
     }
 }
