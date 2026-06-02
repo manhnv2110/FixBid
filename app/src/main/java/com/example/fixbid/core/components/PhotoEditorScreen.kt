@@ -1,4 +1,4 @@
-package com.example.fixbid.presentation.customer.booking
+package com.example.fixbid.core.components
 
 import android.graphics.Bitmap
 import android.graphics.RectF

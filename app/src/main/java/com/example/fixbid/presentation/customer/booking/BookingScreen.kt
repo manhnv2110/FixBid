@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import com.example.fixbid.core.components.PhotoEditorScreen
 import com.example.fixbid.core.components.ScheduleDateTimePicker
 import com.example.fixbid.domain.model.ServiceCategory
 import kotlinx.coroutines.launch
