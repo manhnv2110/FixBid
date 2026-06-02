@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -33,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.example.fixbid.core.components.AppHeader
+import com.example.fixbid.core.components.PhotoEditorScreen
 import com.example.fixbid.core.components.StatusPill
 import com.example.fixbid.core.utils.formatCurrencyVnd
 import com.example.fixbid.core.utils.formatDateTimeVi
@@ -53,6 +55,12 @@ fun JobDetailScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    // Hoisted to the screen level so the photo editor overlay sits above
+    // the report-completion ModalBottomSheet (which itself lives in a
+    // separate popup window). If we kept this state inside the bottom
+    // sheet, dragging the sheet down would dismiss the editor with it.
+    var editingUri by remember { mutableStateOf<Uri?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -118,6 +126,7 @@ fun JobDetailScreen(
             uiState.data != null -> {
                 JobDetailContent(
                     data = uiState.data!!,
+                    payment = uiState.payment,
                     contentPadding = innerPadding
                 )
             }
@@ -147,7 +156,32 @@ fun JobDetailScreen(
                 onNoteChange = viewModel::onCompletionNoteChange,
                 onImagesPicked = viewModel::onCompletionImagesSelected,
                 onRemoveImage = viewModel::removeCompletionImage,
+                onEditImage = { uri -> editingUri = uri },
                 onSubmit = { imageBytes -> viewModel.submitCompletion(imageBytes) }
+            )
+        }
+    }
+
+    // Photo editor overlay — wrapped in a Dialog so it renders in its own
+    // window above the bottom sheet. The Dialog window sits on top of the
+    // ModalBottomSheet's window so the editor is always reachable, and
+    // dragging the bottom sheet no longer takes the editor down with it.
+    editingUri?.let { current ->
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { editingUri = null },
+            properties = androidx.compose.ui.window.DialogProperties(
+                usePlatformDefaultWidth = false,
+                dismissOnBackPress = true,
+                dismissOnClickOutside = false
+            )
+        ) {
+            PhotoEditorScreen(
+                sourceUri = current,
+                onCancel = { editingUri = null },
+                onSave = { savedUri ->
+                    viewModel.replaceCompletionImage(current, savedUri)
+                    editingUri = null
+                }
             )
         }
     }
@@ -158,6 +192,7 @@ fun JobDetailScreen(
 @Composable
 private fun JobDetailContent(
     data: com.example.fixbid.domain.usecase.worker.JobDetailData,
+    payment: com.example.fixbid.domain.model.Payment?,
     contentPadding: PaddingValues
 ) {
     Column(
@@ -188,6 +223,13 @@ private fun JobDetailContent(
         }
 
         InfoCard(booking = data.booking)
+
+        // Receipt card on COMPLETED so the worker sees how much landed in
+        // their wallet and when. Hidden until the payment has actually
+        // been released from escrow to avoid showing "0đ" prematurely.
+        if (data.booking.status == BookingStatus.COMPLETED && payment != null) {
+            PayoutCard(payment = payment)
+        }
 
         data.myBid?.let { bid -> MyBidCard(bid = bid) }
     }
@@ -575,6 +617,118 @@ private fun DetailRow(
                 fontWeight = FontWeight.Medium
             )
         }
+    }
+}
+
+// ─── Payout receipt (worker, COMPLETED) ───────────────────────────────────────
+
+@Composable
+private fun PayoutCard(payment: com.example.fixbid.domain.model.Payment) {
+    val released = payment.escrowStatus == com.example.fixbid.domain.model.EscrowStatus.RELEASED ||
+        payment.status == com.example.fixbid.domain.model.PaymentStatus.COMPLETED
+
+    val (accentColor, statusLabel) = if (released) {
+        AccentGreen to "Đã chuyển vào ví"
+    } else {
+        StatusOrange to "Đang chờ chuyển"
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(accentColor.copy(alpha = 0.16f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Outlined.Payments,
+                        contentDescription = null,
+                        tint = accentColor,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Thanh toán",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = statusLabel,
+                        fontSize = 11.sp,
+                        color = accentColor
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(modifier = Modifier.height(12.dp))
+
+            PayoutLine(label = "Khách thanh toán", value = formatCurrencyVnd(payment.amount))
+            Spacer(modifier = Modifier.height(6.dp))
+            PayoutLine(
+                label = "Phí nền tảng (${com.example.fixbid.core.utils.PaymentConstants.PLATFORM_FEE_LABEL})",
+                value = "- ${formatCurrencyVnd(payment.platformFee)}"
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Bạn nhận được",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = formatCurrencyVnd(payment.workerReceives),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = accentColor
+                )
+            }
+
+            payment.releasedAt?.let { ts ->
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Chuyển lúc ${formatDateTimeVi(ts)}",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PayoutLine(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            value,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
     }
 }
 
@@ -1112,6 +1266,7 @@ private fun ReportCompletionBottomSheet(
     onNoteChange: (String) -> Unit,
     onImagesPicked: (List<Uri>) -> Unit,
     onRemoveImage: (Uri) -> Unit,
+    onEditImage: (Uri) -> Unit,
     onSubmit: (List<Pair<String, ByteArray>>) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -1260,7 +1415,9 @@ private fun ReportCompletionBottomSheet(
                                         color = MaterialTheme.colorScheme.outlineVariant,
                                         shape = MaterialTheme.shapes.medium
                                     )
+                                    .clickable(enabled = !form.isSubmitting) { onEditImage(uri) }
                             )
+                            // Remove (top-end)
                             Box(
                                 modifier = Modifier
                                     .align(Alignment.TopEnd)
@@ -1276,6 +1433,33 @@ private fun ReportCompletionBottomSheet(
                                     contentDescription = "Xoá",
                                     tint = Color.White,
                                     modifier = Modifier.size(14.dp)
+                                )
+                            }
+                            // Edit pill (bottom-center) — opens the photo
+                            // editor so the worker can highlight what
+                            // they fixed before sending it to the customer.
+                            Row(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .padding(bottom = 4.dp)
+                                    .clip(RoundedCornerShape(50))
+                                    .background(MaterialTheme.colorScheme.primary)
+                                    .clickable(enabled = !form.isSubmitting) { onEditImage(uri) }
+                                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Edit,
+                                    contentDescription = "Chỉnh sửa",
+                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.size(11.dp)
+                                )
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(
+                                    text = "Sửa",
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold
                                 )
                             }
                         }
