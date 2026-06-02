@@ -35,7 +35,7 @@ class PaymentRepositoryImpl @Inject constructor(
         val workerId = bookingDto.workerId
             ?: return Resource.Error("Booking chưa có thợ")
 
-        val platformFee = amount * 0.10  // 10% phí nền tảng
+        val platformFee = com.example.fixbid.core.utils.PaymentConstants.platformFee(amount)
         val workerReceives = amount - platformFee
 
         val result = client.from(Tables.PAYMENTS)

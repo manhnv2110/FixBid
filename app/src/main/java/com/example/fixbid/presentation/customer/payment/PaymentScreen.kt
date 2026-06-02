@@ -325,7 +325,6 @@ private fun OrderSummaryCard(booking: Booking) {
 @Composable
 private fun PriceBreakdownCard(booking: Booking) {
     val amount = booking.agreedPrice ?: 0.0
-    val platformFee = amount * 0.10
     val total = amount
 
     Card(
@@ -350,7 +349,7 @@ private fun PriceBreakdownCard(booking: Booking) {
             Spacer(modifier = Modifier.height(8.dp))
 
             PriceRow(
-                label = "Phí nền tảng (10%)",
+                label = "Phí nền tảng (${com.example.fixbid.core.utils.PaymentConstants.PLATFORM_FEE_LABEL})",
                 value = "Đã bao gồm",
                 valueColor = MaterialTheme.colorScheme.onSurfaceVariant
             )
