@@ -20,6 +20,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -74,6 +75,7 @@ class CustomerBookingDetailViewModel @Inject constructor(
 
     init {
         loadBooking()
+        observeBookingRealtime()
     }
 
     fun loadBooking() {
@@ -118,6 +120,56 @@ class CustomerBookingDetailViewModel @Inject constructor(
     fun toggleEditMode() {
         val current = _uiState.value
         _uiState.update { it.copy(isEditing = !current.isEditing) }
+    }
+
+    /**
+     * Live-updates the booking while the screen is open so status transitions
+     * driven by the worker or the payment flow (awaiting payment → confirmed →
+     * in progress → pending completion → completed) appear without a manual
+     * reload. To avoid clobbering data the user is actively editing, the live
+     * value is only applied when not in edit mode; the edit form fields are left
+     * untouched. Payment is re-fetched on status changes so the detail card and
+     * the action buttons (pay / confirm completion) stay in sync.
+     */
+    private fun observeBookingRealtime() {
+        if (bookingId.isBlank()) return
+        viewModelScope.launch {
+            bookingRepository.observeBooking(bookingId)
+                .catch { /* realtime drop is non-fatal: the one-time load already populated the UI */ }
+                .collect { booking ->
+                    if (booking == null) return@collect
+                    // Don't overwrite anything while the user is editing the form.
+                    if (_uiState.value.isEditing) return@collect
+
+                    val previousStatus = _uiState.value.booking?.status
+                    // Refresh payment only when the status actually changed, to
+                    // avoid an extra network call on every realtime echo.
+                    val payment = if (previousStatus != booking.status) {
+                        (paymentRepository.getPaymentByBooking(bookingId) as? Resource.Success)?.data
+                            ?: _uiState.value.payment
+                    } else {
+                        _uiState.value.payment
+                    }
+
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = null,
+                            booking = booking,
+                            payment = payment,
+                            editCategory = booking.category,
+                            editDescription = booking.description,
+                            editAddress = booking.address,
+                            editLatitude = booking.latitude,
+                            editLongitude = booking.longitude,
+                            editScheduledAt = booking.scheduledAt,
+                            editFullName = extractNameFromNote(booking.customerNote),
+                            editPhone = extractPhoneFromNote(booking.customerNote),
+                            editNotes = extractNotesFromNote(booking.customerNote)
+                        )
+                    }
+                }
+        }
     }
 
     fun onDescriptionChange(desc: String) {

@@ -17,6 +17,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -74,6 +75,7 @@ class JobDetailViewModel @Inject constructor(
 
     init {
         load()
+        observeBookingRealtime()
     }
 
     fun load() {
@@ -94,6 +96,62 @@ class JobDetailViewModel @Inject constructor(
                 }
                 is Resource.Loading -> { /* no-op */ }
             }
+        }
+    }
+
+    /**
+     * Refresh the job detail in place, without flipping the full-screen loading
+     * spinner. Used by the realtime observer so a status change pushed from the
+     * customer side (bid accepted → awaiting payment → confirmed, or completion
+     * confirmed) re-renders the action buttons silently. Open dialogs and the
+     * bid/completion forms are preserved.
+     */
+    private fun refresh() {
+        viewModelScope.launch {
+            when (val result = getJobDetailUseCase(bookingId)) {
+                is Resource.Success -> {
+                    val payment = (paymentRepository.getPaymentByBooking(bookingId)
+                        as? Resource.Success)?.data
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = null,
+                            data = result.data,
+                            payment = payment
+                        )
+                    }
+                }
+                // A transient refresh failure is non-fatal: keep showing the last
+                // good data rather than blanking the screen with an error.
+                is Resource.Error -> Unit
+                is Resource.Loading -> Unit
+            }
+        }
+    }
+
+    /**
+     * Live-updates the job while the worker has it open. Supabase realtime fires
+     * whenever this booking row changes, so the worker sees the customer's
+     * actions (their bid getting accepted, payment landing, completion being
+     * confirmed/rejected) reflected in the status banner and action buttons
+     * without leaving the screen.
+     */
+    private fun observeBookingRealtime() {
+        if (bookingId.isBlank()) return
+        viewModelScope.launch {
+            var lastStatus: BookingStatus? = null
+            bookingRepository.observeBooking(bookingId)
+                .catch { /* realtime drop is non-fatal: the one-time load populated the UI */ }
+                .collect { booking ->
+                    if (booking == null) return@collect
+                    // Recompute the full detail (bids/stats/myBid + payment) only
+                    // when the status actually advanced, to avoid redundant fetches
+                    // on every echo of the same row.
+                    if (booking.status != lastStatus) {
+                        lastStatus = booking.status
+                        refresh()
+                    }
+                }
         }
     }
 

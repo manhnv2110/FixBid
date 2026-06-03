@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -66,6 +67,7 @@ class BiddingViewModel @Inject constructor(
 
     init {
         loadBids()
+        observeBidsRealtime()
     }
 
     fun loadBids() {
@@ -84,6 +86,24 @@ class BiddingViewModel @Inject constructor(
                 }
                 is Resource.Loading -> { /* no-op */ }
             }
+        }
+    }
+
+    /**
+     * Live-updates the bid list while the screen is open. Supabase realtime pushes
+     * every insert/update on this booking's bids, so a new bid (or a status change
+     * like accept/withdraw) shows up without the customer having to leave and
+     * re-enter the screen. The initial [loadBids] still drives the first paint and
+     * the error/retry state; this only swaps the list in once data starts flowing.
+     */
+    private fun observeBidsRealtime() {
+        if (bookingId.isBlank()) return
+        viewModelScope.launch {
+            bidRepository.observeBidsForBooking(bookingId)
+                .catch { /* realtime drop is non-fatal: the one-time load already populated the UI */ }
+                .collect { bids ->
+                    _uiState.value = BiddingUiState.Success(bids)
+                }
         }
     }
 
