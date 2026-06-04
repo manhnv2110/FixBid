@@ -125,9 +125,7 @@ fun CustomerBookingDetailScreen(
                     } else {
                         onBackClick()
                     }
-                },
-                backgroundColor = MaterialTheme.colorScheme.surface,
-                contentColor = MaterialTheme.colorScheme.onSurface
+                }
             )
         },
         containerColor = MaterialTheme.colorScheme.background

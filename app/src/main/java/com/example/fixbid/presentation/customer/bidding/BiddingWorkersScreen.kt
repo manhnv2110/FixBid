@@ -10,7 +10,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Badge
@@ -25,7 +24,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -33,10 +31,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import com.example.fixbid.core.components.AppHeader
 import com.example.fixbid.core.utils.toRelativeTime
 import com.example.fixbid.domain.model.Bid
 import com.example.fixbid.domain.model.BidStatus
 import com.example.fixbid.domain.model.WorkerProfile
+import com.example.fixbid.ui.theme.StatusColorsTheme
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -80,26 +80,7 @@ fun BiddingWorkersScreen(
 
     Scaffold(
         topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Text(
-                        text = "Danh sách báo giá",
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleLarge
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back"
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
-            )
+            AppHeader(title = "Danh sách báo giá", onBackClick = onBackClick)
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
@@ -287,7 +268,9 @@ private fun WorkerBidCard(
                         text = bid.worker?.fullName ?: "Thợ #${bid.workerId.take(6)}",
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = bid.createdAt.toRelativeTime(),
@@ -357,13 +340,13 @@ private fun WorkerBidCard(
                         Icon(
                             imageVector = Icons.Default.CheckCircle,
                             contentDescription = "Accepted",
-                            tint = Color(0xFF43A047),
+                            tint = StatusColorsTheme.current.positive,
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = "Đã chọn",
-                            color = Color(0xFF43A047),
+                            color = StatusColorsTheme.current.positive,
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp
                         )
@@ -471,7 +454,10 @@ private fun WorkerProfileBottomSheetContent(
                         text = bid.worker?.fullName ?: "Thợ",
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
                     )
 
                     if (profile.identityVerified) {
