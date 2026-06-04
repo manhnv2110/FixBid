@@ -14,7 +14,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.fixbid.ui.theme.TextPrimary
 import com.example.fixbid.domain.model.ServiceCategory
 
 @Composable
@@ -61,7 +60,7 @@ private fun CategoryItem(
     Card(
         modifier  = modifier.aspectRatio(1f).clickable { onClick() },
         shape     = RoundedCornerShape(12.dp),
-        colors    = CardDefaults.cardColors(containerColor = Color.White),
+        colors    = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
@@ -80,7 +79,7 @@ private fun CategoryItem(
                 text      = category.displayName,
                 fontSize  = 11.sp,
                 textAlign = TextAlign.Center,
-                color     = TextPrimary,
+                color     = MaterialTheme.colorScheme.onSurface,
                 maxLines  = 2
             )
         }

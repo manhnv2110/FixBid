@@ -54,41 +54,8 @@ val md_theme_dark_onSurfaceVariant = Color(0xFFC3C6CF)
 val md_theme_dark_outline = Color(0xFF8D9199)
 val md_theme_dark_outlineVariant = Color(0xFF43474E)
 
-// ─── Legacy Colors (Held for backwards compatibility with unrefactored code) ──
-val PrimaryBlue = Color(0xFF00578A)
-val PrimaryBlueDark = Color(0xFF003D61)
-val LightBlue = Color(0xFFE3F0FF)
+// ─── Brand accent ─────────────────────────────────────────────────────────────
+// AccentGreen is a fixed brand "success/positive" green used for confirmations and
+// availability. Most other semantic colours now live in StatusColors.kt (theme-aware)
+// and UI-role colours come from MaterialTheme.colorScheme.
 val AccentGreen = Color(0xFF4CAF50)
-
-// Text
-val TextPrimary = Color(0xFF1A1A2E)
-val TextSecondary = Color(0xFF6B7280)
-
-// Surface
-val White = Color(0xFFFFFFFF)
-val BackgroundGray = Color(0xFFF5F7FA)
-val CardWhite = Color(0xFFFFFFFF)
-val SurfaceMuted = Color(0xFFF5F5F5)
-val BorderLight = Color(0xFFE0E0E0)
-val BorderSubtle = Color(0xFFF0F0F0)
-
-// Auth
-val AuthBackground = Color(0xFFFFFFFF)
-val AuthSurface = Color(0xFFFFFFFF)
-val AuthBorder = Color(0xFFD6DEE6)
-val AuthMuted = Color(0xFF98A2B3)
-
-// Status Palette
-val StatusOrange = Color(0xFFF57C00)        // pending / chờ
-val StatusOrangeDeep = Color(0xFFE65100)    // pending completion (đậm hơn)
-val StatusBlueAlt = Color(0xFF1565C0)       // confirmed
-val StatusBlueProgress = Color(0xFF2196F3)  // in progress
-val StatusPurple = Color(0xFF6A1B9A)        // disputed/in-progress alt
-val StatusGreen = Color(0xFF43A047)         // completed
-val StatusGreenSoft = Color(0xFFE8F5E9)
-val StatusRed = Color(0xFFD32F2F)           // error / cancelled
-val StatusRedSoft = Color(0xFFFFEBEE)
-val StatusTeal = Color(0xFF00897B)          // bidding
-val StatusAmber = Color(0xFFFFA000)         // pending generic
-val StatusGold = Color(0xFFFFA726)          // rating
-val StatusGray = Color(0xFFB0BEC5)          // neutral / cancelled mute

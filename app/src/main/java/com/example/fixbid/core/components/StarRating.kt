@@ -17,7 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.example.fixbid.ui.theme.StatusGold
+import com.example.fixbid.ui.theme.StatusColorsTheme
 
 /**
  * Read-only star rating display, supports half stars.
@@ -27,7 +27,7 @@ fun StarRatingBar(
     rating: Double,
     modifier: Modifier = Modifier,
     starSize: Dp = 16.dp,
-    color: Color = StatusGold
+    color: Color = StatusColorsTheme.current.rating
 ) {
     Row(modifier = modifier) {
         for (i in 1..5) {
@@ -55,7 +55,7 @@ fun StarRatingInput(
     onRatingChange: (Int) -> Unit,
     modifier: Modifier = Modifier,
     starSize: Dp = 44.dp,
-    color: Color = StatusGold
+    color: Color = StatusColorsTheme.current.rating
 ) {
     Row(modifier = modifier) {
         for (i in 1..5) {
