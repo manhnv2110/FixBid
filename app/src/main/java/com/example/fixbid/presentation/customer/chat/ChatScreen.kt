@@ -24,6 +24,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -62,6 +63,7 @@ fun ChatScreen(
     val context = LocalContext.current
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
+    val density = LocalDensity.current
 
     // Collect one-shot events
     LaunchedEffect(Unit) {
@@ -82,6 +84,19 @@ fun ChatScreen(
         val lastIndex = uiState.messages.lastIndex
         if (lastIndex >= 0) {
             coroutineScope.launch { listState.animateScrollToItem(lastIndex) }
+        }
+    }
+
+    // Keep the latest messages in view when the keyboard opens. With adjustResize
+    // the message list shrinks as the IME slides in; without this the bottom
+    // messages would be clipped behind the input bar. We watch the IME bottom
+    // inset and, once it settles open, pin the list to the most recent message.
+    val imeBottom = WindowInsets.ime.getBottom(density)
+    val isImeVisible = imeBottom > 0
+    LaunchedEffect(isImeVisible, imeBottom) {
+        if (isImeVisible) {
+            val lastIndex = uiState.messages.lastIndex
+            if (lastIndex >= 0) listState.scrollToItem(lastIndex)
         }
     }
 
@@ -360,12 +375,12 @@ private fun MessageBubble(
     val bubbleColor = if (isMine)
         MaterialTheme.colorScheme.primary
     else
-        MaterialTheme.colorScheme.surface
+        MaterialTheme.colorScheme.surfaceVariant
 
     val textColor = if (isMine)
         MaterialTheme.colorScheme.onPrimary
     else
-        MaterialTheme.colorScheme.onSurface
+        MaterialTheme.colorScheme.onSurfaceVariant
 
     // When the same sender posts multiple messages in a row only the last
     // bubble carries the "tail" corner; intermediate bubbles get a uniform
@@ -488,8 +503,13 @@ private fun ChatInputBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .navigationBarsPadding()
-                .imePadding()
+                // Use the union of IME + navigation-bar insets so we apply whichever
+                // is larger, instead of stacking them. Chaining navigationBarsPadding()
+                // and imePadding() double-counts the bar when the keyboard is open and
+                // pushes the input field up over the messages.
+                .windowInsetsPadding(
+                    WindowInsets.ime.union(WindowInsets.navigationBars)
+                )
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
