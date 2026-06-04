@@ -24,7 +24,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -253,7 +252,7 @@ private fun NotificationSection(
                     .fillMaxWidth()
                     .height(80.dp)
                     .clip(RoundedCornerShape(16.dp))
-                    .background(Color.LightGray.copy(alpha = 0.3f))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
             )
         }
         is NotificationUiState.Success -> {
@@ -275,7 +274,7 @@ private fun NotificationSection(
             ) {
                 Text(
                     text = state.message,
-                    color = Color.Red.copy(alpha = 0.7f),
+                    color = MaterialTheme.colorScheme.error,
                     fontSize = 13.sp
                 )
                 TextButton(onClick = onRetry) {
