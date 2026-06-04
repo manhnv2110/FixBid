@@ -138,9 +138,9 @@ fun MyBidsScreen(
                 } else {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(
-                            start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp
-                        ),
+                        contentPadding = WindowInsets.navigationBars.add(
+                            WindowInsets(left = 16.dp, top = 4.dp, right = 16.dp, bottom = 16.dp)
+                        ).asPaddingValues(),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(bids, key = { it.bid.id }) { myBid ->

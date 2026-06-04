@@ -104,7 +104,9 @@ private fun WalletContent(
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+        contentPadding = WindowInsets.navigationBars.add(
+            WindowInsets(left = 16.dp, top = 16.dp, right = 16.dp, bottom = 16.dp)
+        ).asPaddingValues(),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item { BalanceHeroCard(state = state) }
