@@ -46,8 +46,6 @@ import com.example.fixbid.domain.model.Booking
 import com.example.fixbid.domain.model.BookingStatus
 import com.example.fixbid.domain.model.ServiceCategory
 import com.example.fixbid.ui.theme.AccentGreen
-import com.example.fixbid.ui.theme.StatusGold
-import com.example.fixbid.ui.theme.StatusRed
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
@@ -1034,20 +1032,11 @@ private fun AddressActionChip(
 private data class StatusInfo(val label: String, val color: Color)
 
 @Composable
-private fun getStatusInfo(status: BookingStatus): StatusInfo {
-    val isDark = androidx.compose.foundation.isSystemInDarkTheme()
-    return when (status) {
-        BookingStatus.BIDDING -> StatusInfo("Chờ báo giá", if (isDark) Color(0xFF4DB6AC) else Color(0xFF00897B))
-        BookingStatus.AWAITING_PAYMENT -> StatusInfo("Chờ thanh toán", if (isDark) Color(0xFFFFB74D) else Color(0xFFF57C00))
-        BookingStatus.PENDING -> StatusInfo("Chờ xác nhận", if (isDark) Color(0xFFFFD54F) else Color(0xFFFFA000))
-        BookingStatus.CONFIRMED -> StatusInfo("Đã xác nhận", if (isDark) Color(0xFF64B5F6) else Color(0xFF1565C0))
-        BookingStatus.IN_PROGRESS -> StatusInfo("Đang làm", if (isDark) Color(0xFFBA68C8) else Color(0xFF6A1B9A))
-        BookingStatus.PENDING_COMPLETION -> StatusInfo("Chờ xác nhận hoàn thành", if (isDark) Color(0xFFFF8A65) else Color(0xFFE65100))
-        BookingStatus.COMPLETED -> StatusInfo("Hoàn thành", if (isDark) Color(0xFF81C784) else Color(0xFF43A047))
-        BookingStatus.CANCELLED -> StatusInfo("Đã huỷ", if (isDark) Color(0xFFCFD8DC) else Color(0xFFB0BEC5))
-        BookingStatus.DISPUTED -> StatusInfo("Tranh chấp", if (isDark) Color(0xFFE57373) else Color(0xFFD32F2F))
-    }
-}
+private fun getStatusInfo(status: BookingStatus): StatusInfo =
+    StatusInfo(
+        com.example.fixbid.ui.theme.statusLabel(status),
+        com.example.fixbid.ui.theme.statusColor(status)
+    )
 
 // ─── Completed payment receipt ───────────────────────────────────────────────
 
@@ -1059,7 +1048,7 @@ private fun CompletedPaymentCard(payment: com.example.fixbid.domain.model.Paymen
     val accent = if (released)
         com.example.fixbid.ui.theme.AccentGreen
     else
-        com.example.fixbid.ui.theme.StatusOrange
+        com.example.fixbid.ui.theme.StatusColorsTheme.current.pending
 
     val statusLabel = if (released)
         "Đã thanh toán cho thợ"

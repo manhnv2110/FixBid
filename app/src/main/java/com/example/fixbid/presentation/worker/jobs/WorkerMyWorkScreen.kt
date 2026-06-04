@@ -188,7 +188,7 @@ private fun ActiveTab(
             items(inProgress, key = { it.id }) { booking ->
                 WorkerJobCard(
                     booking = booking,
-                    statusColor = StatusBlueProgress,
+                    statusColor = statusColor(BookingStatus.IN_PROGRESS),
                     statusLabel = "Đang làm",
                     onClick = { onJobClick(booking.id) },
                     actionLabel = "Báo hoàn thành",
@@ -201,7 +201,7 @@ private fun ActiveTab(
             items(pendingCompletion, key = { it.id }) { booking ->
                 WorkerJobCard(
                     booking = booking,
-                    statusColor = StatusOrangeDeep,
+                    statusColor = statusColor(BookingStatus.PENDING_COMPLETION),
                     statusLabel = "Chờ khách xác nhận",
                     onClick = { onJobClick(booking.id) }
                 )
@@ -211,7 +211,7 @@ private fun ActiveTab(
             items(pendingJobs, key = { it.id }) { booking ->
                 WorkerJobCard(
                     booking = booking,
-                    statusColor = StatusOrange,
+                    statusColor = statusColor(BookingStatus.CONFIRMED),
                     statusLabel = "Đã xác nhận",
                     onClick = { onJobClick(booking.id) },
                     actionLabel = "Bắt đầu làm",
@@ -277,7 +277,7 @@ private fun CompletedJobRow(
             ) {
                 com.example.fixbid.core.components.StatusPill(
                     text = "Hoàn thành",
-                    color = StatusGreen
+                    color = statusColor(BookingStatus.COMPLETED)
                 )
                 Text(
                     text = formatRelativeTime(booking.updatedAt),

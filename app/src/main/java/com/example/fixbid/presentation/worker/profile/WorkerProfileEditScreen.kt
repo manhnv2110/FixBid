@@ -35,7 +35,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.fixbid.core.components.AppHeader
 import com.example.fixbid.domain.model.ServiceCategory
 import com.example.fixbid.ui.theme.AccentGreen
-import com.example.fixbid.ui.theme.StatusGold
+import com.example.fixbid.ui.theme.StatusColorsTheme
 
 /**
  * Worker professional profile editor.
@@ -384,7 +384,7 @@ private fun ProfileHeroCard(uiState: WorkerProfileEditUiState) {
                     HeroStat(
                         modifier = Modifier.weight(1f),
                         icon = Icons.Filled.Star,
-                        iconTint = StatusGold,
+                        iconTint = StatusColorsTheme.current.rating,
                         value = if (uiState.averageRating > 0)
                             "%.1f".format(uiState.averageRating) else "—",
                         label = "Đánh giá"

@@ -37,7 +37,7 @@ import com.example.fixbid.core.utils.formatCurrencyVnd
 import com.example.fixbid.domain.model.ServiceCategory
 import com.example.fixbid.domain.usecase.customer.DiscoveredWorker
 import com.example.fixbid.domain.usecase.customer.WorkerSortBy
-import com.example.fixbid.ui.theme.StatusGold
+import com.example.fixbid.ui.theme.StatusColorsTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -243,7 +243,7 @@ private fun WorkerCard(worker: DiscoveredWorker, onClick: () -> Unit) {
                 }
                 Spacer(Modifier.height(3.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.Star, contentDescription = null, tint = StatusGold, modifier = Modifier.size(14.dp))
+                    Icon(Icons.Filled.Star, contentDescription = null, tint = StatusColorsTheme.current.rating, modifier = Modifier.size(14.dp))
                     Spacer(Modifier.width(3.dp))
                     Text(
                         text = if (profile.averageRating > 0) "%.1f".format(profile.averageRating) else "Mới",

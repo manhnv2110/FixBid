@@ -71,7 +71,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.example.fixbid.core.components.AppHeader
 import com.example.fixbid.domain.model.Booking
 import com.example.fixbid.ui.theme.AccentGreen
-import com.example.fixbid.ui.theme.StatusBlueProgress
+import com.example.fixbid.ui.theme.StatusColorsTheme
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
@@ -188,7 +188,7 @@ private fun MapContent(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val primary = MaterialTheme.colorScheme.primary.toArgb()
-    val accentRoute = StatusBlueProgress.toArgb()
+    val accentRoute = StatusColorsTheme.current.inProgress.toArgb()
 
     val mapView = remember {
         MapView(context).apply {

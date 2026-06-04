@@ -38,9 +38,7 @@ import com.example.fixbid.core.utils.formatShortDateTime
 import com.example.fixbid.domain.model.BidStatus
 import com.example.fixbid.domain.usecase.worker.MyBid
 import com.example.fixbid.ui.theme.AccentGreen
-import com.example.fixbid.ui.theme.StatusGray
-import com.example.fixbid.ui.theme.StatusGreen
-import com.example.fixbid.ui.theme.StatusOrange
+import com.example.fixbid.ui.theme.StatusColorsTheme
 
 /**
  * Worker screen listing every bid the worker has submitted, grouped by status.
@@ -205,7 +203,7 @@ private fun BidsSummaryStrip(
             icon = Icons.Outlined.AccessTime,
             value = "$pending",
             label = "Đang chờ",
-            tint = StatusOrange
+            tint = StatusColorsTheme.current.pending
         )
         SummaryTile(
             modifier = Modifier.weight(1f),
@@ -274,7 +272,6 @@ private fun MyBidCard(
     val bid = myBid.bid
     val booking = myBid.booking
     val (statusLabel, statusColor) = bidStatusInfo(bid.status)
-
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         shape = RoundedCornerShape(18.dp),
@@ -538,9 +535,13 @@ private fun EmptyBids(filter: MyBidsFilter) {
     }
 }
 
-private fun bidStatusInfo(status: BidStatus): Pair<String, Color> = when (status) {
-    BidStatus.PENDING -> "Đang chờ duyệt" to StatusOrange
-    BidStatus.ACCEPTED -> "Được chọn" to StatusGreen
-    BidStatus.REJECTED -> "Không được chọn" to StatusGray
-    BidStatus.WITHDRAWN -> "Đã rút" to StatusGray
+@Composable
+private fun bidStatusInfo(status: BidStatus): Pair<String, Color> {
+    val sc = StatusColorsTheme.current
+    return when (status) {
+        BidStatus.PENDING -> "Đang chờ duyệt" to sc.pending
+        BidStatus.ACCEPTED -> "Được chọn" to sc.positive
+        BidStatus.REJECTED -> "Không được chọn" to sc.neutral
+        BidStatus.WITHDRAWN -> "Đã rút" to sc.neutral
+    }
 }

@@ -201,7 +201,7 @@ private fun KpiGrid(data: WorkerAnalytics, onReviewsClick: () -> Unit = {}) {
             KpiCard(
                 modifier = Modifier.weight(1f),
                 icon = Icons.Outlined.Payments,
-                tint = StatusBlueAlt,
+                tint = StatusColorsTheme.current.confirmed,
                 value = formatCurrencyVnd(data.averagePerJob),
                 label = "TB mỗi việc"
             )
@@ -210,7 +210,7 @@ private fun KpiGrid(data: WorkerAnalytics, onReviewsClick: () -> Unit = {}) {
             KpiCard(
                 modifier = Modifier.weight(1f),
                 icon = Icons.Outlined.Star,
-                tint = StatusGold,
+                tint = StatusColorsTheme.current.rating,
                 value = if (data.averageRating > 0) "%.1f".format(data.averageRating) else "—",
                 label = "${data.totalReviews} đánh giá",
                 onClick = onReviewsClick
@@ -218,7 +218,7 @@ private fun KpiGrid(data: WorkerAnalytics, onReviewsClick: () -> Unit = {}) {
             KpiCard(
                 modifier = Modifier.weight(1f),
                 icon = Icons.Outlined.WorkHistory,
-                tint = StatusPurple,
+                tint = MaterialTheme.colorScheme.tertiary,
                 value = "${data.acceptanceJobs}",
                 label = "Lượt nhận việc"
             )

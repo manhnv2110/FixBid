@@ -44,7 +44,7 @@ import com.example.fixbid.core.utils.formatCurrencyVnd
 import com.example.fixbid.core.utils.toRelativeTime
 import com.example.fixbid.domain.model.Review
 import com.example.fixbid.domain.usecase.customer.WorkerPublicProfile
-import com.example.fixbid.ui.theme.StatusGold
+import com.example.fixbid.ui.theme.StatusColorsTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -422,7 +422,7 @@ private fun RatingSummaryCard(data: WorkerPublicProfile, distribution: Map<Int, 
                         modifier = Modifier.padding(vertical = 2.dp)
                     ) {
                         Text("$star", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(12.dp))
-                        Icon(Icons.Outlined.Star, contentDescription = null, tint = StatusGold, modifier = Modifier.size(12.dp))
+                        Icon(Icons.Outlined.Star, contentDescription = null, tint = StatusColorsTheme.current.rating, modifier = Modifier.size(12.dp))
                         Spacer(Modifier.width(6.dp))
                         Box(
                             modifier = Modifier
@@ -436,7 +436,7 @@ private fun RatingSummaryCard(data: WorkerPublicProfile, distribution: Map<Int, 
                                     .fillMaxHeight()
                                     .fillMaxWidth(count.toFloat() / total)
                                     .clip(RoundedCornerShape(4.dp))
-                                    .background(StatusGold)
+                                    .background(StatusColorsTheme.current.rating)
                             )
                         }
                         Spacer(Modifier.width(8.dp))

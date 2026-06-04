@@ -44,7 +44,7 @@ import coil.compose.AsyncImage
 import com.example.fixbid.core.components.AppHeader
 import com.example.fixbid.core.utils.toFormattedDate
 import com.example.fixbid.ui.theme.AccentGreen
-import com.example.fixbid.ui.theme.StatusOrange
+import com.example.fixbid.ui.theme.StatusColorsTheme
 
 /**
  * Worker identity verification screen.
@@ -173,7 +173,7 @@ private fun StatusBanner(state: VerifyIdentityUiState) {
             "Bạn đã hoàn tất xác minh — khách hàng sẽ thấy huy hiệu xác minh trên hồ sơ."
         )
         VerificationStatus.PENDING -> Quintuple(
-            StatusOrange,
+            StatusColorsTheme.current.pending,
             Color.White,
             Icons.Outlined.HourglassTop,
             "Đang xét duyệt",

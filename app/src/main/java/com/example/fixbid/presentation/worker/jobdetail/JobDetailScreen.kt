@@ -366,7 +366,7 @@ private fun BiddingStatsCard(
                     modifier = Modifier.weight(1f),
                     label = "Trung bình",
                     value = average?.let { formatCurrencyVnd(it) } ?: "—",
-                    color = StatusGold
+                    color = StatusColorsTheme.current.rating
                 )
             }
         }
@@ -630,7 +630,7 @@ private fun PayoutCard(payment: com.example.fixbid.domain.model.Payment) {
     val (accentColor, statusLabel) = if (released) {
         AccentGreen to "Đã chuyển vào ví"
     } else {
-        StatusOrange to "Đang chờ chuyển"
+        StatusColorsTheme.current.pending to "Đang chờ chuyển"
     }
 
     Card(
@@ -736,10 +736,11 @@ private fun PayoutLine(label: String, value: String) {
 
 @Composable
 private fun MyBidCard(bid: Bid) {
+    val sc = StatusColorsTheme.current
     val (statusColor, statusLabel) = when (bid.status) {
-        BidStatus.PENDING -> StatusOrange to "Đang chờ khách xét"
+        BidStatus.PENDING -> sc.pending to "Đang chờ khách xét"
         BidStatus.ACCEPTED -> AccentGreen to "Đã được chọn"
-        BidStatus.REJECTED -> StatusRed to "Bị từ chối"
+        BidStatus.REJECTED -> sc.negative to "Bị từ chối"
         BidStatus.WITHDRAWN -> MaterialTheme.colorScheme.onSurfaceVariant to "Đã rút"
     }
 

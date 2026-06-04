@@ -37,10 +37,6 @@ import com.example.fixbid.core.utils.toRelativeTime
 import com.example.fixbid.domain.model.Bid
 import com.example.fixbid.domain.model.BidStatus
 import com.example.fixbid.domain.model.WorkerProfile
-import com.example.fixbid.ui.theme.BackgroundGray
-import com.example.fixbid.ui.theme.PrimaryBlue
-import com.example.fixbid.ui.theme.TextPrimary
-import com.example.fixbid.ui.theme.TextSecondary
 import java.text.NumberFormat
 import java.util.Locale
 

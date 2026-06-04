@@ -31,7 +31,7 @@ import com.example.fixbid.core.components.AppHeader
 import com.example.fixbid.core.components.StarRatingBar
 import com.example.fixbid.core.utils.toRelativeTime
 import com.example.fixbid.domain.model.Review
-import com.example.fixbid.ui.theme.StatusGold
+import com.example.fixbid.ui.theme.StatusColorsTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -152,7 +152,7 @@ private fun RatingSummaryCard(uiState: WorkerReviewsUiState) {
                         Icon(
                             Icons.Filled.Star,
                             contentDescription = null,
-                            tint = StatusGold,
+                            tint = StatusColorsTheme.current.rating,
                             modifier = Modifier.size(12.dp)
                         )
                         Spacer(Modifier.width(6.dp))
@@ -168,7 +168,7 @@ private fun RatingSummaryCard(uiState: WorkerReviewsUiState) {
                                     .fillMaxHeight()
                                     .fillMaxWidth(count.toFloat() / total)
                                     .clip(RoundedCornerShape(4.dp))
-                                    .background(StatusGold)
+                                    .background(StatusColorsTheme.current.rating)
                             )
                         }
                         Spacer(Modifier.width(8.dp))

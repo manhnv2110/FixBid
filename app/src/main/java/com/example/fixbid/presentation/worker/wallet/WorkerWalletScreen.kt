@@ -35,8 +35,7 @@ import com.example.fixbid.core.utils.formatCurrencyVnd
 import com.example.fixbid.core.utils.toFormattedDate
 import com.example.fixbid.domain.model.WalletTransactionType
 import com.example.fixbid.ui.theme.AccentGreen
-import com.example.fixbid.ui.theme.StatusOrange
-import com.example.fixbid.ui.theme.StatusRed
+import com.example.fixbid.ui.theme.StatusColorsTheme
 
 /**
  * Worker wallet — backed by the real `wallets` + `wallet_transactions`
@@ -476,7 +475,7 @@ private fun ledgerStyleFor(type: WalletTransactionType): LedgerStyle = when (typ
     WalletTransactionType.ESCROW_HOLD -> LedgerStyle(
         label = "Đang giữ",
         icon = Icons.Outlined.AccessTime,
-        tint = StatusOrange,
+        tint = StatusColorsTheme.current.awaitingPayment,
         direction = LedgerStyle.Direction.NEUTRAL
     )
     WalletTransactionType.ESCROW_RELEASE -> LedgerStyle(
@@ -488,7 +487,7 @@ private fun ledgerStyleFor(type: WalletTransactionType): LedgerStyle = when (typ
     WalletTransactionType.ESCROW_REFUND -> LedgerStyle(
         label = "Hoàn tiền cho khách",
         icon = Icons.Outlined.SwapHoriz,
-        tint = StatusRed,
+        tint = StatusColorsTheme.current.negative,
         direction = LedgerStyle.Direction.NEGATIVE
     )
     WalletTransactionType.WITHDRAWAL -> LedgerStyle(
