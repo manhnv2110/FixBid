@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import com.example.fixbid.core.components.PrimaryTopBar
 import com.example.fixbid.core.utils.toRelativeTime
 import com.example.fixbid.domain.model.Conversation
 
@@ -44,20 +45,12 @@ fun ConversationListScreen(
         modifier = Modifier.fillMaxSize()
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Header xanh — chuẩn design app (giống BookingHistoryScreen)
-            Surface(
-                color = MaterialTheme.colorScheme.primary,
-                shadowElevation = 2.dp,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .statusBarsPadding()
-                        .padding(horizontal = 8.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (onBackClick != null) {
+            val convCount = (uiState as? ConversationListUiState.Success)?.conversations?.size ?: 0
+            PrimaryTopBar(
+                title = "Tin nhắn",
+                subtitle = if (convCount > 0) "$convCount cuộc trò chuyện" else null,
+                leading = if (onBackClick != null) {
+                    {
                         IconButton(onClick = onBackClick) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -65,28 +58,9 @@ fun ConversationListScreen(
                                 tint = MaterialTheme.colorScheme.onPrimary
                             )
                         }
-                    } else {
-                        Spacer(modifier = Modifier.width(12.dp))
                     }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Tin nhắn",
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 20.sp
-                        )
-                        val convCount = (uiState as? ConversationListUiState.Success)
-                            ?.conversations?.size ?: 0
-                        if (convCount > 0) {
-                            Text(
-                                text = "$convCount cuộc trò chuyện",
-                                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.78f),
-                                fontSize = 11.sp
-                            )
-                        }
-                    }
-                }
-            }
+                } else null
+            )
 
             when (val state = uiState) {
                 is ConversationListUiState.Loading -> {

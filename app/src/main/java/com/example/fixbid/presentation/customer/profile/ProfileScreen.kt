@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.fixbid.core.components.PrimaryTopBar
 import com.example.fixbid.domain.model.UserRole
 
 @Composable
@@ -44,21 +45,7 @@ fun ProfileScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         // Header
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.primary)
-                .statusBarsPadding()
-                .padding(horizontal = 20.dp, vertical = 16.dp)
-        ) {
-            Text(
-                text = "Hồ sơ cá nhân",
-                color = MaterialTheme.colorScheme.onPrimary,
-                fontWeight = FontWeight.Bold,
-                fontSize = 20.sp,
-                modifier = Modifier.align(Alignment.Center)
-            )
-        }
+        PrimaryTopBar(title = "Hồ sơ cá nhân")
 
         when {
             uiState.isLoading -> {
@@ -501,12 +488,16 @@ private fun ProfileMenuItem(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        Icon(
-            imageVector = Icons.Default.ChevronRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-            modifier = Modifier.size(20.dp)
-        )
+        // Only advertise navigation when there is somewhere to go — items without an
+        // onClick used to still show a chevron and ripple, implying a dead link.
+        if (onClick != null) {
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                modifier = Modifier.size(20.dp)
+            )
+        }
     }
 }
 

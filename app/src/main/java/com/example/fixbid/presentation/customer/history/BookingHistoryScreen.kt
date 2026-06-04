@@ -31,7 +31,10 @@ import com.example.fixbid.core.utils.toRelativeTime
 import com.example.fixbid.domain.model.Booking
 import com.example.fixbid.domain.model.BookingStatus
 import com.example.fixbid.domain.model.ServiceCategory
+import com.example.fixbid.core.components.PrimaryTopBar
 import com.example.fixbid.core.components.StatusPill
+import com.example.fixbid.ui.theme.statusColor
+import com.example.fixbid.ui.theme.statusLabel
 import androidx.compose.runtime.saveable.rememberSaveable
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -61,21 +64,7 @@ fun BookingHistoryScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         // Header
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.primary)
-                .statusBarsPadding()
-                .padding(horizontal = 20.dp, vertical = 16.dp)
-        ) {
-            Text(
-                text = "Đơn dịch vụ",
-                color = MaterialTheme.colorScheme.onPrimary,
-                fontWeight = FontWeight.Bold,
-                fontSize = 20.sp,
-                modifier = Modifier.align(Alignment.Center)
-            )
-        }
+        PrimaryTopBar(title = "Đơn dịch vụ")
 
         // Tab Row
         TabRow(
@@ -551,20 +540,8 @@ private fun BookingCard(
 private data class StatusInfo(val label: String, val color: Color)
 
 @Composable
-private fun getStatusInfo(status: BookingStatus): StatusInfo {
-    val isDark = isSystemInDarkTheme()
-    return when (status) {
-        BookingStatus.BIDDING -> StatusInfo("Chờ báo giá", if (isDark) Color(0xFF4DB6AC) else Color(0xFF00897B))
-        BookingStatus.AWAITING_PAYMENT -> StatusInfo("Chờ thanh toán", if (isDark) Color(0xFFFFB74D) else Color(0xFFF57C00))
-        BookingStatus.PENDING -> StatusInfo("Chờ xác nhận", if (isDark) Color(0xFFFFD54F) else Color(0xFFFFA000))
-        BookingStatus.CONFIRMED -> StatusInfo("Đã xác nhận", if (isDark) Color(0xFF64B5F6) else Color(0xFF1565C0))
-        BookingStatus.IN_PROGRESS -> StatusInfo("Đang làm", if (isDark) Color(0xFFBA68C8) else Color(0xFF6A1B9A))
-        BookingStatus.PENDING_COMPLETION -> StatusInfo("Chờ xác nhận hoàn thành", if (isDark) Color(0xFFFF8A65) else Color(0xFFE65100))
-        BookingStatus.COMPLETED -> StatusInfo("Hoàn thành", if (isDark) Color(0xFF81C784) else Color(0xFF43A047))
-        BookingStatus.CANCELLED -> StatusInfo("Đã huỷ", if (isDark) Color(0xFFCFD8DC) else Color(0xFFB0BEC5))
-        BookingStatus.DISPUTED -> StatusInfo("Tranh chấp", if (isDark) Color(0xFFE57373) else Color(0xFFD32F2F))
-    }
-}
+private fun getStatusInfo(status: BookingStatus): StatusInfo =
+    StatusInfo(statusLabel(status), statusColor(status))
 
 private fun getCategoryIcon(category: ServiceCategory): ImageVector = when (category) {
     ServiceCategory.PLUMBING -> Icons.Outlined.Plumbing
