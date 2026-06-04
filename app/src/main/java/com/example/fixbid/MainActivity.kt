@@ -41,7 +41,6 @@ import com.example.fixbid.presentation.notification.NotificationListScreen
 import com.example.fixbid.presentation.notification.NotificationSettingsScreen
 import com.example.fixbid.presentation.auth.AuthLogo
 import com.example.fixbid.ui.theme.FixBidTheme
-import com.example.fixbid.ui.theme.PrimaryBlue
 import javax.inject.Inject
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -95,7 +94,7 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
             ) {
                 AuthLogo()
                 Spacer(modifier = Modifier.height(24.dp))
-                CircularProgressIndicator(color = PrimaryBlue)
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             }
         }
         return

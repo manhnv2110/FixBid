@@ -10,10 +10,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Work
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -24,6 +27,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import com.example.fixbid.core.components.AppBottomBar
+import com.example.fixbid.core.components.BottomNavDestination
 import com.example.fixbid.core.components.ChatBell
 import com.example.fixbid.core.components.DraggableAiFab
 import com.example.fixbid.core.components.NotificationBell
@@ -32,11 +41,18 @@ import com.example.fixbid.core.utils.formatShortDateTime
 import com.example.fixbid.domain.model.Booking
 import com.example.fixbid.domain.model.BookingStatus
 import com.example.fixbid.presentation.customer.profile.ProfileScreen
-import com.example.fixbid.presentation.worker.components.WorkerBottomNavbar
 import com.example.fixbid.presentation.worker.components.WorkerJobCard
 import com.example.fixbid.presentation.worker.jobs.JobRequestsScreen
 import com.example.fixbid.presentation.worker.jobs.WorkerMyWorkScreen
 import com.example.fixbid.ui.theme.*
+
+private object WorkerTab {
+    const val HOME = "wtab_home"
+    const val REQUESTS = "wtab_requests"
+    const val WORK = "wtab_work"
+    const val PROFILE = "wtab_profile"
+    val ordered = listOf(HOME, REQUESTS, WORK, PROFILE)
+}
 
 /**
  * Worker shell with a 4-tab workflow optimised for real-world operation:
@@ -69,71 +85,111 @@ fun WorkerHomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val chatUnreadCount by chatListViewModel.unreadCount.collectAsState()
-    var selectedNavIndex by rememberSaveable { mutableIntStateOf(0) }
+
+    val tabNavController = rememberNavController()
+    val currentRoute = tabNavController
+        .currentBackStackEntryAsState().value?.destination?.route
+        ?: WorkerTab.HOME
+    val selectedIndex = WorkerTab.ordered.indexOf(currentRoute).coerceAtLeast(0)
+
+    fun switchTab(route: String) {
+        if (route != currentRoute) {
+            tabNavController.navigate(route) {
+                popUpTo(WorkerTab.HOME) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
+    }
+
+    val destinations = listOf(
+        BottomNavDestination("Trang chủ", Icons.Filled.Dashboard, Icons.Outlined.Dashboard),
+        BottomNavDestination("Tìm việc", Icons.Filled.Search, Icons.Outlined.Search, badgeCount = uiState.openRequests.size),
+        BottomNavDestination("Việc làm", Icons.Filled.Work, Icons.Outlined.WorkOutline),
+        BottomNavDestination("Hồ sơ", Icons.Filled.Person, Icons.Outlined.Person)
+    )
 
     LaunchedEffect(showWorkTab) {
-        if (showWorkTab) selectedNavIndex = 2
+        if (showWorkTab) {
+            tabNavController.navigate(WorkerTab.WORK) {
+                popUpTo(WorkerTab.HOME) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
     }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         bottomBar = {
-            WorkerBottomNavbar(
-                selectedIndex = selectedNavIndex,
-                onItemSelected = { selectedNavIndex = it },
-                openRequestCount = uiState.openRequests.size
+            AppBottomBar(
+                destinations = destinations,
+                selectedIndex = selectedIndex,
+                onItemSelected = { index -> switchTab(WorkerTab.ordered[index]) }
             )
         },
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize()) {
-            when (selectedNavIndex) {
-                1 -> Box(modifier = Modifier.padding(innerPadding)) {
-                    JobRequestsScreen(
-                        onBackClick = null,            // embedded as a tab — no back arrow
-                        onJobClick = onJobRequestClick
-                    )
-                }
-                2 -> Box(modifier = Modifier.padding(innerPadding)) {
-                    WorkerMyWorkScreen(
+            NavHost(
+                navController = tabNavController,
+                startDestination = WorkerTab.HOME,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                composable(WorkerTab.HOME) {
+                    WorkerDashboard(
+                        uiState = uiState,
+                        bottomPadding = innerPadding.calculateBottomPadding(),
+                        onNotificationClick = onNotificationClick,
+                        unreadNotificationCount = unreadNotificationCount,
+                        chatUnreadCount = chatUnreadCount,
+                        onChatClick = onChatClick,
+                        onToggleAvailability = viewModel::toggleAvailability,
+                        onRetry = viewModel::loadDashboard,
                         onJobClick = onJobClick,
+                        onJobRequestClick = onJobRequestClick,
+                        onBrowseAllRequests = { switchTab(WorkerTab.REQUESTS) },
+                        onAnalyticsClick = onAnalyticsClick,
+                        onMyBidsClick = onMyBidsClick,
+                        onWalletClick = onWalletClick,
+                        onEditProfileClick = onWorkerProfileEditClick,
+                        onVerifyIdentityClick = onVerifyIdentityClick,
+                        onSeeAllWork = { switchTab(WorkerTab.WORK) },
                         onStartJob = viewModel::startJob,
                         onCompleteJob = viewModel::completeJob
                     )
                 }
-                3 -> Box(modifier = Modifier.padding(innerPadding)) {
-                    ProfileScreen(
-                        onSignOut = onSignOut,
-                        onNotificationSettingsClick = onNotificationSettingsClick,
-                        onWorkerProfileClick = onWorkerProfileEditClick
-                    )
+                composable(WorkerTab.REQUESTS) {
+                    Box(modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())) {
+                        JobRequestsScreen(
+                            onBackClick = null,            // embedded as a tab — no back arrow
+                            onJobClick = onJobRequestClick
+                        )
+                    }
                 }
-                else -> WorkerDashboard(
-                    uiState = uiState,
-                    bottomPadding = innerPadding.calculateBottomPadding(),
-                    onNotificationClick = onNotificationClick,
-                    unreadNotificationCount = unreadNotificationCount,
-                    chatUnreadCount = chatUnreadCount,
-                    onChatClick = onChatClick,
-                    onToggleAvailability = viewModel::toggleAvailability,
-                    onRetry = viewModel::loadDashboard,
-                    onJobClick = onJobClick,
-                    onJobRequestClick = onJobRequestClick,
-                    onBrowseAllRequests = { selectedNavIndex = 1 },
-                    onAnalyticsClick = onAnalyticsClick,
-                    onMyBidsClick = onMyBidsClick,
-                    onWalletClick = onWalletClick,
-                    onEditProfileClick = onWorkerProfileEditClick,
-                    onVerifyIdentityClick = onVerifyIdentityClick,
-                    onSeeAllWork = { selectedNavIndex = 2 },
-                    onStartJob = viewModel::startJob,
-                    onCompleteJob = viewModel::completeJob
-                )
+                composable(WorkerTab.WORK) {
+                    Box(modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())) {
+                        WorkerMyWorkScreen(
+                            onJobClick = onJobClick,
+                            onStartJob = viewModel::startJob,
+                            onCompleteJob = viewModel::completeJob
+                        )
+                    }
+                }
+                composable(WorkerTab.PROFILE) {
+                    Box(modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())) {
+                        ProfileScreen(
+                            onSignOut = onSignOut,
+                            onNotificationSettingsClick = onNotificationSettingsClick,
+                            onWorkerProfileClick = onWorkerProfileEditClick
+                        )
+                    }
+                }
             }
 
             // Draggable AI assistant overlay — only on the dashboard tab.
-            if (selectedNavIndex == 0) {
+            if (currentRoute == WorkerTab.HOME) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -394,7 +450,7 @@ private fun DashboardHeader(
                             modifier = Modifier
                                 .size(11.dp)
                                 .clip(CircleShape)
-                                .background(if (isAvailable) AccentGreen else StatusGray)
+                                .background(if (isAvailable) AccentGreen else StatusColorsTheme.current.neutral)
                         )
                     }
                     Spacer(modifier = Modifier.width(12.dp))
@@ -507,10 +563,11 @@ private fun FocusTaskCard(
                 }
             }
         } else {
+            val sc = StatusColorsTheme.current
             val (label, color, actionLabel) = when (focus.status) {
-                BookingStatus.IN_PROGRESS -> Triple("Đang thực hiện", StatusBlueProgress, "Mở chi tiết")
-                BookingStatus.CONFIRMED -> Triple("Sắp tới • Đã xác nhận", StatusOrange, "Bắt đầu làm")
-                else -> Triple("Chờ khách xác nhận", StatusOrangeDeep, "Mở chi tiết")
+                BookingStatus.IN_PROGRESS -> Triple("Đang thực hiện", sc.inProgress, "Mở chi tiết")
+                BookingStatus.CONFIRMED -> Triple("Sắp tới • Đã xác nhận", sc.awaitingPayment, "Bắt đầu làm")
+                else -> Triple("Chờ khách xác nhận", sc.pendingCompletion, "Mở chi tiết")
             }
             // Status-coloured left accent stripe so the urgency reads at a glance
             // even before the user processes the text in the pill.
@@ -827,7 +884,7 @@ private fun DashboardStatsRow(
             icon = Icons.Outlined.PendingActions,
             value = "$activeCount",
             label = "Đang xử lý",
-            tint = StatusBlueProgress,
+            tint = StatusColorsTheme.current.inProgress,
             onClick = onActiveClick
         )
         StatTile(
@@ -835,7 +892,7 @@ private fun DashboardStatsRow(
             icon = Icons.Outlined.NewReleases,
             value = "$openRequestCount",
             label = "Yêu cầu mới",
-            tint = StatusOrangeDeep,
+            tint = StatusColorsTheme.current.pendingCompletion,
             onClick = onRequestsClick
         )
     }
@@ -1049,7 +1106,7 @@ private fun ActiveWorkSection(
                 when (booking.status) {
                     BookingStatus.IN_PROGRESS -> WorkerJobCard(
                         booking = booking,
-                        statusColor = StatusBlueProgress,
+                        statusColor = statusColor(BookingStatus.IN_PROGRESS),
                         statusLabel = "Đang làm",
                         onClick = { onJobClick(booking.id) },
                         actionLabel = "Báo hoàn thành",
@@ -1058,22 +1115,22 @@ private fun ActiveWorkSection(
                     )
                     BookingStatus.PENDING_COMPLETION -> WorkerJobCard(
                         booking = booking,
-                        statusColor = StatusOrangeDeep,
+                        statusColor = statusColor(BookingStatus.PENDING_COMPLETION),
                         statusLabel = "Chờ khách xác nhận",
                         onClick = { onJobClick(booking.id) }
                     )
                     BookingStatus.CONFIRMED -> WorkerJobCard(
                         booking = booking,
-                        statusColor = StatusOrange,
+                        statusColor = statusColor(BookingStatus.CONFIRMED),
                         statusLabel = "Đã xác nhận",
                         onClick = { onJobClick(booking.id) },
                         actionLabel = "Bắt đầu",
-                        actionColor = PrimaryBlue,
+                        actionColor = MaterialTheme.colorScheme.primary,
                         onActionClick = { onStartJob(booking.id) }
                     )
                     else -> WorkerJobCard(
                         booking = booking,
-                        statusColor = StatusGray,
+                        statusColor = statusColor(booking.status),
                         statusLabel = booking.status.name,
                         onClick = { onJobClick(booking.id) }
                     )

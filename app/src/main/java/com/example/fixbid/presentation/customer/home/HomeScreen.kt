@@ -9,7 +9,15 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.ChatBubble
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LocationOn
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.PersonSearch
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,20 +29,40 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import com.example.fixbid.core.utils.ServiceCategoryMapper
 import com.example.fixbid.domain.model.ServiceCategory
-import com.example.fixbid.core.components.BottomNavbar
+import com.example.fixbid.core.components.AppBottomBar
+import com.example.fixbid.core.components.BottomNavDestination
 import com.example.fixbid.core.components.CategoryGrid
 import com.example.fixbid.core.components.DraggableAiFab
 import com.example.fixbid.core.components.NotificationBell
 import com.example.fixbid.core.components.NotificationCard
+import com.example.fixbid.core.components.PrimaryTopBar
 import com.example.fixbid.core.components.PromoBanner
 import com.example.fixbid.presentation.customer.history.BookingHistoryScreen
 import com.example.fixbid.presentation.customer.profile.ProfileScreen
 import com.example.fixbid.presentation.customer.chat.ConversationListScreen
 import com.example.fixbid.presentation.customer.chat.ConversationListViewModel
-import androidx.compose.runtime.saveable.rememberSaveable
 
+private object CustomerTab {
+    const val HOME = "tab_home"
+    const val HISTORY = "tab_history"
+    const val CHAT = "tab_chat"
+    const val PROFILE = "tab_profile"
+    val ordered = listOf(HOME, HISTORY, CHAT, PROFILE)
+}
+
+/**
+ * Customer shell. Hosts the four primary tabs in a nested [NavHost] tied to its
+ * own [androidx.navigation.NavController] so each tab keeps an independent back
+ * stack and scroll/form state, and the bottom bar selection follows the real
+ * navigation state. Detail destinations (booking detail, payment, chat thread…)
+ * still live on the outer NavController via the hoisted callbacks.
+ */
 @Composable
 fun HomeScreen(
     onCategoryClick: (ServiceCategory) -> Unit = {},
@@ -55,78 +83,96 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
     chatListViewModel: ConversationListViewModel = hiltViewModel()
 ) {
-
     val uiState by viewModel.uiState.collectAsState()
     val chatUnreadCount by chatListViewModel.unreadCount.collectAsState()
-    var selectedNavIndex by rememberSaveable { mutableIntStateOf(0) }
 
-    // Switch to history tab when signaled (History is still index 1)
+    val tabNavController = rememberNavController()
+    val currentRoute = tabNavController
+        .currentBackStackEntryAsState().value?.destination?.route
+        ?: CustomerTab.HOME
+    val selectedIndex = CustomerTab.ordered.indexOf(currentRoute).coerceAtLeast(0)
+
+    val destinations = listOf(
+        BottomNavDestination("Trang chủ", Icons.Filled.Home, Icons.Outlined.Home),
+        BottomNavDestination("Lịch sử", Icons.Filled.History, Icons.Outlined.History),
+        BottomNavDestination("Chat", Icons.Filled.ChatBubble, Icons.Outlined.ChatBubbleOutline, badgeCount = chatUnreadCount),
+        BottomNavDestination("Hồ sơ", Icons.Filled.Person, Icons.Outlined.Person)
+    )
+
+    // Deep-link / signal: jump to the History tab when asked.
     LaunchedEffect(showHistoryTab) {
         if (showHistoryTab) {
-            selectedNavIndex = 1
+            tabNavController.navigate(CustomerTab.HISTORY) {
+                popUpTo(CustomerTab.HOME) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
         }
     }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         bottomBar = {
-            BottomNavbar(
-                selectedIndex = selectedNavIndex,
-                onItemSelected = { selectedNavIndex = it },
-                chatUnreadCount = chatUnreadCount
+            AppBottomBar(
+                destinations = destinations,
+                selectedIndex = selectedIndex,
+                onItemSelected = { index ->
+                    val route = CustomerTab.ordered[index]
+                    if (route != currentRoute) {
+                        tabNavController.navigate(route) {
+                            popUpTo(CustomerTab.HOME) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                }
             )
         },
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize()) {
-            when (selectedNavIndex) {
-                1 -> Box(modifier = Modifier.padding(innerPadding)) {
-                    BookingHistoryScreen(
-                        onBookingClick = onBookingClick,
-                        onBiddingWorkersClick = onBiddingWorkersClick,
-                        onCompletionConfirmClick = onCompletionConfirmClick,
-                        onPaymentClick = onPaymentClick,
-                        onReviewClick = onReviewClick,
-                        onWorkerProfileClick = onWorkerProfileClick
-                    )
-                }
-                2 -> Box(modifier = Modifier.padding(innerPadding)) {
-                    ConversationListScreen(
-                        onConversationClick = onChatConversationClick,
-                        viewModel = chatListViewModel
-                    )
-                }
-                3 -> Box(modifier = Modifier.padding(innerPadding)) {
-                    ProfileScreen(
-                        onSignOut = onSignOut,
-                        onNotificationSettingsClick = onNotificationSettingsClick
-                    )
-                }
-                else -> Column(
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    HomeHeader(
+            NavHost(
+                navController = tabNavController,
+                startDestination = CustomerTab.HOME,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                composable(CustomerTab.HOME) {
+                    HomeTabContent(
+                        uiState = uiState,
+                        bottomPadding = innerPadding.calculateBottomPadding(),
                         onNotificationClick = onNotificationClick,
-                        unreadNotificationCount = unreadNotificationCount
+                        unreadNotificationCount = unreadNotificationCount,
+                        onFindWorkersClick = onFindWorkersClick,
+                        onCategoryClick = onCategoryClick,
+                        onRetryNotifications = viewModel::loadNotifications
                     )
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 16.dp)
-                            .padding(top = 20.dp, bottom = innerPadding.calculateBottomPadding() + 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(20.dp)
-                    ) {
-                        PromoBanner()
-                        NotificationSection(
-                            state = uiState.notificationState,
-                            onRetry = viewModel::loadNotifications
+                }
+                composable(CustomerTab.HISTORY) {
+                    Box(modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())) {
+                        BookingHistoryScreen(
+                            onBookingClick = onBookingClick,
+                            onBiddingWorkersClick = onBiddingWorkersClick,
+                            onCompletionConfirmClick = onCompletionConfirmClick,
+                            onPaymentClick = onPaymentClick,
+                            onReviewClick = onReviewClick,
+                            onWorkerProfileClick = onWorkerProfileClick
                         )
-                        FindWorkersCta(onClick = onFindWorkersClick)
-                        CategorySection(
-                            categories = uiState.categories,
-                            onCategoryClick = onCategoryClick
+                    }
+                }
+                composable(CustomerTab.CHAT) {
+                    Box(modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())) {
+                        ConversationListScreen(
+                            onConversationClick = onChatConversationClick,
+                            viewModel = chatListViewModel
+                        )
+                    }
+                }
+                composable(CustomerTab.PROFILE) {
+                    Box(modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())) {
+                        ProfileScreen(
+                            onSignOut = onSignOut,
+                            onNotificationSettingsClick = onNotificationSettingsClick
                         )
                     }
                 }
@@ -134,7 +180,7 @@ fun HomeScreen(
 
             // Draggable AI assistant overlay — only on the home tab so it
             // doesn't cover other screens' primary actions.
-            if (selectedNavIndex == 0) {
+            if (currentRoute == CustomerTab.HOME) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -150,59 +196,46 @@ fun HomeScreen(
     }
 }
 
-/**
- * Customer home screen header. The previous version included a search bar
- * and a "Bạn cần giúp gì nào?" prompt that did not drive any flow, so it has
- * been simplified to a tight one-row header that only carries the location
- * label and the notification bell.
- */
+/** Home tab body: brand header, promo, recent notifications, CTAs and categories. */
 @Composable
-private fun HomeHeader(
+private fun HomeTabContent(
+    uiState: HomeUiState,
+    bottomPadding: androidx.compose.ui.unit.Dp,
     onNotificationClick: () -> Unit,
-    unreadNotificationCount: Int = 0,
+    unreadNotificationCount: Int,
+    onFindWorkersClick: () -> Unit,
+    onCategoryClick: (ServiceCategory) -> Unit,
+    onRetryNotifications: () -> Unit
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.primary,
-        shadowElevation = 2.dp
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(horizontal = 20.dp)
-                .padding(top = 14.dp, bottom = 16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Vị trí của bạn",
-                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium
+    Column(modifier = Modifier.fillMaxSize()) {
+        PrimaryTopBar(
+            title = "Hà Nội",
+            subtitle = "Vị trí của bạn",
+            actions = {
+                NotificationBell(
+                    unreadCount = unreadNotificationCount,
+                    onClick = onNotificationClick,
+                    tint = MaterialTheme.colorScheme.onPrimary
                 )
-                Spacer(modifier = Modifier.height(2.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Outlined.LocationOn,
-                        contentDescription = "Vị trí",
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "Hà Nội",
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 16.sp
-                    )
-                }
             }
-            NotificationBell(
-                unreadCount = unreadNotificationCount,
-                onClick = onNotificationClick,
-                tint = MaterialTheme.colorScheme.onPrimary
+        )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp)
+                .padding(top = 20.dp, bottom = bottomPadding + 16.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            PromoBanner()
+            NotificationSection(
+                state = uiState.notificationState,
+                onRetry = onRetryNotifications
+            )
+            FindWorkersCta(onClick = onFindWorkersClick)
+            CategorySection(
+                categories = uiState.categories,
+                onCategoryClick = onCategoryClick
             )
         }
     }

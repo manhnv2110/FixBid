@@ -1,76 +1,81 @@
-package com.example.fixbid.presentation.worker.components
+package com.example.fixbid.core.components
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-private data class WorkerNavItem(
+/**
+ * One destination in [AppBottomBar].
+ *
+ * [badgeCount] drives a small count badge on the icon (e.g. unread chats, new
+ * job requests). Zero hides the badge.
+ */
+data class BottomNavDestination(
     val label: String,
     val activeIcon: ImageVector,
-    val inactiveIcon: ImageVector
+    val inactiveIcon: ImageVector,
+    val badgeCount: Int = 0
 )
 
 /**
- * Bottom navbar cho worker — 4 tab theo workflow thực tế:
- * Trang chủ (dashboard) · Tìm việc (yêu cầu mở) · Việc làm · Hồ sơ.
+ * The single bottom navigation bar used across the whole app.
  *
- * [openRequestCount] hiển thị badge số yêu cầu mới phù hợp kỹ năng trên tab "Tìm việc".
+ * Previously customer and worker shells each shipped their own bar — one a
+ * hand-rolled `Surface`+`Row`, the other a real `NavigationBar` — so the two
+ * halves of the app looked and behaved differently. This component is the one
+ * Material 3 source of truth: callers only supply their [destinations] and the
+ * selected index.
  */
 @Composable
-fun WorkerBottomNavbar(
+fun AppBottomBar(
+    destinations: List<BottomNavDestination>,
     selectedIndex: Int,
     onItemSelected: (Int) -> Unit,
-    openRequestCount: Int = 0
+    modifier: Modifier = Modifier
 ) {
-    val items = listOf(
-        WorkerNavItem("Trang chủ", Icons.Filled.Dashboard, Icons.Outlined.Dashboard),
-        WorkerNavItem("Tìm việc", Icons.Filled.Search, Icons.Outlined.Search),
-        WorkerNavItem("Việc làm", Icons.Filled.Work, Icons.Outlined.WorkOutline),
-        WorkerNavItem("Hồ sơ", Icons.Filled.Person, Icons.Outlined.Person)
-    )
-
     NavigationBar(
+        modifier = modifier,
         containerColor = MaterialTheme.colorScheme.surface,
-        tonalElevation = 8.dp
+        tonalElevation = 3.dp
     ) {
-        items.forEachIndexed { index, item ->
+        destinations.forEachIndexed { index, item ->
             val selected = selectedIndex == index
             NavigationBarItem(
                 selected = selected,
                 onClick = { onItemSelected(index) },
                 icon = {
-                    if (index == 1 && openRequestCount > 0) {
+                    val icon = if (selected) item.activeIcon else item.inactiveIcon
+                    if (item.badgeCount > 0) {
                         BadgedBox(
                             badge = {
                                 Badge {
                                     Text(
-                                        text = if (openRequestCount > 9) "9+" else "$openRequestCount",
+                                        text = if (item.badgeCount > 9) "9+" else "${item.badgeCount}",
                                         fontSize = 9.sp
                                     )
                                 }
                             }
                         ) {
-                            Icon(
-                                imageVector = if (selected) item.activeIcon else item.inactiveIcon,
-                                contentDescription = item.label
-                            )
+                            Icon(imageVector = icon, contentDescription = item.label)
                         }
                     } else {
-                        Icon(
-                            imageVector = if (selected) item.activeIcon else item.inactiveIcon,
-                            contentDescription = item.label
-                        )
+                        Icon(imageVector = icon, contentDescription = item.label)
                     }
                 },
                 label = {
                     Text(
-                        item.label,
+                        text = item.label,
                         fontSize = 11.sp,
                         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                         maxLines = 1
