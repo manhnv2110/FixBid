@@ -121,9 +121,15 @@ class NotificationRepositoryImpl @Inject constructor(
 
     override suspend fun saveFcmToken(userId: String, token: String): Resource<Unit> =
         runCatching {
+            // Conflict-resolve on the unique `token` column so a re-install or
+            // a different user signing in on the same device overwrites the
+            // existing row instead of inserting a duplicate. The unique
+            // constraint is added by migration 0006_fcm_tokens_unique.sql.
             client.postgrest[Tables.FCM_TOKENS].upsert(
-                mapOf("user_id" to userId, "token" to token)
-            )
+                value = mapOf("user_id" to userId, "token" to token)
+            ) {
+                onConflict = "token"
+            }
             Resource.Success(Unit)
         }.getOrElse { Resource.Error(it.message ?: "Lỗi lưu token") }
 }

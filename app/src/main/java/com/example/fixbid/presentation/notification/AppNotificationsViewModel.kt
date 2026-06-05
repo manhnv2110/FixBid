@@ -30,7 +30,8 @@ class AppNotificationsViewModel @Inject constructor(
     private val notificationRepository: NotificationRepository,
     private val authRepository: AuthRepository,
     private val preferences: UserPreferencesDataStore,
-    private val appNotificationManager: AppNotificationManager
+    private val appNotificationManager: AppNotificationManager,
+    private val registerFcmTokenUseCase: com.example.fixbid.domain.usecase.shared.RegisterFcmTokenUseCase
 ) : ViewModel() {
 
     val unreadCount: StateFlow<Int> = observeUnreadCount()
@@ -42,10 +43,22 @@ class AppNotificationsViewModel @Inject constructor(
     init {
         appNotificationManager.ensureChannels()
         observeIncomingForPush()
+        syncPushToken()
     }
 
     fun markPermissionRequested() {
         _permissionRequested.value = true
+    }
+
+    /**
+     * Register this device's FCM token against the signed-in user so the backend
+     * can deliver pushes while the app is backgrounded/killed. Safe no-op when
+     * push isn't configured or no user is signed in.
+     */
+    private fun syncPushToken() {
+        viewModelScope.launch {
+            runCatching { registerFcmTokenUseCase() }
+        }
     }
 
     private fun observeIncomingForPush() {
