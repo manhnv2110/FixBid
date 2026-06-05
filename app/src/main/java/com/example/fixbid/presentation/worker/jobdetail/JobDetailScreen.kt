@@ -43,6 +43,7 @@ import com.example.fixbid.domain.model.Bid
 import com.example.fixbid.domain.model.BidStatus
 import com.example.fixbid.domain.model.Booking
 import com.example.fixbid.domain.model.BookingStatus
+import com.example.fixbid.domain.model.BookingType
 import com.example.fixbid.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -69,6 +70,8 @@ fun JobDetailScreen(
                     Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show()
                 JobDetailEvent.BidPlaced -> { /* state đã update */ }
                 JobDetailEvent.CompletionSubmitted -> { /* state đã update */ }
+                JobDetailEvent.DirectBookingAccepted,
+                JobDetailEvent.DirectBookingDeclined -> { /* state đã update via load() */ }
             }
         }
     }
@@ -83,9 +86,12 @@ fun JobDetailScreen(
                 JobDetailBottomBar(
                     booking = data.booking,
                     myBid = data.myBid,
+                    isResponding = uiState.isRespondingDirect,
                     onPlaceBid = viewModel::openBidDialog,
                     onReportCompletion = viewModel::openCompletionDialog,
-                    onNavigateToCustomer = { onNavigateToCustomer(data.booking.id) }
+                    onNavigateToCustomer = { onNavigateToCustomer(data.booking.id) },
+                    onAcceptDirect = viewModel::acceptDirectBooking,
+                    onDeclineDirect = viewModel::openDeclineDialog
                 )
             }
         },
@@ -158,6 +164,16 @@ fun JobDetailScreen(
                 onRemoveImage = viewModel::removeCompletionImage,
                 onEditImage = { uri -> editingUri = uri },
                 onSubmit = { imageBytes -> viewModel.submitCompletion(imageBytes) }
+            )
+        }
+
+        // Decline-direct-booking dialog: collects an optional reason so the
+        // customer gets actionable feedback instead of a bare "đã huỷ".
+        if (uiState.showDeclineDialog) {
+            DeclineDirectBookingDialog(
+                isSubmitting = uiState.isRespondingDirect,
+                onDismiss = viewModel::closeDeclineDialog,
+                onConfirm = { reason -> viewModel.declineDirectBooking(reason) }
             )
         }
     }
@@ -813,9 +829,12 @@ private fun MyBidCard(bid: Bid) {
 private fun JobDetailBottomBar(
     booking: Booking,
     myBid: Bid?,
+    isResponding: Boolean,
     onPlaceBid: () -> Unit,
     onReportCompletion: () -> Unit,
-    onNavigateToCustomer: () -> Unit
+    onNavigateToCustomer: () -> Unit,
+    onAcceptDirect: () -> Unit,
+    onDeclineDirect: () -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -829,23 +848,26 @@ private fun JobDetailBottomBar(
                 .padding(16.dp)
         ) {
             when (booking.status) {
-                // Bidding stage — worker đặt giá
-                BookingStatus.BIDDING, BookingStatus.PENDING -> {
-                    if (myBid == null || myBid.status == BidStatus.WITHDRAWN
-                        || myBid.status == BidStatus.REJECTED) {
-                        PrimaryActionButton(
-                            label = if (myBid == null) "Đặt giá thầu" else "Đặt lại giá",
-                            icon = Icons.Outlined.Gavel,
-                            onClick = onPlaceBid
+                // PENDING splits two ways: a direct booking is awaiting THIS worker's
+                // accept/decline; a bidding-typed PENDING is the legacy "place bid"
+                // path (kept for backwards compatibility with existing data).
+                BookingStatus.PENDING -> {
+                    if (booking.type == BookingType.DIRECT) {
+                        DirectBookingActionRow(
+                            isResponding = isResponding,
+                            onAccept = onAcceptDirect,
+                            onDecline = onDeclineDirect
                         )
                     } else {
-                        StatusInfoRow(
-                            isPositive = myBid.status == BidStatus.ACCEPTED,
-                            text = if (myBid.status == BidStatus.ACCEPTED)
-                                "Khách đã chọn bạn cho công việc này"
-                            else "Bạn đã đặt giá. Chờ khách phản hồi."
+                        BiddingActionRow(
+                            myBid = myBid,
+                            onPlaceBid = onPlaceBid
                         )
                     }
+                }
+                // Bidding stage — worker đặt giá
+                BookingStatus.BIDDING -> {
+                    BiddingActionRow(myBid = myBid, onPlaceBid = onPlaceBid)
                 }
 
                 // Khách đã chọn thợ, đang chờ thanh toán
@@ -930,6 +952,97 @@ private fun JobDetailBottomBar(
                         isPositive = false,
                         text = "Công việc không còn hoạt động."
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BiddingActionRow(
+    myBid: Bid?,
+    onPlaceBid: () -> Unit
+) {
+    if (myBid == null || myBid.status == BidStatus.WITHDRAWN ||
+        myBid.status == BidStatus.REJECTED) {
+        PrimaryActionButton(
+            label = if (myBid == null) "Đặt giá thầu" else "Đặt lại giá",
+            icon = Icons.Outlined.Gavel,
+            onClick = onPlaceBid
+        )
+    } else {
+        StatusInfoRow(
+            isPositive = myBid.status == BidStatus.ACCEPTED,
+            text = if (myBid.status == BidStatus.ACCEPTED)
+                "Khách đã chọn bạn cho công việc này"
+            else "Bạn đã đặt giá. Chờ khách phản hồi."
+        )
+    }
+}
+
+/**
+ * Action row shown to a worker when a customer has assigned a DIRECT booking
+ * to them and is awaiting accept/decline. Mirrors the Place-bid affordance for
+ * the bidding flow but routed through the dedicated direct-booking use cases.
+ */
+@Composable
+private fun DirectBookingActionRow(
+    isResponding: Boolean,
+    onAccept: () -> Unit,
+    onDecline: () -> Unit
+) {
+    Column {
+        StatusInfoRow(
+            isPositive = true,
+            text = "Khách hàng đặt thẳng bạn cho công việc này. Hãy phản hồi sớm."
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            OutlinedButton(
+                onClick = onDecline,
+                enabled = !isResponding,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(52.dp),
+                shape = MaterialTheme.shapes.medium,
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error
+                )
+            ) {
+                Icon(
+                    Icons.Outlined.Cancel,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Từ chối", fontWeight = FontWeight.SemiBold)
+            }
+            Button(
+                onClick = onAccept,
+                enabled = !isResponding,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(52.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = AccentGreen),
+                shape = MaterialTheme.shapes.medium
+            ) {
+                if (isResponding) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Icon(
+                        Icons.Outlined.CheckCircle,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Nhận đơn", fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -1570,4 +1683,91 @@ private fun resolveImageBytes(
             }
         }.getOrNull()
     }
+}
+
+
+// ─── Decline-direct dialog ────────────────────────────────────────────────────
+
+/**
+ * Capture the worker's reason for declining a direct booking. Reason is stored
+ * in `cancel_reason` so the customer sees a meaningful explanation when the
+ * notification arrives. Empty/whitespace becomes a generic message in the use case.
+ */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun DeclineDirectBookingDialog(
+    isSubmitting: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var reason by remember { mutableStateOf("") }
+    val presetReasons = listOf(
+        "Đang bận lịch khác",
+        "Vị trí quá xa",
+        "Không đúng chuyên môn",
+        "Giá khách đề xuất chưa phù hợp"
+    )
+
+    AlertDialog(
+        onDismissRequest = { if (!isSubmitting) onDismiss() },
+        title = { Text("Từ chối đơn này?", fontWeight = FontWeight.Bold) },
+        text = {
+            Column {
+                Text(
+                    "Cho khách biết lý do (không bắt buộc):",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(12.dp))
+                androidx.compose.foundation.layout.FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    presetReasons.forEach { preset ->
+                        FilterChip(
+                            selected = reason == preset,
+                            onClick = { reason = preset },
+                            label = { Text(preset, fontSize = 12.sp) }
+                        )
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = reason,
+                    onValueChange = { reason = it },
+                    placeholder = { Text("Hoặc nhập lý do khác...") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    maxLines = 4,
+                    shape = RoundedCornerShape(10.dp),
+                    enabled = !isSubmitting
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = !isSubmitting,
+                onClick = { onConfirm(reason) }
+            ) {
+                if (isSubmitting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                } else {
+                    Text(
+                        "Xác nhận từ chối",
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(enabled = !isSubmitting, onClick = onDismiss) {
+                Text("Huỷ")
+            }
+        }
+    )
 }

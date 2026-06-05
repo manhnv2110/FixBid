@@ -9,6 +9,8 @@ import com.example.fixbid.domain.model.Resource
 import com.example.fixbid.domain.notification.NotificationContentFactory
 import com.example.fixbid.domain.repository.BookingRepository
 import com.example.fixbid.domain.usecase.shared.SendNotificationUseCase
+import com.example.fixbid.domain.usecase.worker.AcceptDirectBookingUseCase
+import com.example.fixbid.domain.usecase.worker.DeclineDirectBookingUseCase
 import com.example.fixbid.domain.usecase.worker.GetJobDetailUseCase
 import com.example.fixbid.domain.usecase.worker.JobDetailData
 import com.example.fixbid.domain.usecase.worker.PlaceBidUseCase
@@ -46,13 +48,18 @@ data class JobDetailUiState(
     val showBidDialog: Boolean = false,
     val bidForm: BidFormState = BidFormState(),
     val showCompletionDialog: Boolean = false,
-    val completionForm: CompletionFormState = CompletionFormState()
+    val completionForm: CompletionFormState = CompletionFormState(),
+    /** True while an accept/decline call for a DIRECT booking is in flight. */
+    val isRespondingDirect: Boolean = false,
+    val showDeclineDialog: Boolean = false
 )
 
 sealed interface JobDetailEvent {
     data class Toast(val message: String) : JobDetailEvent
     data object BidPlaced : JobDetailEvent
     data object CompletionSubmitted : JobDetailEvent
+    data object DirectBookingAccepted : JobDetailEvent
+    data object DirectBookingDeclined : JobDetailEvent
 }
 
 @HiltViewModel
@@ -60,6 +67,8 @@ class JobDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val getJobDetailUseCase: GetJobDetailUseCase,
     private val placeBidUseCase: PlaceBidUseCase,
+    private val acceptDirectBookingUseCase: AcceptDirectBookingUseCase,
+    private val declineDirectBookingUseCase: DeclineDirectBookingUseCase,
     private val bookingRepository: BookingRepository,
     private val paymentRepository: com.example.fixbid.domain.repository.PaymentRepository,
     private val sendNotification: SendNotificationUseCase
@@ -367,6 +376,60 @@ class JobDetailViewModel @Inject constructor(
                 }
                 is Resource.Loading -> {}
             }
+        }
+    }
+
+    // ─── Direct booking accept / decline ─────────────────────────────────────
+
+    /**
+     * Worker accepts a DIRECT booking the customer assigned to them. Backend
+     * flips status to AWAITING_PAYMENT (customer pays next) and the customer
+     * gets a push notification. Realtime then updates this screen automatically.
+     */
+    fun acceptDirectBooking() {
+        if (_uiState.value.isRespondingDirect) return
+        val bookingIdLocal = bookingId
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRespondingDirect = true) }
+            when (val result = acceptDirectBookingUseCase(bookingIdLocal)) {
+                is Resource.Success -> {
+                    _events.trySend(JobDetailEvent.Toast("Đã nhận đơn — chờ khách thanh toán"))
+                    _events.trySend(JobDetailEvent.DirectBookingAccepted)
+                    load()
+                }
+                is Resource.Error -> {
+                    _events.trySend(JobDetailEvent.Toast(result.message))
+                }
+                is Resource.Loading -> { /* no-op */ }
+            }
+            _uiState.update { it.copy(isRespondingDirect = false) }
+        }
+    }
+
+    fun openDeclineDialog() = _uiState.update { it.copy(showDeclineDialog = true) }
+    fun closeDeclineDialog() = _uiState.update { it.copy(showDeclineDialog = false) }
+
+    /**
+     * Worker declines with a reason. Reason is stored in `cancel_reason`, the
+     * customer is notified, and the screen is reloaded so the action buttons
+     * collapse to the read-only "đã huỷ" banner.
+     */
+    fun declineDirectBooking(reason: String) {
+        if (_uiState.value.isRespondingDirect) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRespondingDirect = true, showDeclineDialog = false) }
+            when (val result = declineDirectBookingUseCase(bookingId, reason)) {
+                is Resource.Success -> {
+                    _events.trySend(JobDetailEvent.Toast("Đã từ chối đơn"))
+                    _events.trySend(JobDetailEvent.DirectBookingDeclined)
+                    load()
+                }
+                is Resource.Error -> {
+                    _events.trySend(JobDetailEvent.Toast(result.message))
+                }
+                is Resource.Loading -> { /* no-op */ }
+            }
+            _uiState.update { it.copy(isRespondingDirect = false) }
         }
     }
 }
