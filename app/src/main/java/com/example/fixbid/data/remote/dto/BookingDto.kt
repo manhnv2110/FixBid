@@ -25,6 +25,7 @@ data class BookingDto(
     @SerialName("agreed_price") val agreedPrice: Double? = null,
     @SerialName("customer_note") val customerNote: String? = null,
     @SerialName("worker_note") val workerNote: String? = null,
+    @SerialName("cancel_reason") val cancelReason: String? = null,
     @SerialName("description_images") val descriptionImages: List<String>? = null,
     @SerialName("completion_note") val completionNote: String? = null,
     @SerialName("completion_images") val completionImages: List<String>? = null,
@@ -50,6 +51,7 @@ data class BookingDto(
         agreedPrice = agreedPrice,
         customerNote = customerNote,
         workerNote = workerNote,
+        cancelReason = cancelReason,
         descriptionImages = descriptionImages,
         completionNote = completionNote,
         completionImages = completionImages,
@@ -74,6 +76,7 @@ fun Booking.toDto() = BookingDto(
     agreedPrice            = agreedPrice,
     customerNote           = customerNote,
     workerNote             = workerNote,
+    cancelReason           = cancelReason,
     descriptionImages      = descriptionImages?.ifEmpty { null },
     completionNote         = completionNote,
     completionImages       = completionImages?.ifEmpty { null }
