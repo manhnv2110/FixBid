@@ -1,6 +1,7 @@
 package com.example.fixbid.di
 
 import com.example.fixbid.data.repository.*
+import com.example.fixbid.data.remote.FirebasePushTokenProvider
 import com.example.fixbid.domain.repository.*
 import dagger.Binds
 import dagger.Module
@@ -41,4 +42,7 @@ abstract class RepositoryModule {
 
     @Binds @Singleton
     abstract fun bindWalletRepository(impl: WalletRepositoryImpl): WalletRepository
+
+    @Binds @Singleton
+    abstract fun bindPushTokenProvider(impl: FirebasePushTokenProvider): PushTokenProvider
 }
