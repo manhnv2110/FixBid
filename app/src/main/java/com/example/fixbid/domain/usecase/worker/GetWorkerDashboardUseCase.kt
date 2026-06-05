@@ -15,6 +15,12 @@ data class WorkerDashboardData(
     val activeJobs: List<Booking>,
     val pendingJobs: List<Booking>,
     val completedJobs: List<Booking>,
+    /**
+     * Direct bookings the customer assigned to this worker that are still
+     * awaiting an Accept/Decline. They surface separately from the open
+     * bidding requests so the worker doesn't miss them.
+     */
+    val pendingDirectRequests: List<Booking> = emptyList(),
     val completedCount: Int,
     val totalEarnings: Double,
     val monthlyEarnings: Double
@@ -44,6 +50,9 @@ class GetWorkerDashboardUseCase @Inject constructor(
         val confirmedResult = bookingRepository.getWorkerBookings(user.id, BookingStatus.CONFIRMED)
         val confirmedJobs = (confirmedResult as? Resource.Success)?.data ?: emptyList()
 
+        val pendingDirectResult = bookingRepository.getPendingDirectBookings(user.id)
+        val pendingDirectRequests = (pendingDirectResult as? Resource.Success)?.data ?: emptyList()
+
         val completedResult = bookingRepository.getWorkerBookings(user.id, BookingStatus.COMPLETED)
         val completedJobs = (completedResult as? Resource.Success)?.data ?: emptyList()
 
@@ -66,6 +75,7 @@ class GetWorkerDashboardUseCase @Inject constructor(
                 activeJobs = allActiveJobs,
                 pendingJobs = confirmedJobs,
                 completedJobs = completedJobs,
+                pendingDirectRequests = pendingDirectRequests,
                 completedCount = completedJobs.size + (profile?.totalJobsDone ?: 0),
                 totalEarnings = totalEarnings,
                 monthlyEarnings = monthlyEarnings

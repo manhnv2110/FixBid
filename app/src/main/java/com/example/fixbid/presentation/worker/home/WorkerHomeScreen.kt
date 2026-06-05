@@ -157,7 +157,9 @@ fun WorkerHomeScreen(
                         onVerifyIdentityClick = onVerifyIdentityClick,
                         onSeeAllWork = { switchTab(WorkerTab.WORK) },
                         onStartJob = viewModel::startJob,
-                        onCompleteJob = viewModel::completeJob
+                        onCompleteJob = viewModel::completeJob,
+                        onAcceptDirect = viewModel::acceptDirectBooking,
+                        onDeclineDirect = viewModel::declineDirectBooking
                     )
                 }
                 composable(WorkerTab.REQUESTS) {
@@ -227,8 +229,16 @@ private fun WorkerDashboard(
     onVerifyIdentityClick: () -> Unit,
     onSeeAllWork: () -> Unit,
     onStartJob: (String) -> Unit,
-    onCompleteJob: (String) -> Unit
+    onCompleteJob: (String) -> Unit,
+    onAcceptDirect: (String) -> Unit,
+    onDeclineDirect: (bookingId: String, reason: String) -> Unit
 ) {
+    // Local UI state for the decline-reason dialog. The viewmodel already
+    // exposes `respondingDirectId` for the in-flight indicator on the card,
+    // so this composable only needs to track which booking is being asked
+    // about (held in process memory; recreated cheaply on rotation).
+    var declineTarget by remember { mutableStateOf<String?>(null) }
+
     Column(modifier = Modifier.fillMaxSize()) {
         DashboardHeader(
             userName = uiState.userName,
@@ -303,6 +313,23 @@ private fun WorkerDashboard(
                         onBrowseRequests = onBrowseAllRequests
                     )
 
+                    // 3b. Direct booking requests waiting for accept/decline.
+                    //     Surfaced right under the focus card because they're
+                    //     time-sensitive: the customer is sitting on the booking
+                    //     screen waiting to know whether to pay you or move on.
+                    if (uiState.pendingDirectRequests.isNotEmpty()) {
+                        DashboardSectionTitle(
+                            title = "Yêu cầu trực tiếp (${uiState.pendingDirectRequests.size})"
+                        )
+                        PendingDirectRequestsSection(
+                            requests = uiState.pendingDirectRequests,
+                            respondingId = uiState.respondingDirectId,
+                            onItemClick = onJobClick,
+                            onAccept = onAcceptDirect,
+                            onDecline = { bookingId -> declineTarget = bookingId }
+                        )
+                    }
+
                     // 4. Secondary shortcuts
                     DashboardSectionTitle(title = "Lối tắt")
                     SecondaryShortcuts(
@@ -336,6 +363,20 @@ private fun WorkerDashboard(
                 }
             }
         }
+    }
+
+    // Decline-reason dialog — opened from a Direct request card. We only
+    // show it after the worker explicitly chose to decline a specific booking
+    // so the dashboard stays uncluttered the rest of the time.
+    declineTarget?.let { bookingId ->
+        DeclineReasonDialog(
+            isSubmitting = uiState.respondingDirectId == bookingId,
+            onDismiss = { declineTarget = null },
+            onConfirm = { reason ->
+                onDeclineDirect(bookingId, reason)
+                declineTarget = null
+            }
+        )
     }
 }
 
@@ -1311,4 +1352,239 @@ private fun VerifyTipBanner(onVerifyClick: () -> Unit) {
             }
         }
     }
+}
+
+
+// ─── Pending direct booking requests ─────────────────────────────────────────
+
+/**
+ * Section that surfaces the worker's [pendingDirectRequests] — DIRECT-type
+ * bookings the customer assigned to them that are still PENDING. Each card
+ * shows enough context for an instant decision (category, scheduled time,
+ * budget, address) and exposes Accept / Decline actions inline so the worker
+ * doesn't need to drill into the detail screen for routine cases.
+ */
+@Composable
+private fun PendingDirectRequestsSection(
+    requests: List<Booking>,
+    respondingId: String?,
+    onItemClick: (String) -> Unit,
+    onAccept: (String) -> Unit,
+    onDecline: (String) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // Take the 3 most-recent requests for the dashboard. The full list lives
+        // on the dedicated requests tab; the worker can see all from there.
+        requests.take(3).forEach { booking ->
+            DirectRequestCard(
+                booking = booking,
+                isResponding = respondingId == booking.id,
+                onClick = { onItemClick(booking.id) },
+                onAccept = { onAccept(booking.id) },
+                onDecline = { onDecline(booking.id) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun DirectRequestCard(
+    booking: Booking,
+    isResponding: Boolean,
+    onClick: () -> Unit,
+    onAccept: () -> Unit,
+    onDecline: () -> Unit
+) {
+    val accent = StatusColorsTheme.current.pending
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = !isResponding, onClick = onClick),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(modifier = Modifier.height(IntrinsicSize.Min)) {
+            // Status accent stripe so the row reads at a glance.
+            Box(
+                modifier = Modifier
+                    .width(5.dp)
+                    .fillMaxHeight()
+                    .background(accent)
+            )
+            Column(Modifier.padding(16.dp)) {
+                // Header row — pill + customer
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    com.example.fixbid.core.components.StatusPill(
+                        text = "Đặt trực tiếp",
+                        color = accent
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = booking.customer?.fullName ?: "Khách hàng",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Spacer(Modifier.height(10.dp))
+
+                Text(
+                    text = booking.category.displayName,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (booking.description.isNotBlank()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = booking.description,
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        lineHeight = 18.sp
+                    )
+                }
+
+                Spacer(Modifier.height(10.dp))
+                FocusMetaRow(icon = Icons.Outlined.LocationOn, text = booking.address)
+                Spacer(Modifier.height(4.dp))
+                FocusMetaRow(
+                    icon = Icons.Outlined.Schedule,
+                    text = "Hẹn ${formatShortDateTime(booking.scheduledAt)} • ${booking.estimatedDurationHours}h"
+                )
+
+                Spacer(Modifier.height(14.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDecline,
+                        enabled = !isResponding,
+                        modifier = Modifier.weight(1f).height(46.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Text("Từ chối", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    }
+                    Button(
+                        onClick = onAccept,
+                        enabled = !isResponding,
+                        modifier = Modifier.weight(1f).height(46.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentGreen),
+                        contentPadding = PaddingValues(horizontal = 12.dp)
+                    ) {
+                        if (isResponding) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                        } else {
+                            Icon(
+                                Icons.AutoMirrored.Outlined.ArrowForward,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text("Nhận đơn", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Reason capture for declining a direct booking. Mirrors the screen-level
+ * dialog in JobDetailScreen so the worker has a consistent decline flow whether
+ * they tap it from the dashboard card or from the detail screen.
+ */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun DeclineReasonDialog(
+    isSubmitting: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    val presetReasons = listOf(
+        "Không trống lịch hôm đó",
+        "Vị trí quá xa",
+        "Không đúng chuyên môn",
+        "Đang bận đơn khác"
+    )
+    var reason by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = { if (!isSubmitting) onDismiss() },
+        title = { Text("Từ chối đơn?", fontWeight = FontWeight.Bold) },
+        text = {
+            Column {
+                Text(
+                    text = "Cho khách biết lý do để họ tìm thợ khác phù hợp hơn:",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(12.dp))
+                androidx.compose.foundation.layout.FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    presetReasons.forEach { preset ->
+                        FilterChip(
+                            selected = reason == preset,
+                            onClick = { reason = preset },
+                            label = { Text(preset, fontSize = 12.sp) }
+                        )
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = reason,
+                    onValueChange = { reason = it },
+                    placeholder = { Text("Hoặc nhập lý do khác...") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    maxLines = 4,
+                    shape = RoundedCornerShape(10.dp),
+                    enabled = !isSubmitting
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = !isSubmitting,
+                onClick = { onConfirm(reason) }
+            ) {
+                if (isSubmitting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                } else {
+                    Text(
+                        "Xác nhận từ chối",
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(enabled = !isSubmitting, onClick = onDismiss) { Text("Huỷ") }
+        }
+    )
 }

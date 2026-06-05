@@ -8,14 +8,18 @@ import com.example.fixbid.domain.model.Resource
 import com.example.fixbid.domain.model.WorkerProfile
 import com.example.fixbid.domain.repository.AuthRepository
 import com.example.fixbid.domain.repository.WorkerRepository
+import com.example.fixbid.domain.usecase.worker.AcceptDirectBookingUseCase
+import com.example.fixbid.domain.usecase.worker.DeclineDirectBookingUseCase
 import com.example.fixbid.domain.usecase.worker.GetOpenJobRequestsUseCase
 import com.example.fixbid.domain.usecase.worker.GetWorkerDashboardUseCase
 import com.example.fixbid.domain.usecase.worker.ReleasePendingEscrowsUseCase
 import com.example.fixbid.domain.usecase.worker.UpdateJobStatusUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -29,6 +33,9 @@ data class WorkerHomeUiState(
     val pendingJobs: List<Booking> = emptyList(),      // CONFIRMED
     val completedJobs: List<Booking> = emptyList(),
     val openRequests: List<Booking> = emptyList(),     // BIDDING — preview ở dashboard
+    /** DIRECT bookings assigned to this worker that need accept/decline. */
+    val pendingDirectRequests: List<Booking> = emptyList(),
+    val respondingDirectId: String? = null,            // worker đang xử lý đơn nào
     val completedCount: Int = 0,
     val totalEarnings: Double = 0.0,
     val monthlyEarnings: Double = 0.0,
@@ -36,11 +43,17 @@ data class WorkerHomeUiState(
     val isTogglingAvailability: Boolean = false
 )
 
+sealed interface WorkerHomeEvent {
+    data class Toast(val message: String) : WorkerHomeEvent
+}
+
 @HiltViewModel
 class WorkerHomeViewModel @Inject constructor(
     private val getDashboardUseCase: GetWorkerDashboardUseCase,
     private val getOpenJobRequestsUseCase: GetOpenJobRequestsUseCase,
     private val updateJobStatusUseCase: UpdateJobStatusUseCase,
+    private val acceptDirectBookingUseCase: AcceptDirectBookingUseCase,
+    private val declineDirectBookingUseCase: DeclineDirectBookingUseCase,
     private val releasePendingEscrows: ReleasePendingEscrowsUseCase,
     private val workerRepository: WorkerRepository,
     private val authRepository: AuthRepository
@@ -48,6 +61,9 @@ class WorkerHomeViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(WorkerHomeUiState())
     val uiState: StateFlow<WorkerHomeUiState> = _uiState.asStateFlow()
+
+    private val _events = Channel<WorkerHomeEvent>(Channel.BUFFERED)
+    val events = _events.receiveAsFlow()
 
     init {
         loadDashboard()
@@ -83,6 +99,7 @@ class WorkerHomeViewModel @Inject constructor(
                             pendingJobs = data.pendingJobs,
                             completedJobs = data.completedJobs,
                             openRequests = openRequests,
+                            pendingDirectRequests = data.pendingDirectRequests,
                             completedCount = data.completedCount,
                             totalEarnings = data.totalEarnings,
                             monthlyEarnings = data.monthlyEarnings
@@ -134,19 +151,66 @@ class WorkerHomeViewModel @Inject constructor(
 
     fun startJob(bookingId: String) {
         viewModelScope.launch {
-            when (updateJobStatusUseCase(bookingId, BookingStatus.IN_PROGRESS)) {
+            when (val result = updateJobStatusUseCase(bookingId, BookingStatus.IN_PROGRESS)) {
                 is Resource.Success -> loadDashboard()
-                else -> { /* TODO: surface error via event */ }
+                is Resource.Error -> _events.trySend(WorkerHomeEvent.Toast(result.message))
+                is Resource.Loading -> { /* no-op */ }
             }
         }
     }
 
     fun completeJob(bookingId: String) {
         viewModelScope.launch {
-            when (updateJobStatusUseCase(bookingId, BookingStatus.PENDING_COMPLETION)) {
+            when (val result = updateJobStatusUseCase(bookingId, BookingStatus.PENDING_COMPLETION)) {
                 is Resource.Success -> loadDashboard()
-                else -> { /* TODO: surface error via event */ }
+                is Resource.Error -> _events.trySend(WorkerHomeEvent.Toast(result.message))
+                is Resource.Loading -> { /* no-op */ }
             }
+        }
+    }
+
+    /**
+     * Accept a direct booking the customer assigned to me. Backend transitions
+     * the booking to AWAITING_PAYMENT and pushes a notification to the customer.
+     * The dashboard reloads so the new "đang chờ thanh toán" job moves out of
+     * pendingDirectRequests and into the appropriate bucket.
+     */
+    fun acceptDirectBooking(bookingId: String) {
+        if (_uiState.value.respondingDirectId != null) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(respondingDirectId = bookingId) }
+            when (val result = acceptDirectBookingUseCase(bookingId)) {
+                is Resource.Success -> {
+                    _events.trySend(WorkerHomeEvent.Toast("Đã nhận đơn — chờ khách thanh toán"))
+                    loadDashboard()
+                }
+                is Resource.Error -> {
+                    _events.trySend(WorkerHomeEvent.Toast(result.message))
+                    _uiState.update { it.copy(respondingDirectId = null) }
+                }
+                is Resource.Loading -> { /* no-op */ }
+            }
+            _uiState.update { it.copy(respondingDirectId = null) }
+        }
+    }
+
+    /** Decline a direct booking with an optional reason. Reloads the dashboard on success. */
+    fun declineDirectBooking(bookingId: String, reason: String) {
+        if (_uiState.value.respondingDirectId != null) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(respondingDirectId = bookingId) }
+            when (val result = declineDirectBookingUseCase(bookingId, reason)) {
+                is Resource.Success -> {
+                    _events.trySend(WorkerHomeEvent.Toast("Đã từ chối đơn"))
+                    loadDashboard()
+                }
+                is Resource.Error -> {
+                    _events.trySend(WorkerHomeEvent.Toast(result.message))
+                    _uiState.update { it.copy(respondingDirectId = null) }
+                }
+                is Resource.Loading -> { /* no-op */ }
+            }
+            _uiState.update { it.copy(respondingDirectId = null) }
         }
     }
 }
