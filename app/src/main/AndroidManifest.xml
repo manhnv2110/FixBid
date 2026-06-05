@@ -63,6 +63,33 @@
                     android:host="vnpay-return" />
             </intent-filter>
         </activity>
+
+        <!-- FCM: receives background/killed-app push and renders via AppNotificationManager.
+             Dormant until google-services.json is added. -->
+        <service
+            android:name=".core.notification.FixBidMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- Receives the "Mark as read" action posted from a heads-up notification. -->
+        <receiver
+            android:name=".core.notification.NotificationActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.example.fixbid.action.MARK_NOTIFICATION_READ" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Default channel + small icon for any notification-style payloads. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="fixbid_bookings" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_notification" />
     </application>
 
 </manifest>

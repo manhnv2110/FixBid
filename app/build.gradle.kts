@@ -9,6 +9,14 @@ plugins {
     id("com.google.dagger.hilt.android")
 }
 
+// Apply the Google Services plugin only when a google-services.json is present.
+// This lets the project build & run (with in-app realtime notifications) before
+// Firebase is configured; drop the file in app/ to light up background FCM push.
+val googleServicesJson = file("google-services.json")
+if (googleServicesJson.exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 val localProps = Properties().apply {
     val file = rootProject.file("local.properties")
     if (file.exists()) load(file.inputStream())
@@ -120,6 +128,13 @@ dependencies {
 
     // Permissions helper for Compose
     implementation("com.google.accompanist:accompanist-permissions:0.34.0")
+
+    // Firebase Cloud Messaging (background/killed-app push). The BOM keeps the
+    // messaging artifact version aligned. Active once google-services.json is added.
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+    implementation("com.google.firebase:firebase-messaging-ktx")
+    // Bridges the Play Services Task<String> token fetch into a coroutine.
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
 
     // Test
     testImplementation(libs.junit)

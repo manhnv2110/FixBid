@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "381953208574",
+    "project_id": "fixbid-da9ad",
+    "storage_bucket": "fixbid-da9ad.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:381953208574:android:5ac0d33c33672b2fa1f5af",
+        "android_client_info": {
+          "package_name": "com.example.fixbid"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCe5xjTXzdgh9S6VE7sJqt7idCd0mclVlA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
