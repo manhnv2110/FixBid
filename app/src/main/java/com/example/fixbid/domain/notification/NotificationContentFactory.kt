@@ -54,6 +54,46 @@ object NotificationContentFactory {
         referenceId = bookingId
     )
 
+    /**
+     * Khách được báo thợ đã chấp nhận đơn đặt trực tiếp — bước tiếp theo là thanh toán.
+     * Khác với [bookingConfirmedForCustomer] (phát sau khi thanh toán xong) để copy nói rõ
+     * action kế tiếp.
+     */
+    fun directBookingAcceptedForCustomer(
+        customerId: String,
+        bookingId: String,
+        categoryName: String,
+        workerName: String?
+    ) = NotificationContent(
+        recipientUserId = customerId,
+        title = "Thợ đã nhận đơn",
+        body = buildString {
+            append(workerName?.takeIf { it.isNotBlank() } ?: "Thợ")
+            append(" đã chấp nhận yêu cầu \"$categoryName\". ")
+            append("Vui lòng thanh toán để xác nhận lịch hẹn.")
+        },
+        type = NotificationType.BOOKING_CONFIRMED,
+        referenceId = bookingId
+    )
+
+    /** Khách được báo thợ từ chối đơn đặt trực tiếp. */
+    fun directBookingDeclinedForCustomer(
+        customerId: String,
+        bookingId: String,
+        categoryName: String,
+        reason: String?
+    ) = NotificationContent(
+        recipientUserId = customerId,
+        title = "Thợ không thể nhận đơn",
+        body = buildString {
+            append("Yêu cầu \"$categoryName\" của bạn không được thợ nhận.")
+            if (!reason.isNullOrBlank()) append(" Lý do: $reason")
+            append(" Bạn có thể thử thợ khác hoặc đăng yêu cầu mở.")
+        },
+        type = NotificationType.BOOKING_CANCELLED,
+        referenceId = bookingId
+    )
+
     /** Nhắc lịch hẹn sắp tới (cleaning schedule reminder). */
     fun bookingReminderForUser(
         userId: String,
