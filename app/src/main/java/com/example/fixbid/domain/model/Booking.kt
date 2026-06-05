@@ -16,6 +16,7 @@ data class Booking(
     val agreedPrice: Double?,                          // giá đã thống nhất (sau đấu thầu hoặc confirm)
     val customerNote: String?,
     val workerNote: String?,
+    val cancelReason: String? = null,                   // lý do huỷ — viết khi worker từ chối / customer huỷ
     val descriptionImages: List<String>? = emptyList(), // URL ảnh mô tả công việc từ khách
     val completionNote: String? = null,                // ghi chú hoàn thành từ thợ
     val completionImages: List<String>? = emptyList(),  // URL ảnh thực tế sau khi hoàn thành

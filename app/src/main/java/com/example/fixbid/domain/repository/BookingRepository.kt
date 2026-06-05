@@ -19,6 +19,16 @@ interface BookingRepository {
     // Worker
     suspend fun getWorkerBookings(workerId: String, status: BookingStatus? = null): Resource<List<Booking>>
     suspend fun getOpenJobRequests(categories: List<ServiceCategory>? = null, excludeBookingIds: List<String> = emptyList()): Resource<List<Booking>>
+
+    /** PENDING + DIRECT bookings assigned to this worker — they must accept or decline. */
+    suspend fun getPendingDirectBookings(workerId: String): Resource<List<Booking>>
+
+    /** Worker accepts a DIRECT booking → status flips to AWAITING_PAYMENT so customer pays. */
+    suspend fun acceptDirectBooking(bookingId: String): Resource<Booking>
+
+    /** Worker declines a DIRECT booking → status=CANCELLED, reason saved in cancel_reason. */
+    suspend fun declineDirectBooking(bookingId: String, reason: String): Resource<Booking>
+
     suspend fun confirmBooking(bookingId: String): Resource<Booking>
     suspend fun startJob(bookingId: String): Resource<Booking>
     suspend fun completeJob(bookingId: String, workerNote: String?): Resource<Booking>

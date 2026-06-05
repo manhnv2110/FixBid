@@ -98,6 +98,54 @@ class BookingRepositoryImpl @Inject constructor(
         Resource.Success(result.map { it.toDomain() }.filter { it.id !in excludeSet })
     }.getOrElse { Resource.Error(it.message ?: "Lỗi tải danh sách yêu cầu") }
 
+    override suspend fun getPendingDirectBookings(workerId: String): Resource<List<Booking>> =
+        runCatching {
+            val result = client.postgrest[Tables.BOOKINGS].select(Columns.ALL) {
+                filter {
+                    eq("worker_id", workerId)
+                    eq("type", "direct")
+                    eq("status", "pending")
+                }
+                order("created_at", Order.DESCENDING)
+                limit(50)
+            }.decodeList<BookingDto>()
+            Resource.Success(result.map { it.toDomain() })
+        }.getOrElse { Resource.Error(it.message ?: "Lỗi tải yêu cầu trực tiếp") }
+
+    override suspend fun acceptDirectBooking(bookingId: String): Resource<Booking> =
+        runCatching {
+            val result = client.postgrest[Tables.BOOKINGS].update(
+                buildJsonObject {
+                    put("status", "awaiting_payment")
+                    put("updated_at", java.time.Instant.now().toString())
+                }
+            ) {
+                filter { eq("id", bookingId) }
+                select(Columns.ALL)
+            }.decodeSingle<BookingDto>()
+            Resource.Success(result.toDomain())
+        }.getOrElse { Resource.Error(it.message ?: "Nhận đơn thất bại") }
+
+    override suspend fun declineDirectBooking(
+        bookingId: String,
+        reason: String
+    ): Resource<Booking> = runCatching {
+        val result = client.postgrest[Tables.BOOKINGS].update(
+            buildJsonObject {
+                put("status", "cancelled")
+                // Use the dedicated cancel_reason column so the customer's
+                // original customer_note (containing phone/name/address) stays
+                // intact for follow-up support.
+                put("cancel_reason", reason)
+                put("updated_at", java.time.Instant.now().toString())
+            }
+        ) {
+            filter { eq("id", bookingId) }
+            select(Columns.ALL)
+        }.decodeSingle<BookingDto>()
+        Resource.Success(result.toDomain())
+    }.getOrElse { Resource.Error(it.message ?: "Từ chối đơn thất bại") }
+
     override suspend fun confirmBooking(bookingId: String): Resource<Booking> =
         updateStatus(bookingId, BookingStatus.CONFIRMED)
 
@@ -185,7 +233,14 @@ class BookingRepositoryImpl @Inject constructor(
     override suspend fun cancelBooking(bookingId: String, reason: String): Resource<Unit> =
         runCatching {
             client.postgrest[Tables.BOOKINGS].update(
-                buildJsonObject { put("status", "cancelled"); put("customer_note", reason) }
+                // Save the cancellation reason in the dedicated `cancel_reason`
+                // column so the customer's original note (containing phone,
+                // name, address details) is not overwritten.
+                buildJsonObject {
+                    put("status", "cancelled")
+                    put("cancel_reason", reason)
+                    put("updated_at", java.time.Instant.now().toString())
+                }
             ) { filter { eq("id", bookingId) } }
             Resource.Success(Unit)
         }.getOrElse { Resource.Error(it.message ?: "Hủy thất bại") }
@@ -207,9 +262,11 @@ class BookingRepositoryImpl @Inject constructor(
     override suspend fun rejectCompletion(bookingId: String, reason: String): Resource<Booking> =
         runCatching {
             val result = client.postgrest[Tables.BOOKINGS].update(
+                // Reject reason goes into worker_note (the worker is the one being
+                // told to redo the work). customer_note must stay untouched.
                 buildJsonObject {
                     put("status", "in_progress")
-                    put("customer_note", reason)
+                    put("worker_note", reason)
                     put("updated_at", java.time.Instant.now().toString())
                 }
             ) {
