@@ -292,7 +292,8 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                 },
                 onNotificationSettingsClick = { navController.navigate("notification_settings") },
                 onFindWorkersClick = { navController.navigate("discover_workers") },
-                onChatbotClick = { navController.navigate("chatbot") }
+                onChatbotClick = { navController.navigate("chatbot") },
+                onWalletClick = { navController.navigate("customer_wallet") }
             )
         }
 
@@ -520,7 +521,8 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                 },
                 onNavigateToCompletionConfirm = { bId ->
                     navController.navigate("completion_confirm/$bId")
-                }
+                },
+                onWalletClick = { navController.navigate("customer_wallet") }
             )
         }
 
@@ -569,6 +571,14 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                 returnUri = decodedUri,
                 onDone = {
                     navController.popBackStack("home", inclusive = false)
+                },
+                // Top-up success routes the user to their wallet so they can
+                // see the new credit + ledger row immediately.
+                onTopupSuccess = {
+                    navController.popBackStack("home", inclusive = false)
+                    navController.navigate("customer_wallet") {
+                        launchSingleTop = true
+                    }
                 }
             )
         }
@@ -600,6 +610,27 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
             com.example.fixbid.presentation.customer.review.ReviewScreen(
                 onBackClick = { navController.popBackStack() },
                 onDone = { navController.popBackStack("home", inclusive = false) }
+            )
+        }
+
+        composable("customer_wallet") {
+            com.example.fixbid.presentation.customer.profile.CustomerWalletScreen(
+                onBackClick = { navController.popBackStack() },
+                onTransactionClick = { txId ->
+                    navController.navigate("customer_wallet_transaction/$txId")
+                }
+            )
+        }
+
+        composable(
+            route = "customer_wallet_transaction/{transactionId}",
+            arguments = listOf(navArgument("transactionId") { type = NavType.StringType })
+        ) {
+            com.example.fixbid.presentation.customer.profile.WalletTransactionDetailScreen(
+                onBackClick = { navController.popBackStack() },
+                onBookingClick = { bookingId ->
+                    navController.navigate("customer_booking_detail/$bookingId")
+                }
             )
         }
 

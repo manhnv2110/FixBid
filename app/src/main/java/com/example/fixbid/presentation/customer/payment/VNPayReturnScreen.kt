@@ -37,6 +37,7 @@ import javax.inject.Inject
 data class VNPayReturnUiState(
     val isProcessing: Boolean = true,
     val isSuccess: Boolean = false,
+    val isTopup: Boolean = false,
     val message: String = "Đang xử lý kết quả thanh toán..."
 )
 
@@ -70,10 +71,16 @@ class VNPayReturnViewModel @Inject constructor(
             _uiState.value = VNPayReturnUiState(isProcessing = true)
             when (val result = processVNPayReturnUseCase(params)) {
                 is Resource.Success -> {
+                    val isTopup = result.data is ProcessVNPayReturnUseCase.Result.WalletTopup
                     _uiState.value = VNPayReturnUiState(
                         isProcessing = false,
                         isSuccess = true,
-                        message = "Thanh toán thành công!\nTiền đang được hệ thống giữ an toàn."
+                        isTopup = isTopup,
+                        message = if (isTopup) {
+                            "Nạp tiền thành công!\nSố dư ví đã được cập nhật."
+                        } else {
+                            "Thanh toán thành công!\nTiền đang được hệ thống giữ an toàn."
+                        }
                     )
                 }
                 is Resource.Error -> {
@@ -95,6 +102,7 @@ class VNPayReturnViewModel @Inject constructor(
 fun VNPayReturnScreen(
     returnUri: String,
     onDone: () -> Unit,
+    onTopupSuccess: () -> Unit = onDone,
     viewModel: VNPayReturnViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -164,7 +172,7 @@ fun VNPayReturnScreen(
                         )
                         Spacer(modifier = Modifier.height(32.dp))
                         Button(
-                            onClick = onDone,
+                            onClick = if (uiState.isTopup) onTopupSuccess else onDone,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(50.dp),
@@ -174,7 +182,7 @@ fun VNPayReturnScreen(
                             )
                         ) {
                             Text(
-                                "Về trang chủ",
+                                if (uiState.isTopup) "Xem ví của tôi" else "Về trang chủ",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 15.sp
                             )

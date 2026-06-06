@@ -1,29 +1,38 @@
 package com.example.fixbid.domain.usecase.customer
 
 import com.example.fixbid.data.remote.vnpay.VNPayService
-import com.example.fixbid.domain.model.Payment
 import com.example.fixbid.domain.model.Resource
 import com.example.fixbid.domain.repository.BookingRepository
 import com.example.fixbid.domain.repository.PaymentRepository
+import com.example.fixbid.domain.repository.WalletRepository
 import javax.inject.Inject
 
 /**
  * Use case: Xử lý callback từ VNPay sau khi thanh toán.
  *
- * Flow:
- * 1. Verify chữ ký response
- * 2. Kiểm tra mã phản hồi (00 = thành công)
- * 3. Cập nhật payment status -> ESCROW (holding)
- * 4. Cập nhật booking status -> CONFIRMED
- * 5. Hold worker_receives vào pending_balance của ví thợ
+ * Hai luồng chạy chung route deep link `fixbid://vnpay-return`:
+ *
+ *  - **Booking payment** — `vnp_TxnRef` là raw payment id. Chuyển payment
+ *    sang ESCROW + booking sang CONFIRMED + hold escrow vào ví thợ.
+ *  - **Wallet top-up** — `vnp_TxnRef` có prefix `TOPUP-` (xem
+ *    [CreateWalletTopupUseCase.TOPUP_TXN_REF_PREFIX]). Cộng tiền vào ví khách
+ *    qua `fn_credit_wallet_topup`.
+ *
+ * Sealed [Result] phơi rõ luồng nào vừa hoàn tất để UI điều hướng đúng nơi
+ * (ví khách vs trang chủ).
  */
 class ProcessVNPayReturnUseCase @Inject constructor(
     private val paymentRepository: PaymentRepository,
     private val bookingRepository: BookingRepository,
-    private val walletRepository: com.example.fixbid.domain.repository.WalletRepository,
+    private val walletRepository: WalletRepository,
     private val vnPayService: VNPayService
 ) {
-    suspend operator fun invoke(params: Map<String, String>): Resource<Payment> {
+    sealed class Result {
+        data class BookingPayment(val paymentId: String, val bookingId: String) : Result()
+        data class WalletTopup(val vnpTxnRef: String, val balanceAfter: Double?) : Result()
+    }
+
+    suspend operator fun invoke(params: Map<String, String>): Resource<Result> {
         // 1. Verify chữ ký
         if (!vnPayService.verifyReturnUrl(params)) {
             return Resource.Error("Chữ ký không hợp lệ. Giao dịch có thể bị giả mạo.")
@@ -31,14 +40,37 @@ class ProcessVNPayReturnUseCase @Inject constructor(
 
         val responseCode = params["vnp_ResponseCode"]
         val transactionId = params["vnp_TransactionNo"] ?: ""
-        val paymentId = params["vnp_TxnRef"] ?: ""
+        val txnRef = params["vnp_TxnRef"] ?: ""
 
-        // 2. Kiểm tra mã phản hồi
+        if (txnRef.isBlank()) {
+            return Resource.Error("Thiếu mã giao dịch (vnp_TxnRef)")
+        }
+
+        // ── Wallet top-up branch ───────────────────────────────────────────
+        // The gateway echoes back exactly the vnp_TxnRef we shipped — that's
+        // also the value stored as `wallet_topups.vnp_txn_ref`, so we look up
+        // by the full ref (not by stripping the prefix).
+        if (txnRef.startsWith(CreateWalletTopupUseCase.TOPUP_TXN_REF_PREFIX)) {
+            if (!vnPayService.isPaymentSuccess(responseCode)) {
+                walletRepository.failWalletTopup(txnRef, responseCode ?: "unknown")
+                return Resource.Error(getErrorMessage(responseCode))
+            }
+
+            return when (val r = walletRepository.creditWalletTopup(txnRef, transactionId)) {
+                is Resource.Success -> Resource.Success(
+                    Result.WalletTopup(vnpTxnRef = txnRef, balanceAfter = r.data.balance)
+                )
+                is Resource.Error -> Resource.Error(r.message)
+                Resource.Loading -> Resource.Loading
+            }
+        }
+
+        // ── Booking payment branch (existing flow) ─────────────────────────
+        val paymentId = txnRef
         if (!vnPayService.isPaymentSuccess(responseCode)) {
             return Resource.Error(getErrorMessage(responseCode))
         }
 
-        // 3. Cập nhật payment -> ESCROW (hệ thống giữ tiền)
         val updateResult = paymentRepository.updatePaymentToEscrow(
             paymentId = paymentId,
             transactionId = transactionId
@@ -46,16 +78,17 @@ class ProcessVNPayReturnUseCase @Inject constructor(
 
         return when (updateResult) {
             is Resource.Success -> {
-                // 4. Cập nhật booking -> CONFIRMED (thợ có thể bắt đầu công việc)
                 val bookingId = updateResult.data.bookingId
                 bookingRepository.confirmBooking(bookingId)
-                // 5. Bơm worker_receives sang pending_balance của ví thợ.
-                //    RPC idempotent: nếu IPN + return URL chạy hai lần thì
-                //    cũng chỉ insert một dòng wallet_transactions.
                 runCatching { walletRepository.holdEscrow(updateResult.data.id) }
-                updateResult
+                Resource.Success(
+                    Result.BookingPayment(
+                        paymentId = updateResult.data.id,
+                        bookingId = bookingId
+                    )
+                )
             }
-            is Resource.Error -> updateResult
+            is Resource.Error -> Resource.Error(updateResult.message)
             Resource.Loading -> Resource.Loading
         }
     }
