@@ -3,11 +3,11 @@ enum class ServiceCategory(
     val displayName: String,
     val iconRes: Int = 0   // sẽ được map ở tầng UI, tạm để 0
 ) {
-    PLUMBING("Sửa ống nước"),
-    ELECTRICAL("Sửa điện"),
+    PLUMBING("Ống nước"),
+    ELECTRICAL("Điện"),
     CARPENTRY("Mộc / Nội thất"),
     AIR_CONDITIONING("Điều hòa"),
-    APPLIANCE_REPAIR("Sửa đồ gia dụng"),
+    APPLIANCE_REPAIR("Đồ gia dụng"),
     CLEANING("Vệ sinh"),
     LOCKSMITH("Khóa cửa"),
     ROOFING("Mái nhà"),

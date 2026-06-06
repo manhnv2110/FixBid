@@ -70,9 +70,12 @@ class WorkerHomeViewModel @Inject constructor(
         loadDashboard()
     }
 
-    fun loadDashboard() {
+    fun loadDashboard(forceShowLoading: Boolean = false) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            val hasData = _uiState.value.profile != null
+            if (forceShowLoading || !hasData) {
+                _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            }
 
             // Belt-and-braces: clear any escrows that got stuck because a
             // previous customer confirm-completion could not finish the
@@ -104,7 +107,8 @@ class WorkerHomeViewModel @Inject constructor(
                             pendingDirectRequests = data.pendingDirectRequests,
                             completedCount = data.completedCount,
                             totalEarnings = data.totalEarnings,
-                            monthlyEarnings = data.monthlyEarnings
+                            monthlyEarnings = data.monthlyEarnings,
+                            errorMessage = null
                         )
                     }
                     // Surface a soft toast / event when stuck payouts are
@@ -121,8 +125,11 @@ class WorkerHomeViewModel @Inject constructor(
                         it.copy(
                             isLoading = false,
                             userName = userName,
-                            errorMessage = result.message
+                            errorMessage = if (hasData) null else result.message
                         )
+                    }
+                    if (hasData) {
+                        _events.trySend(WorkerHomeEvent.Toast(result.message ?: "Không thể làm mới dữ liệu"))
                     }
                 }
                 is Resource.Loading -> { /* no-op */ }

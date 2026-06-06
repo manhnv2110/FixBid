@@ -349,6 +349,7 @@ private fun CategorySection(
     categories: List<ServiceCategory>,
     onCategoryClick: (ServiceCategory) -> Unit
 ) {
+    val isDark = com.example.fixbid.ui.theme.LocalIsDarkTheme.current
     Column {
         Text(
             text = "Danh mục dịch vụ",
@@ -361,7 +362,7 @@ private fun CategorySection(
 
         CategoryGrid(
             categories = categories,
-            iconMapper = ServiceCategoryMapper::getIconRes,
+            iconMapper = { category -> ServiceCategoryMapper.getIconRes(category, isDark = isDark) },
             onCategoryClick = onCategoryClick
         )
     }

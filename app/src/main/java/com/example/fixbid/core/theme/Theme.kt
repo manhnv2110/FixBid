@@ -83,6 +83,8 @@ fun SetStatusBarColor(darkIcons: Boolean, darkTheme: Boolean = isSystemInDarkThe
     }
 }
 
+val LocalIsDarkTheme = androidx.compose.runtime.compositionLocalOf { false }
+
 @Composable
 fun FixBidTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -91,7 +93,10 @@ fun FixBidTheme(
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
     val statusColors = if (darkTheme) DarkStatusColors else LightStatusColors
 
-    CompositionLocalProvider(LocalStatusColors provides statusColors) {
+    CompositionLocalProvider(
+        LocalStatusColors provides statusColors,
+        LocalIsDarkTheme provides darkTheme
+    ) {
         MaterialTheme(
             colorScheme = colorScheme,
             typography = Typography,

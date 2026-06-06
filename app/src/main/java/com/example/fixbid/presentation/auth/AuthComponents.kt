@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -337,7 +338,8 @@ fun OtpInputRow(
                         }
                         Box(
                             modifier = Modifier
-                                .width(48.dp)
+                                .weight(1f)
+                                .widthIn(max = 48.dp)
                                 .height(54.dp)
                                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
                                 .border(1.dp, borderColor, RoundedCornerShape(12.dp)),

@@ -163,7 +163,7 @@ fun WorkerHomeScreen(
                         chatUnreadCount = chatUnreadCount,
                         onChatClick = onChatClick,
                         onToggleAvailability = viewModel::toggleAvailability,
-                        onRetry = viewModel::loadDashboard,
+                        onRetry = { viewModel.loadDashboard(forceShowLoading = true) },
                         onJobClick = onJobClick,
                         onJobRequestClick = onJobRequestClick,
                         onBrowseAllRequests = { switchTab(WorkerTab.REQUESTS) },
@@ -270,7 +270,7 @@ private fun WorkerDashboard(
         )
 
         when {
-            uiState.isLoading -> {
+            uiState.isLoading && uiState.profile == null -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }

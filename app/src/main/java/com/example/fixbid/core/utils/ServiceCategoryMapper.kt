@@ -6,16 +6,16 @@ import com.example.fixbid.domain.model.ServiceCategory
 
 object ServiceCategoryMapper {
 
-    fun getIconRes(category: ServiceCategory): Int = when (category) {
-        ServiceCategory.PLUMBING        -> R.drawable.ic_plumbing
-        ServiceCategory.ELECTRICAL      -> R.drawable.ic_electrical
-        ServiceCategory.CARPENTRY       -> R.drawable.ic_carpentry
-        ServiceCategory.AIR_CONDITIONING -> R.drawable.ic_air_conditioning
-        ServiceCategory.APPLIANCE_REPAIR -> R.drawable.ic_appliances
-        ServiceCategory.CLEANING        -> R.drawable.ic_cleaning
-        ServiceCategory.LOCKSMITH       -> R.drawable.ic_lock
-        ServiceCategory.ROOFING         -> R.drawable.ic_roof
-        ServiceCategory.OTHER           -> R.drawable.ic_other
+    fun getIconRes(category: ServiceCategory, isDark: Boolean = false): Int = when (category) {
+        ServiceCategory.PLUMBING        -> if (isDark) R.drawable.ic_plumbing_dark else R.drawable.ic_plumbing
+        ServiceCategory.ELECTRICAL      -> if (isDark) R.drawable.ic_electrical_dark else R.drawable.ic_electrical
+        ServiceCategory.CARPENTRY       -> if (isDark) R.drawable.ic_carpentry_dark else R.drawable.ic_carpentry
+        ServiceCategory.AIR_CONDITIONING -> if (isDark) R.drawable.ic_air_conditioning_dark else R.drawable.ic_air_conditioning
+        ServiceCategory.APPLIANCE_REPAIR -> if (isDark) R.drawable.ic_appliances_dark else R.drawable.ic_appliances
+        ServiceCategory.CLEANING        -> if (isDark) R.drawable.ic_cleaning_dark else R.drawable.ic_cleaning
+        ServiceCategory.LOCKSMITH       -> if (isDark) R.drawable.ic_lock_dark else R.drawable.ic_lock
+        ServiceCategory.ROOFING         -> if (isDark) R.drawable.ic_roof_dark else R.drawable.ic_roof
+        ServiceCategory.OTHER           -> if (isDark) R.drawable.ic_other_dark else R.drawable.ic_other
     }
 
     val homeCategories = listOf(
