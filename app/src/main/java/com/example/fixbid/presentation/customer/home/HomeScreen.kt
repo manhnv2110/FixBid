@@ -234,7 +234,7 @@ private fun HomeTabContent(
         PrimaryTopBar(
             title = uiState.cityName,
             subtitle = "Vị trí của bạn",
-            modifier = Modifier.clickable { onLocationClick() },
+            onTitleClick = onLocationClick,
             actions = {
                 NotificationBell(
                     unreadCount = unreadNotificationCount,
