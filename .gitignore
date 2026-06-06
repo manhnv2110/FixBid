@@ -13,4 +13,9 @@
 .externalNativeBuild
 .cxx
 local.properties
-.kotlin/ 
+.kotlin/
+.kiro/
+
+# jqwik writes a small SQLite-like file with shrinking history when property
+# tests run; pure runtime artifact, never check it in.
+.jqwik-database
