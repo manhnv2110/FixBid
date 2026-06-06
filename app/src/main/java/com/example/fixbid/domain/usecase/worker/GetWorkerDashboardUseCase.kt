@@ -16,6 +16,12 @@ data class WorkerDashboardData(
     val pendingJobs: List<Booking>,
     val completedJobs: List<Booking>,
     /**
+     * Bookings the worker has cancelled (status = CANCELLED). Surfaced in the
+     * "Việc làm của tôi" screen so the worker can review prior cancellations
+     * along with the reason and refund amount.
+     */
+    val cancelledJobs: List<Booking> = emptyList(),
+    /**
      * Direct bookings the customer assigned to this worker that are still
      * awaiting an Accept/Decline. They surface separately from the open
      * bidding requests so the worker doesn't miss them.
@@ -56,6 +62,12 @@ class GetWorkerDashboardUseCase @Inject constructor(
         val completedResult = bookingRepository.getWorkerBookings(user.id, BookingStatus.COMPLETED)
         val completedJobs = (completedResult as? Resource.Success)?.data ?: emptyList()
 
+        // Cancelled bookings — both worker-initiated cancels (after a
+        // confirmed/paid booking) and customer-initiated cancels land here so
+        // the worker can review history. Sorted by updatedAt desc downstream.
+        val cancelledResult = bookingRepository.getWorkerBookings(user.id, BookingStatus.CANCELLED)
+        val cancelledJobs = (cancelledResult as? Resource.Success)?.data ?: emptyList()
+
         // Calculate earnings from payment history
         val paymentResult = paymentRepository.getPaymentHistory(user.id)
         val payments = (paymentResult as? Resource.Success)?.data ?: emptyList()
@@ -75,6 +87,7 @@ class GetWorkerDashboardUseCase @Inject constructor(
                 activeJobs = allActiveJobs,
                 pendingJobs = confirmedJobs,
                 completedJobs = completedJobs,
+                cancelledJobs = cancelledJobs,
                 pendingDirectRequests = pendingDirectRequests,
                 completedCount = completedJobs.size + (profile?.totalJobsDone ?: 0),
                 totalEarnings = totalEarnings,

@@ -86,6 +86,22 @@ fun WorkerHomeScreen(
     val uiState by viewModel.uiState.collectAsState()
     val chatUnreadCount by chatListViewModel.unreadCount.collectAsState()
 
+    // Refresh the dashboard whenever this shell re-enters the foreground —
+    // covers the case where the worker cancels / starts / completes a job in
+    // a child screen (JobDetail, etc.) and pops back here. Without this, the
+    // job cards keep showing stale buttons like "Bắt đầu làm" until the user
+    // pulls to refresh manually.
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                viewModel.loadDashboard()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     val tabNavController = rememberNavController()
     val currentRoute = tabNavController
         .currentBackStackEntryAsState().value?.destination?.route
