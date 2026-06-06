@@ -146,9 +146,9 @@ class ChatViewModel @Inject constructor(
             .sortedBy { it.createdAt }
             .distinctBy { it.id }
 
-        // Only update UI if content changed (avoid unnecessary recompositions)
+        // Only update UI if content changed or if we need to dismiss the initial loading state
         val current = _uiState.value.messages
-        if (merged.size != current.size || merged != current) {
+        if (merged.size != current.size || merged != current || _uiState.value.isLoading) {
             _uiState.value = _uiState.value.copy(
                 messages = merged,
                 isLoading = false
