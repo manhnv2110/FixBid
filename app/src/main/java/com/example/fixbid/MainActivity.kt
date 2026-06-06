@@ -40,6 +40,7 @@ import com.example.fixbid.presentation.notification.AppNotificationsViewModel
 import com.example.fixbid.presentation.notification.NotificationListScreen
 import com.example.fixbid.presentation.notification.NotificationSettingsScreen
 import com.example.fixbid.presentation.auth.AuthLogo
+import com.example.fixbid.presentation.support.HelpSupportScreen
 import com.example.fixbid.ui.theme.FixBidTheme
 import javax.inject.Inject
 import dagger.hilt.android.AndroidEntryPoint
@@ -293,7 +294,8 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                 onNotificationSettingsClick = { navController.navigate("notification_settings") },
                 onFindWorkersClick = { navController.navigate("discover_workers") },
                 onChatbotClick = { navController.navigate("chatbot") },
-                onWalletClick = { navController.navigate("customer_wallet") }
+                onWalletClick = { navController.navigate("customer_wallet") },
+                onHelpSupportClick = { navController.navigate("help_support") }
             )
         }
 
@@ -338,7 +340,8 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                 showWorkTab = showWork,
                 onNotificationSettingsClick = { navController.navigate("notification_settings") },
                 onWorkerProfileEditClick = { navController.navigate("worker_profile_edit") },
-                onVerifyIdentityClick = { navController.navigate("worker_verify_identity") }
+                onVerifyIdentityClick = { navController.navigate("worker_verify_identity") },
+                onHelpSupportClick = { navController.navigate("help_support") }
             )
         }
 
@@ -435,6 +438,12 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                 onNavigateRoute = { route ->
                     runCatching { navController.navigate(route) }
                 }
+            )
+        }
+
+        composable("help_support") {
+            HelpSupportScreen(
+                onBackClick = { navController.popBackStack() }
             )
         }
 

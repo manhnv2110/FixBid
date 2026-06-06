@@ -80,6 +80,7 @@ fun HomeScreen(
     onFindWorkersClick: () -> Unit = {},
     onChatbotClick: () -> Unit = {},
     onWalletClick: () -> Unit = {},
+    onHelpSupportClick: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
     chatListViewModel: ConversationListViewModel = hiltViewModel()
 ) {
@@ -173,7 +174,8 @@ fun HomeScreen(
                         ProfileScreen(
                             onSignOut = onSignOut,
                             onNotificationSettingsClick = onNotificationSettingsClick,
-                            onWalletClick = onWalletClick
+                            onWalletClick = onWalletClick,
+                            onHelpSupportClick = onHelpSupportClick
                         )
                     }
                 }

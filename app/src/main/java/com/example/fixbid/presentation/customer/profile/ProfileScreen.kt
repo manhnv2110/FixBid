@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -34,6 +35,7 @@ fun ProfileScreen(
     onNotificationSettingsClick: () -> Unit = {},
     onWorkerProfileClick: (() -> Unit)? = null,
     onWalletClick: (() -> Unit)? = null,
+    onHelpSupportClick: () -> Unit = {},
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -386,9 +388,10 @@ fun ProfileScreen(
                                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
                             )
                             ProfileMenuItem(
-                                icon = Icons.Outlined.HelpOutline,
+                                icon = Icons.AutoMirrored.Outlined.HelpOutline,
                                 title = "Trợ giúp & Hỗ trợ",
-                                subtitle = "FAQ, liên hệ hỗ trợ"
+                                subtitle = "FAQ, liên hệ hỗ trợ",
+                                onClick = onHelpSupportClick
                             )
                             HorizontalDivider(
                                 modifier = Modifier.padding(horizontal = 20.dp),
