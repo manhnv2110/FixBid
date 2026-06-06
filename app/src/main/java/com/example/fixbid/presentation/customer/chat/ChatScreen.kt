@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -29,6 +30,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
 import com.example.fixbid.core.utils.toFormattedDate
 import com.example.fixbid.domain.model.Message
 import kotlinx.coroutines.flow.collectLatest
@@ -62,7 +64,6 @@ fun ChatScreen(
     val context = LocalContext.current
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
-    val density = LocalDensity.current
 
     // Collect one-shot events
     LaunchedEffect(Unit) {
@@ -71,8 +72,7 @@ fun ChatScreen(
                 is ChatEvent.Toast ->
                     Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show()
                 is ChatEvent.ScrollToBottom -> {
-                    val lastIndex = uiState.messages.lastIndex
-                    if (lastIndex >= 0) listState.animateScrollToItem(lastIndex)
+                    if (uiState.messages.isNotEmpty()) listState.animateScrollToItem(0)
                 }
             }
         }
@@ -80,22 +80,8 @@ fun ChatScreen(
 
     // Auto-scroll when message count changes
     LaunchedEffect(uiState.messages.size) {
-        val lastIndex = uiState.messages.lastIndex
-        if (lastIndex >= 0) {
-            coroutineScope.launch { listState.animateScrollToItem(lastIndex) }
-        }
-    }
-
-    // Keep the latest messages in view when the keyboard opens. With adjustResize
-    // the message list shrinks as the IME slides in; without this the bottom
-    // messages would be clipped behind the input bar. We watch the IME bottom
-    // inset and, once it settles open, pin the list to the most recent message.
-    val imeBottom = WindowInsets.ime.getBottom(density)
-    val isImeVisible = imeBottom > 0
-    LaunchedEffect(isImeVisible, imeBottom) {
-        if (isImeVisible) {
-            val lastIndex = uiState.messages.lastIndex
-            if (lastIndex >= 0) listState.scrollToItem(lastIndex)
+        if (uiState.messages.isNotEmpty()) {
+            coroutineScope.launch { listState.animateScrollToItem(0) }
         }
     }
 
@@ -106,6 +92,7 @@ fun ChatScreen(
     ) {
         ChatHeader(
             workerName = viewModel.workerName,
+            avatarUrl = uiState.counterpartAvatarUrl,
             onBackClick = onBackClick
         )
 
@@ -123,10 +110,11 @@ fun ChatScreen(
                 }
                 else -> {
                     val groupedItems = remember(uiState.messages) {
-                        buildChatItems(uiState.messages)
+                        buildChatItems(uiState.messages).reversed()
                     }
                     LazyColumn(
                         state = listState,
+                        reverseLayout = true,
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
                         verticalArrangement = Arrangement.spacedBy(2.dp)
@@ -191,6 +179,7 @@ fun ChatScreen(
 @Composable
 private fun ChatHeader(
     workerName: String,
+    avatarUrl: String?,
     onBackClick: () -> Unit
 ) {
     Surface(
@@ -212,8 +201,7 @@ private fun ChatHeader(
                 )
             }
 
-            // Avatar with a small online dot. Server avatar isn't surfaced
-            // in ChatViewModel today, so we render initials in a soft fill.
+            // Avatar with a small online dot.
             val initial = workerName.trim().firstOrNull()?.uppercase() ?: "?"
             Box(modifier = Modifier.size(40.dp)) {
                 Box(
@@ -223,12 +211,21 @@ private fun ChatHeader(
                         .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = initial,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
-                    )
+                    if (!avatarUrl.isNullOrBlank()) {
+                        AsyncImage(
+                            model = avatarUrl,
+                            contentDescription = "Avatar",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Text(
+                            text = initial,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                    }
                 }
                 Box(
                     modifier = Modifier
@@ -577,7 +574,8 @@ private fun BasicChatField(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        contentAlignment = Alignment.CenterStart
     ) {
         if (value.isEmpty()) {
             Text(

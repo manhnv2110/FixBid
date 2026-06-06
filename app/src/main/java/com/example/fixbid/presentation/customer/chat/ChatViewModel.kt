@@ -31,7 +31,8 @@ data class ChatUiState(
     val isSending: Boolean = false,
     val inputText: String = "",
     val currentUserId: String = "",
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val counterpartAvatarUrl: String? = null
 )
 
 sealed class ChatEvent {
@@ -43,6 +44,7 @@ sealed class ChatEvent {
 class ChatViewModel @Inject constructor(
     private val chatRepository: ChatRepository,
     private val authRepository: AuthRepository,
+    private val profileRepository: com.example.fixbid.data.repository.ProfileRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -67,6 +69,12 @@ class ChatViewModel @Inject constructor(
             val user = authRepository.getCurrentUser()
             _uiState.value = _uiState.value.copy(currentUserId = user?.id ?: "")
             markAsRead()
+
+            if (workerId.isNotBlank()) {
+                profileRepository.getProfile(workerId).onSuccess { profile ->
+                    _uiState.value = _uiState.value.copy(counterpartAvatarUrl = profile.avatarUrl)
+                }
+            }
         }
         // 1. Start Realtime WebSocket subscription (may take a second to connect)
         startRealtimeUpdates()
