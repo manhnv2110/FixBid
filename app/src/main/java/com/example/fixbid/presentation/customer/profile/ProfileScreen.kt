@@ -33,6 +33,7 @@ fun ProfileScreen(
     onSignOut: () -> Unit,
     onNotificationSettingsClick: () -> Unit = {},
     onWorkerProfileClick: (() -> Unit)? = null,
+    onWalletClick: (() -> Unit)? = null,
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -339,6 +340,18 @@ fun ProfileScreen(
                                     title = "Hồ sơ nghề nghiệp",
                                     subtitle = "Kỹ năng, kinh nghiệm, giá dịch vụ",
                                     onClick = onWorkerProfileClick
+                                )
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(horizontal = 20.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                                )
+                            }
+                            if (onWalletClick != null && user.role != UserRole.WORKER) {
+                                ProfileMenuItem(
+                                    icon = Icons.Outlined.AccountBalanceWallet,
+                                    title = "Ví của tôi",
+                                    subtitle = "Số dư & lịch sử giao dịch",
+                                    onClick = onWalletClick
                                 )
                                 HorizontalDivider(
                                     modifier = Modifier.padding(horizontal = 20.dp),

@@ -498,6 +498,18 @@ private fun ledgerStyleFor(type: WalletTransactionType): LedgerStyle = when (typ
         tint = MaterialTheme.colorScheme.primary,
         direction = LedgerStyle.Direction.NEGATIVE
     )
+    WalletTransactionType.WITHDRAWAL_REQUEST -> LedgerStyle(
+        label = "Yêu cầu rút tiền (đang xử lý)",
+        icon = Icons.Outlined.AccessTime,
+        tint = StatusColorsTheme.current.awaitingPayment,
+        direction = LedgerStyle.Direction.NEGATIVE
+    )
+    WalletTransactionType.TOPUP -> LedgerStyle(
+        label = "Nạp tiền vào ví",
+        icon = Icons.Outlined.ArrowDownward,
+        tint = AccentGreen,
+        direction = LedgerStyle.Direction.POSITIVE
+    )
     WalletTransactionType.ADJUSTMENT -> LedgerStyle(
         label = "Điều chỉnh",
         icon = Icons.Outlined.SwapHoriz,

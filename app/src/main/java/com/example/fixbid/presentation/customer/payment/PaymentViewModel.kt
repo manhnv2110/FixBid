@@ -144,10 +144,17 @@ class PaymentViewModel @Inject constructor(
 
             when (val result = processVNPayReturnUseCase(params)) {
                 is Resource.Success -> {
+                    // The use case now returns either a booking-payment or a
+                    // top-up branch. This screen only handles booking payments;
+                    // refetch the payment row to get the latest snapshot rather
+                    // than carrying the result through (top-ups never land here
+                    // because the deep link is consumed by VNPayReturnScreen).
+                    val refreshed = (paymentRepository.getPaymentByBooking(bookingId)
+                        as? Resource.Success)?.data
                     _uiState.value = _uiState.value.copy(
                         isProcessing = false,
-                        payment = result.data,
-                        paymentSuccess = true
+                        payment = refreshed ?: _uiState.value.payment,
+                        paymentSuccess = result.data is ProcessVNPayReturnUseCase.Result.BookingPayment
                     )
                     _events.emit(PaymentEvent.Toast("Thanh toán thành công! Tiền đang được giữ an toàn."))
                     _events.emit(PaymentEvent.PaymentCompleted)

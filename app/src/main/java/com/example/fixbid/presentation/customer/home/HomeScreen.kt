@@ -79,6 +79,7 @@ fun HomeScreen(
     onNotificationSettingsClick: () -> Unit = {},
     onFindWorkersClick: () -> Unit = {},
     onChatbotClick: () -> Unit = {},
+    onWalletClick: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
     chatListViewModel: ConversationListViewModel = hiltViewModel()
 ) {
@@ -171,7 +172,8 @@ fun HomeScreen(
                     Box(modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())) {
                         ProfileScreen(
                             onSignOut = onSignOut,
-                            onNotificationSettingsClick = onNotificationSettingsClick
+                            onNotificationSettingsClick = onNotificationSettingsClick,
+                            onWalletClick = onWalletClick
                         )
                     }
                 }

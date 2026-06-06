@@ -74,6 +74,16 @@ android {
         compose = true
         buildConfig = true
     }
+
+    // jqwik runs on the JUnit Platform; tell the unit-test task to use it so
+    // @Property tests are discovered alongside legacy JUnit 4 tests.
+    testOptions {
+        unitTests.all {
+            it.useJUnitPlatform {
+                includeEngines("jqwik", "junit-jupiter", "junit-vintage")
+            }
+        }
+    }
 }
 
 dependencies {
@@ -136,8 +146,27 @@ dependencies {
     // Bridges the Play Services Task<String> token fetch into a coroutine.
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
 
-    // Test
+    // Test — JUnit 4 (legacy) + JUnit 5 (jqwik) + jqwik PBT + Testcontainers Postgres
     testImplementation(libs.junit)
+
+    // jqwik (property-based testing) runs on the JUnit Platform engine.
+    testImplementation("net.jqwik:jqwik:1.9.3")
+    testImplementation("net.jqwik:jqwik-kotlin:1.9.3")
+
+    // Postgres testcontainer + JDBC driver — boots a real Postgres for SQL/RPC PBT.
+    testImplementation("org.testcontainers:testcontainers:1.20.4")
+    testImplementation("org.testcontainers:postgresql:1.20.4")
+    testImplementation("org.testcontainers:junit-jupiter:1.20.4")
+    testImplementation("org.postgresql:postgresql:42.7.4")
+
+    // JUnit 5 platform (engine + launcher) so jqwik tests run under `./gradlew test`.
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.11.4")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.11.4")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.11.4")
+    // Vintage engine keeps the legacy JUnit 4 ExampleUnitTest running under the
+    // JUnit Platform alongside jqwik / Jupiter tests.
+    testRuntimeOnly("org.junit.vintage:junit-vintage-engine:5.11.4")
+
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))

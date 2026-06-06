@@ -55,6 +55,7 @@ fun CustomerBookingDetailScreen(
     onNavigateToBids: (String) -> Unit,
     onNavigateToPayment: (String) -> Unit,
     onNavigateToCompletionConfirm: (String) -> Unit,
+    onWalletClick: () -> Unit = {},
     viewModel: CustomerBookingDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -173,6 +174,21 @@ fun CustomerBookingDetailScreen(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    // Refund banner — shown above the rest of the details when
+                    // the worker has cancelled and the escrow has been refunded
+                    // back into the customer's wallet. Predicate matches Req 8.1.
+                    val payment = uiState.payment
+                    if (
+                        booking.status == BookingStatus.CANCELLED &&
+                        payment?.escrowStatus == com.example.fixbid.domain.model.EscrowStatus.REFUNDED
+                    ) {
+                        WorkerCancelledRefundBanner(
+                            refundAmount = payment.amount,
+                            cancelReason = booking.cancelReason,
+                            onWalletClick = onWalletClick
+                        )
+                    }
+
                     // Status summary card
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -1035,6 +1051,92 @@ private fun getStatusInfo(status: BookingStatus): StatusInfo =
         com.example.fixbid.ui.theme.statusLabel(status),
         com.example.fixbid.ui.theme.statusColor(status)
     )
+
+// ─── Worker-cancelled refund banner ──────────────────────────────────────────
+
+@Composable
+private fun WorkerCancelledRefundBanner(
+    refundAmount: Double,
+    cancelReason: String?,
+    onWalletClick: () -> Unit
+) {
+    // Distinct error-tinted card matching the worker side's "Bạn đã hủy đơn này"
+    // banner (JobDetailScreen.WorkerCancelledBanner) so cancel-and-refunded
+    // bookings read the same on both sides. Predicate enforced by caller.
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.error.copy(alpha = 0.18f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Cancel,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = "Thợ đã hủy đơn",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            // Customer is refunded the full amount they paid (including
+            // platform_fee) per fn_refund_escrow_to_customer policy.
+            Text(
+                text = "Số tiền đã hoàn: ${formatCurrencyVnd(refundAmount)}",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onErrorContainer
+            )
+            // Reason is technically nullable on the model (legacy data), but
+            // any booking cancelled via WorkerCancelBookingUseCase always has
+            // one. Hide the line entirely rather than showing "Lý do: null".
+            if (!cancelReason.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Lý do: $cancelReason",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    lineHeight = 19.sp
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(
+                onClick = onWalletClick,
+                modifier = Modifier.fillMaxWidth().height(44.dp),
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.AccountBalanceWallet,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Xem ví", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            }
+        }
+    }
+}
 
 // ─── Completed payment receipt ───────────────────────────────────────────────
 

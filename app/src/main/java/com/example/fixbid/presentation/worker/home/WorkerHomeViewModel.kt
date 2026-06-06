@@ -32,6 +32,7 @@ data class WorkerHomeUiState(
     val activeJobs: List<Booking> = emptyList(),       // IN_PROGRESS + PENDING_COMPLETION
     val pendingJobs: List<Booking> = emptyList(),      // CONFIRMED
     val completedJobs: List<Booking> = emptyList(),
+    val cancelledJobs: List<Booking> = emptyList(),
     val openRequests: List<Booking> = emptyList(),     // BIDDING — preview ở dashboard
     /** DIRECT bookings assigned to this worker that need accept/decline. */
     val pendingDirectRequests: List<Booking> = emptyList(),
@@ -98,6 +99,7 @@ class WorkerHomeViewModel @Inject constructor(
                             activeJobs = data.activeJobs,
                             pendingJobs = data.pendingJobs,
                             completedJobs = data.completedJobs,
+                            cancelledJobs = data.cancelledJobs,
                             openRequests = openRequests,
                             pendingDirectRequests = data.pendingDirectRequests,
                             completedCount = data.completedCount,

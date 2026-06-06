@@ -87,11 +87,14 @@ fun JobDetailScreen(
                     booking = data.booking,
                     myBid = data.myBid,
                     isResponding = uiState.isRespondingDirect,
+                    isCancelling = uiState.isCancelling,
+                    currentUserId = uiState.currentUserId,
                     onPlaceBid = viewModel::openBidDialog,
                     onReportCompletion = viewModel::openCompletionDialog,
                     onNavigateToCustomer = { onNavigateToCustomer(data.booking.id) },
                     onAcceptDirect = viewModel::acceptDirectBooking,
-                    onDeclineDirect = viewModel::openDeclineDialog
+                    onDeclineDirect = viewModel::openDeclineDialog,
+                    onCancelBooking = viewModel::openCancelDialog
                 )
             }
         },
@@ -133,6 +136,7 @@ fun JobDetailScreen(
                 JobDetailContent(
                     data = uiState.data!!,
                     payment = uiState.payment,
+                    currentUserId = uiState.currentUserId,
                     contentPadding = innerPadding
                 )
             }
@@ -176,6 +180,24 @@ fun JobDetailScreen(
                 onConfirm = { reason -> viewModel.declineDirectBooking(reason) }
             )
         }
+
+        // Worker cancel-after-payment dialog. Mounted whenever the ViewModel
+        // flips `showCancelDialog` (only reachable via the "Hủy đơn" button
+        // in the CONFIRMED branch, which itself respects the same predicate).
+        // workerReceives is sourced from the loaded payment row so the dialog
+        // can show the worker exactly how much they're forfeiting; if no
+        // payment row is available we fall back to 0 to keep the contract
+        // total rather than the stale agreed price.
+        if (uiState.showCancelDialog) {
+            WorkerCancelDialog(
+                form = uiState.cancelForm,
+                workerReceives = uiState.payment?.workerReceives?.toLong() ?: 0L,
+                onReasonChange = viewModel::onCancelReasonChange,
+                onConfirm = viewModel::confirmCancel,
+                onDismiss = viewModel::closeCancelDialog,
+                isSubmitting = uiState.isCancelling
+            )
+        }
     }
 
     // Photo editor overlay — wrapped in a Dialog so it renders in its own
@@ -209,6 +231,7 @@ fun JobDetailScreen(
 private fun JobDetailContent(
     data: com.example.fixbid.domain.usecase.worker.JobDetailData,
     payment: com.example.fixbid.domain.model.Payment?,
+    currentUserId: String?,
     contentPadding: PaddingValues
 ) {
     Column(
@@ -223,6 +246,23 @@ private fun JobDetailContent(
             .padding(top = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        // Worker cancellation receipt — rendered above the rest of the detail
+        // so the worker immediately sees what was deducted from their wallet
+        // and the reason they originally typed. Predicate matches Req 8.3:
+        // booking is CANCELLED, payment was refunded, and we belong to the
+        // worker side of the transaction.
+        if (
+            data.booking.status == BookingStatus.CANCELLED &&
+            payment?.escrowStatus == com.example.fixbid.domain.model.EscrowStatus.REFUNDED &&
+            currentUserId != null &&
+            data.booking.workerId == currentUserId
+        ) {
+            WorkerCancelledBanner(
+                workerReceives = payment.workerReceives,
+                cancelReason = data.booking.cancelReason
+            )
+        }
+
         SummaryCard(booking = data.booking)
 
         BiddingStatsCard(
@@ -252,6 +292,73 @@ private fun JobDetailContent(
 }
 
 // ─── Summary (gộp Hero + Budget) ──────────────────────────────────────────────
+
+@Composable
+private fun WorkerCancelledBanner(
+    workerReceives: Double,
+    cancelReason: String?
+) {
+    // Distinct error-tinted card so it reads as "destructive history" rather
+    // than a regular detail row. Sits above the summary so the worker doesn't
+    // have to scroll to understand the booking's terminal state.
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.error.copy(alpha = 0.18f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Cancel,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = "Bạn đã hủy đơn này",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            // worker_receives mirrors what was actually deducted from the
+            // worker's pending wallet inside fn_refund_escrow_to_customer,
+            // not the gross amount the customer paid.
+            Text(
+                text = "Số tiền đã trừ khỏi ví: ${formatCurrencyVnd(workerReceives)}",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onErrorContainer
+            )
+            // Reason is technically nullable on the model (legacy data), but
+            // any booking cancelled via WorkerCancelBookingUseCase always has
+            // a reason ≥ 10 chars. Hide the line entirely when missing rather
+            // than show "Lý do: null".
+            if (!cancelReason.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Lý do: $cancelReason",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    lineHeight = 19.sp
+                )
+            }
+        }
+    }
+}
 
 @Composable
 private fun SummaryCard(booking: Booking) {
@@ -830,11 +937,14 @@ private fun JobDetailBottomBar(
     booking: Booking,
     myBid: Bid?,
     isResponding: Boolean,
+    isCancelling: Boolean,
+    currentUserId: String?,
     onPlaceBid: () -> Unit,
     onReportCompletion: () -> Unit,
     onNavigateToCustomer: () -> Unit,
     onAcceptDirect: () -> Unit,
-    onDeclineDirect: () -> Unit
+    onDeclineDirect: () -> Unit,
+    onCancelBooking: () -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -891,6 +1001,48 @@ private fun JobDetailBottomBar(
                             icon = Icons.Outlined.Directions,
                             onClick = onNavigateToCustomer
                         )
+                        // Worker-cancel affordance — only shown to the actual
+                        // assigned worker (Req 1.1 / 11.1). The use case
+                        // re-validates the same predicate server-side so even
+                        // a stale UI can't trigger an unauthorized cancel.
+                        if (currentUserId != null && booking.workerId == currentUserId) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedButton(
+                                onClick = onCancelBooking,
+                                enabled = !isCancelling,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp),
+                                shape = MaterialTheme.shapes.medium,
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.error
+                                ),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    width = 1.dp,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            ) {
+                                if (isCancelling) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Cancel,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Hủy đơn",
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 14.sp
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
 
