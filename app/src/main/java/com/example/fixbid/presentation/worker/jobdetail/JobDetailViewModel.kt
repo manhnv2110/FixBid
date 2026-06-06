@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.fixbid.domain.model.BookingStatus
 import com.example.fixbid.domain.model.Resource
 import com.example.fixbid.domain.notification.NotificationContentFactory
+import com.example.fixbid.domain.repository.AuthRepository
 import com.example.fixbid.domain.repository.BookingRepository
 import com.example.fixbid.domain.usecase.shared.SendNotificationUseCase
 import com.example.fixbid.domain.usecase.worker.AcceptDirectBookingUseCase
@@ -14,6 +15,7 @@ import com.example.fixbid.domain.usecase.worker.DeclineDirectBookingUseCase
 import com.example.fixbid.domain.usecase.worker.GetJobDetailUseCase
 import com.example.fixbid.domain.usecase.worker.JobDetailData
 import com.example.fixbid.domain.usecase.worker.PlaceBidUseCase
+import com.example.fixbid.domain.usecase.worker.WorkerCancelBookingUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,6 +42,14 @@ data class CompletionFormState(
     val errorMessage: String? = null
 )
 
+data class CancelFormState(
+    val reason: String = "",
+    val errorMessage: String? = null
+) {
+    val trimmedReason: String get() = reason.trim()
+    val isValid: Boolean get() = trimmedReason.length >= 10
+}
+
 data class JobDetailUiState(
     val isLoading: Boolean = true,
     val data: JobDetailData? = null,
@@ -51,7 +61,17 @@ data class JobDetailUiState(
     val completionForm: CompletionFormState = CompletionFormState(),
     /** True while an accept/decline call for a DIRECT booking is in flight. */
     val isRespondingDirect: Boolean = false,
-    val showDeclineDialog: Boolean = false
+    val showDeclineDialog: Boolean = false,
+    val showCancelDialog: Boolean = false,
+    val cancelForm: CancelFormState = CancelFormState(),
+    val isCancelling: Boolean = false,
+    /**
+     * Current authenticated user id, used by the screen to gate the cancel
+     * button visibility and the cancelled banner predicate
+     * (`booking.workerId == currentUserId`). Null while the session is still
+     * resolving — visibility predicates default to false in that window.
+     */
+    val currentUserId: String? = null
 )
 
 sealed interface JobDetailEvent {
@@ -71,7 +91,9 @@ class JobDetailViewModel @Inject constructor(
     private val declineDirectBookingUseCase: DeclineDirectBookingUseCase,
     private val bookingRepository: BookingRepository,
     private val paymentRepository: com.example.fixbid.domain.repository.PaymentRepository,
-    private val sendNotification: SendNotificationUseCase
+    private val sendNotification: SendNotificationUseCase,
+    private val workerCancelBookingUseCase: WorkerCancelBookingUseCase,
+    private val authRepository: AuthRepository
 ) : ViewModel() {
 
     private val bookingId: String = savedStateHandle.get<String>("bookingId") ?: ""
@@ -83,8 +105,24 @@ class JobDetailViewModel @Inject constructor(
     val events = _events.receiveAsFlow()
 
     init {
+        loadCurrentUser()
         load()
         observeBookingRealtime()
+    }
+
+    /**
+     * Resolve the authenticated user id once on init so the screen can render
+     * the cancel button + cancelled banner without each composable poking the
+     * auth repository directly. Failure is non-fatal — the predicates simply
+     * stay false until a future reload populates the id.
+     */
+    private fun loadCurrentUser() {
+        viewModelScope.launch {
+            val id = authRepository.getCurrentUser()?.id
+            if (id != null) {
+                _uiState.update { it.copy(currentUserId = id) }
+            }
+        }
     }
 
     fun load() {
@@ -430,6 +468,71 @@ class JobDetailViewModel @Inject constructor(
                 is Resource.Loading -> { /* no-op */ }
             }
             _uiState.update { it.copy(isRespondingDirect = false) }
+        }
+    }
+
+    // ─── Worker cancel after payment ─────────────────────────────────────────
+
+    /**
+     * Open the cancel dialog with a fresh form. Used from the "Hủy đơn" button
+     * that's only visible when `booking.status == CONFIRMED` and the booking
+     * belongs to the current worker.
+     */
+    fun openCancelDialog() = _uiState.update {
+        it.copy(showCancelDialog = true, cancelForm = CancelFormState())
+    }
+
+    /** Dismiss the cancel dialog without invoking the use case. */
+    fun closeCancelDialog() = _uiState.update {
+        it.copy(showCancelDialog = false, cancelForm = CancelFormState())
+    }
+
+    fun onCancelReasonChange(value: String) = _uiState.update {
+        it.copy(cancelForm = it.cancelForm.copy(reason = value, errorMessage = null))
+    }
+
+    /**
+     * Invoke [WorkerCancelBookingUseCase] with the current reason. On success,
+     * close the dialog and reload the detail so the cancelled banner replaces
+     * the action buttons. On error, surface the message inside the dialog and
+     * re-enable the buttons so the worker can retry or amend the reason.
+     */
+    fun confirmCancel() {
+        if (_uiState.value.isCancelling) return
+        val form = _uiState.value.cancelForm
+        if (!form.isValid) return
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isCancelling = true,
+                    cancelForm = it.cancelForm.copy(errorMessage = null)
+                )
+            }
+            when (val result = workerCancelBookingUseCase(bookingId, form.reason)) {
+                is Resource.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            isCancelling = false,
+                            showCancelDialog = false,
+                            cancelForm = CancelFormState()
+                        )
+                    }
+                    _events.trySend(JobDetailEvent.Toast("Đã hủy đơn — tiền đã hoàn cho khách"))
+                    load()
+                }
+                is Resource.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isCancelling = false,
+                            cancelForm = it.cancelForm.copy(errorMessage = result.message)
+                        )
+                    }
+                }
+                is Resource.Loading -> {
+                    _uiState.update { it.copy(isCancelling = false) }
+                }
+            }
         }
     }
 }

@@ -94,6 +94,41 @@ object NotificationContentFactory {
         referenceId = bookingId
     )
 
+    /**
+     * Khách được báo thợ đã chủ động hủy đơn sau khi đã thanh toán — kèm xác nhận
+     * số tiền đã được hoàn vào ví FixBid và lý do thợ hủy.
+     */
+    fun bookingCancelledByWorkerForCustomer(
+        customerId: String,
+        bookingId: String,
+        categoryName: String,
+        refundAmountLabel: String,
+        reason: String
+    ) = NotificationContent(
+        recipientUserId = customerId,
+        title = "Thợ đã hủy đơn",
+        body = "Đơn \"$categoryName\" đã được hoàn $refundAmountLabel vào ví FixBid. Lý do: $reason",
+        type = NotificationType.BOOKING_CANCELLED,
+        referenceId = bookingId
+    )
+
+    /**
+     * Thợ được xác nhận đã hủy đơn thành công — kèm số tiền đã bị trừ khỏi ví và
+     * hoàn cho khách.
+     */
+    fun bookingCancelledByWorkerForWorker(
+        workerId: String,
+        bookingId: String,
+        categoryName: String,
+        deductedAmountLabel: String
+    ) = NotificationContent(
+        recipientUserId = workerId,
+        title = "Đã hủy đơn thành công",
+        body = "Đơn \"$categoryName\" đã hủy. $deductedAmountLabel đã được hoàn cho khách và trừ khỏi ví của bạn.",
+        type = NotificationType.BOOKING_CANCELLED,
+        referenceId = bookingId
+    )
+
     /** Nhắc lịch hẹn sắp tới (cleaning schedule reminder). */
     fun bookingReminderForUser(
         userId: String,
