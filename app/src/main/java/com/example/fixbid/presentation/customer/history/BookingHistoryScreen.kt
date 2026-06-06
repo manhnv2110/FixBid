@@ -197,6 +197,7 @@ fun BookingHistoryScreen(
                                     booking = booking,
                                     isDone = selectedTab == 1,
                                     isCancelled = selectedTab == 2,
+                                    isReviewed = state.reviewedBookingIds.contains(booking.id),
                                     onClick = { onBookingClick(booking.id) },
                                     onBiddingWorkersClick = { onBiddingWorkersClick(booking.id) },
                                     onPaymentClick = { onPaymentClick(booking.id) },
@@ -267,6 +268,7 @@ private fun BookingCard(
     booking: Booking,
     isDone: Boolean,
     isCancelled: Boolean = false,
+    isReviewed: Boolean = false,
     onClick: () -> Unit,
     onBiddingWorkersClick: () -> Unit,
     onPaymentClick: () -> Unit,
@@ -585,7 +587,7 @@ private fun BookingCard(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Đánh giá thợ",
+                        text = if (isReviewed) "Đã đánh giá" else "Đánh giá thợ",
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 13.sp

@@ -83,6 +83,22 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
     val authViewModel: AuthViewModel = hiltViewModel()
     val uiState by authViewModel.uiState.collectAsState()
 
+    val navController = rememberNavController()
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+    // Màn hình xác thực, màn hình loading bootstrapping, và kết quả thành công/thanh toán (nền sáng, không header) cần icon trạng thái màu tối;
+    // các màn hình còn lại (có header màu xanh thương hiệu hoặc màu tối) cần icon trạng thái màu sáng (trắng).
+    val needsDarkIcons = uiState.isBootstrapping || currentRoute in listOf(
+        AuthRoutes.Welcome,
+        AuthRoutes.Login,
+        AuthRoutes.Register,
+        AuthRoutes.Otp,
+        AuthRoutes.ForgotPassword,
+        "booking_success/{bookingId}",
+        "vnpay_return/{encodedUri}"
+    )
+    com.example.fixbid.ui.theme.SetStatusBarColor(darkIcons = needsDarkIcons, darkTheme = isDark)
+
     // Show loading while bootstrapping (checking saved session)
     if (uiState.isBootstrapping) {
         Box(
@@ -101,7 +117,6 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
         return
     }
 
-    val navController = rememberNavController()
     val context = LocalContext.current
 
     // Session-scoped notification coordinator: drives the unread badge and posts
@@ -122,11 +137,6 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
             notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         }
     }
-
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = navBackStackEntry?.destination?.route
-    val needsLightIcons = currentRoute == "home" || currentRoute == "worker_home"
-    com.example.fixbid.ui.theme.SetStatusBarColor(darkIcons = !needsLightIcons, darkTheme = isDark)
 
     // Listen to auth events for navigation
     LaunchedEffect(Unit) {

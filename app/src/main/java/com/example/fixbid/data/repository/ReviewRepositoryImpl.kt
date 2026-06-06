@@ -59,6 +59,14 @@ class ReviewRepositoryImpl @Inject constructor(
         Resource.Success(result.map { it.toDomain() })
     }.getOrElse { Resource.Error(it.message ?: "Lỗi tải đánh giá") }
 
+    override suspend fun getReviewsByCustomer(customerId: String): Resource<List<Review>> =
+        runCatching {
+            val result = client.from(Tables.REVIEWS)
+                .select { filter { eq("customer_id", customerId) } }
+                .decodeList<ReviewDto>()
+            Resource.Success(result.map { it.toDomain() })
+        }.getOrElse { Resource.Error(it.message ?: "Lỗi tải danh sách đánh giá") }
+
     override suspend fun getReviewByBooking(bookingId: String): Resource<Review?> =
         runCatching {
             val result = client.from(Tables.REVIEWS)

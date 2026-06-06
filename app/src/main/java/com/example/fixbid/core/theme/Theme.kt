@@ -72,12 +72,23 @@ fun SetStatusBarColor(darkIcons: Boolean, darkTheme: Boolean = isSystemInDarkThe
     
     if (!view.isInEditMode) {
         DisposableEffect(appearanceLightIcons) {
-            val window = (view.context as Activity).window
-            val controller = WindowCompat.getInsetsController(window, view)
-            val original = controller.isAppearanceLightStatusBars
-            controller.isAppearanceLightStatusBars = appearanceLightIcons
-            onDispose {
-                controller.isAppearanceLightStatusBars = original
+            var context = view.context
+            while (context is android.content.ContextWrapper) {
+                if (context is Activity) break
+                context = context.baseContext
+            }
+            val activity = context as? Activity
+            
+            if (activity != null) {
+                val window = activity.window
+                val controller = WindowCompat.getInsetsController(window, window.decorView)
+                val original = controller.isAppearanceLightStatusBars
+                controller.isAppearanceLightStatusBars = appearanceLightIcons
+                onDispose {
+                    controller.isAppearanceLightStatusBars = original
+                }
+            } else {
+                onDispose {}
             }
         }
     }

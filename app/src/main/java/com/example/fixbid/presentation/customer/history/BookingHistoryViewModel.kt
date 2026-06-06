@@ -6,6 +6,8 @@ import com.example.fixbid.domain.model.Booking
 import com.example.fixbid.domain.model.BookingStatus
 import com.example.fixbid.domain.model.Resource
 import com.example.fixbid.domain.usecase.customer.GetMyBookingsUseCase
+import com.example.fixbid.domain.repository.AuthRepository
+import com.example.fixbid.domain.repository.ReviewRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,14 +20,17 @@ sealed class HistoryUiState {
     data class Success(
         val activeBookings: List<Booking>,
         val completedBookings: List<Booking>,
-        val cancelledBookings: List<Booking>
+        val cancelledBookings: List<Booking>,
+        val reviewedBookingIds: Set<String> = emptySet()
     ) : HistoryUiState()
     data class Error(val message: String) : HistoryUiState()
 }
 
 @HiltViewModel
 class BookingHistoryViewModel @Inject constructor(
-    private val getMyBookingsUseCase: GetMyBookingsUseCase
+    private val getMyBookingsUseCase: GetMyBookingsUseCase,
+    private val authRepository: AuthRepository,
+    private val reviewRepository: ReviewRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<HistoryUiState>(HistoryUiState.Loading)
@@ -96,10 +101,22 @@ class BookingHistoryViewModel @Inject constructor(
                     )
                 }.sortedByDescending { it.updatedAt }
 
+                // Fetch reviews written by current customer
+                val currentUser = authRepository.getCurrentUser()
+                val reviewedBookingIds = if (currentUser != null) {
+                    when (val reviewsResult = reviewRepository.getReviewsByCustomer(currentUser.id)) {
+                        is Resource.Success -> reviewsResult.data.map { it.bookingId }.toSet()
+                        else -> emptySet()
+                    }
+                } else {
+                    emptySet()
+                }
+
                 _uiState.value = HistoryUiState.Success(
                     activeBookings = active,
                     completedBookings = completed,
-                    cancelledBookings = cancelled
+                    cancelledBookings = cancelled,
+                    reviewedBookingIds = reviewedBookingIds
                 )
             }
             is Resource.Error -> {

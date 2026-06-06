@@ -1,4 +1,4 @@
-﻿package com.example.fixbid.presentation.customer.chat
+package com.example.fixbid.presentation.customer.chat
 
 import android.widget.Toast
 import androidx.compose.foundation.background
