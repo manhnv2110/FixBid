@@ -27,6 +27,7 @@ import javax.inject.Inject
 
 data class WorkerHomeUiState(
     val isLoading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val userName: String = "",
     val avatarUrl: String? = null,
     val isAvailable: Boolean = true,
@@ -150,7 +151,17 @@ class WorkerHomeViewModel @Inject constructor(
                 }
                 is Resource.Loading -> { /* no-op */ }
             }
+            // Always clear the refresh spinner once we've completed a load
+            // cycle, even on failure, so pull-to-refresh doesn't stick on.
+            _uiState.update { it.copy(isRefreshing = false) }
         }
+    }
+
+    /** Pull-to-refresh entry-point: shows a refresh spinner without flashing the full-screen loader. */
+    fun refresh() {
+        if (_uiState.value.isRefreshing) return
+        _uiState.update { it.copy(isRefreshing = true) }
+        loadDashboard()
     }
 
     fun toggleAvailability() {
