@@ -21,7 +21,7 @@
 
     <!-- F : x = 25..33 — left bar + top bar + mid bar -->
     <path
-        android:fillColor="#FFFFFFFF"
+        android:fillColor="#111418"
         android:pathData="
             M 25,43 h 3 v 22 h -3 z
             M 25,43 h 8 v 3 h -8 z
@@ -29,7 +29,7 @@
 
     <!-- I : x = 35..43 — top cap + middle bar + bottom cap -->
     <path
-        android:fillColor="#FFFFFFFF"
+        android:fillColor="#111418"
         android:pathData="
             M 35,43 h 8 v 3 h -8 z
             M 37.5,46 h 3 v 16 h -3 z
@@ -37,14 +37,14 @@
 
     <!-- X : x = 45..53 — two real diagonals (parallelograms drawn with lineTo) -->
     <path
-        android:fillColor="#FFFFFFFF"
+        android:fillColor="#00629E"
         android:pathData="
             M 45,43 l 3,0 l 8,22 l -3,0 z
             M 50,43 l 3,0 l -8,22 l -3,0 z" />
 
     <!-- B : x = 55..63 — left bar + 3 horizontals + right bars on the two lobes -->
     <path
-        android:fillColor="#FFFFFFFF"
+        android:fillColor="#111418"
         android:pathData="
             M 55,43 h 3 v 22 h -3 z
             M 55,43 h 6 v 3 h -6 z
@@ -55,7 +55,7 @@
 
     <!-- I : x = 65..73 -->
     <path
-        android:fillColor="#FFFFFFFF"
+        android:fillColor="#111418"
         android:pathData="
             M 65,43 h 8 v 3 h -8 z
             M 67.5,46 h 3 v 16 h -3 z
@@ -63,7 +63,7 @@
 
     <!-- D : x = 75..83 — left bar + top cap + bottom cap + right bar (full height) -->
     <path
-        android:fillColor="#FFFFFFFF"
+        android:fillColor="#111418"
         android:pathData="
             M 75,43 h 3 v 22 h -3 z
             M 75,43 h 6 v 3 h -6 z
