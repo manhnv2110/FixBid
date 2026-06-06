@@ -51,7 +51,7 @@ fun BookingHistoryScreen(
     val uiState by viewModel.uiState.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
-    val tabs = listOf("Đang xử lý", "Hoàn thành")
+    val tabs = listOf("Đang xử lý", "Hoàn thành", "Đã hủy")
 
     // Auto refresh khi screen hiển thị lại
     LaunchedEffect(Unit) {
@@ -84,8 +84,10 @@ fun BookingHistoryScreen(
         ) {
             tabs.forEachIndexed { index, title ->
                 val count = when (val state = uiState) {
-                    is HistoryUiState.Success -> {
-                        if (index == 0) state.activeBookings.size else state.completedBookings.size
+                    is HistoryUiState.Success -> when (index) {
+                        0 -> state.activeBookings.size
+                        1 -> state.completedBookings.size
+                        else -> state.cancelledBookings.size
                     }
                     else -> 0
                 }
@@ -167,7 +169,11 @@ fun BookingHistoryScreen(
                 }
             }
             is HistoryUiState.Success -> {
-                val items = if (selectedTab == 0) state.activeBookings else state.completedBookings
+                val items = when (selectedTab) {
+                    0 -> state.activeBookings
+                    1 -> state.completedBookings
+                    else -> state.cancelledBookings
+                }
 
                 PullToRefreshBox(
                     isRefreshing = isRefreshing,
@@ -179,7 +185,7 @@ fun BookingHistoryScreen(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
-                            EmptyState(isActive = selectedTab == 0)
+                            EmptyState(tab = selectedTab)
                         }
                     } else {
                         LazyColumn(
@@ -190,6 +196,7 @@ fun BookingHistoryScreen(
                                 BookingCard(
                                     booking = booking,
                                     isDone = selectedTab == 1,
+                                    isCancelled = selectedTab == 2,
                                     onClick = { onBookingClick(booking.id) },
                                     onBiddingWorkersClick = { onBiddingWorkersClick(booking.id) },
                                     onPaymentClick = { onPaymentClick(booking.id) },
@@ -211,27 +218,44 @@ fun BookingHistoryScreen(
 }
 
 @Composable
-private fun EmptyState(isActive: Boolean) {
+private fun EmptyState(tab: Int) {
+    val (icon, title, subtitle) = when (tab) {
+        0 -> Triple(
+            Icons.Outlined.Assignment,
+            "Chưa có đơn nào đang xử lý",
+            "Đặt dịch vụ ngay để bắt đầu!"
+        )
+        1 -> Triple(
+            Icons.Outlined.CheckCircleOutline,
+            "Chưa có đơn hoàn thành",
+            "Các đơn hoàn thành sẽ hiển thị ở đây"
+        )
+        else -> Triple(
+            Icons.Outlined.Block,
+            "Chưa có đơn bị hủy",
+            "Đơn bị hủy hoặc tranh chấp sẽ hiển thị ở đây"
+        )
+    }
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.padding(32.dp)
     ) {
         Icon(
-            imageVector = if (isActive) Icons.Outlined.Assignment else Icons.Outlined.CheckCircleOutline,
+            imageVector = icon,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
             modifier = Modifier.size(56.dp)
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = if (isActive) "Chưa có đơn nào đang xử lý" else "Chưa có đơn hoàn thành",
+            text = title,
             fontSize = 16.sp,
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(
-            text = if (isActive) "Đặt dịch vụ ngay để bắt đầu!" else "Các đơn hoàn thành sẽ hiển thị ở đây",
+            text = subtitle,
             fontSize = 13.sp,
             color = MaterialTheme.colorScheme.outline
         )
@@ -242,6 +266,7 @@ private fun EmptyState(isActive: Boolean) {
 private fun BookingCard(
     booking: Booking,
     isDone: Boolean,
+    isCancelled: Boolean = false,
     onClick: () -> Unit,
     onBiddingWorkersClick: () -> Unit,
     onPaymentClick: () -> Unit,
@@ -334,6 +359,40 @@ private fun BookingCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+            }
+
+            // Cancellation summary — surfaced on the "Đã hủy" tab so the
+            // customer sees the reason and a refund hint without needing to
+            // open the booking detail. Detail screen still has the full
+            // `WorkerCancelledRefundBanner` with the "Xem ví" CTA.
+            if (isCancelled && booking.status == BookingStatus.CANCELLED &&
+                !booking.cancelReason.isNullOrBlank()
+            ) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f))
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Cancel,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Lý do hủy: ${booking.cancelReason}",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        lineHeight = 17.sp
+                    )
+                }
             }
 
             // Bottom section based on status

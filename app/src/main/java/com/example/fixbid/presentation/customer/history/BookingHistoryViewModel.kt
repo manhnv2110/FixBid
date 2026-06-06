@@ -17,7 +17,8 @@ sealed class HistoryUiState {
     object Loading : HistoryUiState()
     data class Success(
         val activeBookings: List<Booking>,
-        val completedBookings: List<Booking>
+        val completedBookings: List<Booking>,
+        val cancelledBookings: List<Booking>
     ) : HistoryUiState()
     data class Error(val message: String) : HistoryUiState()
 }
@@ -80,16 +81,25 @@ class BookingHistoryViewModel @Inject constructor(
                 }.sortedByDescending { it.createdAt }
 
                 val completed = all.filter {
+                    it.status == BookingStatus.COMPLETED
+                }.sortedByDescending { it.createdAt }
+
+                // CANCELLED + DISPUTED share the "đã đóng, không hoàn thành" bucket.
+                // We surface them in a dedicated tab so customers can review the
+                // refund banner / cancel reason without scrolling past completed
+                // jobs. Sorted by updatedAt so the most recent cancellation is
+                // on top — that's usually what the customer just came back for.
+                val cancelled = all.filter {
                     it.status in listOf(
-                        BookingStatus.COMPLETED,
                         BookingStatus.CANCELLED,
                         BookingStatus.DISPUTED
                     )
-                }.sortedByDescending { it.createdAt }
+                }.sortedByDescending { it.updatedAt }
 
                 _uiState.value = HistoryUiState.Success(
                     activeBookings = active,
-                    completedBookings = completed
+                    completedBookings = completed,
+                    cancelledBookings = cancelled
                 )
             }
             is Resource.Error -> {
