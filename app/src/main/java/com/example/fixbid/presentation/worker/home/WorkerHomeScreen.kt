@@ -22,6 +22,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -31,6 +33,10 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import coil.compose.AsyncImagePainter
+import coil.compose.SubcomposeAsyncImage
+import coil.compose.SubcomposeAsyncImageContent
+import coil.request.ImageRequest
 import com.example.fixbid.core.components.AppBottomBar
 import com.example.fixbid.core.components.BottomNavDestination
 import com.example.fixbid.core.components.ChatBell
@@ -108,6 +114,12 @@ fun WorkerHomeScreen(
         .currentBackStackEntryAsState().value?.destination?.route
         ?: WorkerTab.HOME
     val selectedIndex = WorkerTab.ordered.indexOf(currentRoute).coerceAtLeast(0)
+
+    LaunchedEffect(currentRoute) {
+        if (currentRoute == WorkerTab.HOME) {
+            viewModel.loadDashboard()
+        }
+    }
 
     fun switchTab(route: String) {
         if (route != currentRoute) {
@@ -260,6 +272,7 @@ private fun WorkerDashboard(
     Column(modifier = Modifier.fillMaxSize()) {
         DashboardHeader(
             userName = uiState.userName,
+            avatarUrl = uiState.avatarUrl,
             isAvailable = uiState.isAvailable,
             isToggling = uiState.isTogglingAvailability,
             onToggleAvailability = onToggleAvailability,
@@ -403,6 +416,7 @@ private fun WorkerDashboard(
 @Composable
 private fun DashboardHeader(
     userName: String,
+    avatarUrl: String? = null,
     isAvailable: Boolean,
     isToggling: Boolean,
     onToggleAvailability: () -> Unit,
@@ -443,12 +457,34 @@ private fun DashboardHeader(
                             .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.18f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = (userName.trim().firstOrNull()?.uppercase() ?: "T"),
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp
-                        )
+                        if (avatarUrl != null) {
+                            SubcomposeAsyncImage(
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(avatarUrl)
+                                    .crossfade(true)
+                                    .build(),
+                                contentDescription = "Avatar",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            ) {
+                                when (painter.state) {
+                                    is AsyncImagePainter.State.Success -> SubcomposeAsyncImageContent()
+                                    else -> Text(
+                                        text = userName.trim().firstOrNull()?.uppercase() ?: "T",
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 18.sp
+                                    )
+                                }
+                            }
+                        } else {
+                            Text(
+                                text = (userName.trim().firstOrNull()?.uppercase() ?: "T"),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp
+                            )
+                        }
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {

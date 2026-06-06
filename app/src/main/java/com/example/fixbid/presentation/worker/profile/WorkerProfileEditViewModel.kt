@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.fixbid.domain.model.Resource
 import com.example.fixbid.domain.model.ServiceCategory
 import com.example.fixbid.domain.model.WorkerProfile
+import com.example.fixbid.domain.repository.AuthRepository
 import com.example.fixbid.domain.usecase.worker.GetMyWorkerProfileUseCase
 import com.example.fixbid.domain.usecase.worker.UpdateMyWorkerProfileUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -20,6 +21,8 @@ import javax.inject.Inject
 data class WorkerProfileEditUiState(
     val isLoading: Boolean = true,
     val isSaving: Boolean = false,
+    val isUploadingAvatar: Boolean = false,
+    val avatarUrl: String? = null,
     val existing: WorkerProfile? = null,
     val bio: String = "",
     val selectedSkills: Set<ServiceCategory> = emptySet(),
@@ -41,7 +44,8 @@ sealed interface WorkerProfileEditEvent {
 @HiltViewModel
 class WorkerProfileEditViewModel @Inject constructor(
     private val getMyWorkerProfileUseCase: GetMyWorkerProfileUseCase,
-    private val updateMyWorkerProfileUseCase: UpdateMyWorkerProfileUseCase
+    private val updateMyWorkerProfileUseCase: UpdateMyWorkerProfileUseCase,
+    private val authRepository: AuthRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(WorkerProfileEditUiState())
@@ -75,6 +79,9 @@ class WorkerProfileEditViewModel @Inject constructor(
                             identityVerified = p.identityVerified
                         )
                     }
+                    // Load avatar từ user profile
+                    val user = authRepository.getCurrentUser()
+                    _uiState.update { it.copy(avatarUrl = user?.avatarUrl) }
                 }
                 is Resource.Error -> _uiState.update {
                     it.copy(isLoading = false, errorMessage = result.message)
@@ -122,6 +129,25 @@ class WorkerProfileEditViewModel @Inject constructor(
                 }
                 is Resource.Error -> {
                     _uiState.update { it.copy(isSaving = false, errorMessage = result.message) }
+                    _events.send(WorkerProfileEditEvent.Toast(result.message))
+                }
+                is Resource.Loading -> {}
+            }
+        }
+    }
+
+    fun uploadAvatar(imageBytes: ByteArray) {
+        viewModelScope.launch {
+            val userId = authRepository.getCurrentUser()?.id ?: return@launch
+            _uiState.update { it.copy(isUploadingAvatar = true) }
+            val fileName = "avatar_${System.currentTimeMillis()}.jpg"
+            when (val result = authRepository.uploadAvatar(userId, imageBytes, fileName)) {
+                is Resource.Success -> {
+                    _uiState.update { it.copy(isUploadingAvatar = false, avatarUrl = result.data) }
+                    _events.send(WorkerProfileEditEvent.Toast("Đã cập nhật ảnh đại diện"))
+                }
+                is Resource.Error -> {
+                    _uiState.update { it.copy(isUploadingAvatar = false, errorMessage = result.message) }
                     _events.send(WorkerProfileEditEvent.Toast(result.message))
                 }
                 is Resource.Loading -> {}

@@ -19,6 +19,7 @@ data class ProfileUiState(
     val isLoading: Boolean = true,
     val isEditing: Boolean = false,
     val isSaving: Boolean = false,
+    val isUploadingAvatar: Boolean = false,
     val editFullName: String = "",
     val editPhone: String = "",
     val errorMessage: String? = null,
@@ -124,6 +125,31 @@ class ProfileViewModel @Inject constructor(
         viewModelScope.launch {
             authRepository.signOut()
             onSignedOut()
+        }
+    }
+
+    fun uploadAvatar(imageBytes: ByteArray) {
+        val userId = _uiState.value.user?.id ?: return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isUploadingAvatar = true, errorMessage = null)
+            val fileName = "avatar.jpg" // tên cố định, luôn ghi đè file cũ
+            when (val result = authRepository.uploadAvatar(userId, imageBytes, fileName)) {
+                is Resource.Success -> {
+                    // result.data là signed URL mới, hoạt động với mọi loại bucket
+                    _uiState.value = _uiState.value.copy(
+                        isUploadingAvatar = false,
+                        user = _uiState.value.user?.copy(avatarUrl = result.data),
+                        successMessage = "Đã cập nhật ảnh đại diện"
+                    )
+                }
+                is Resource.Error -> {
+                    _uiState.value = _uiState.value.copy(
+                        isUploadingAvatar = false,
+                        errorMessage = result.message
+                    )
+                }
+                is Resource.Loading -> {}
+            }
         }
     }
 

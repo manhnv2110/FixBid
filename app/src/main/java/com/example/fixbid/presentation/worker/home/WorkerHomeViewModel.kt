@@ -21,12 +21,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class WorkerHomeUiState(
     val isLoading: Boolean = true,
     val userName: String = "",
+    val avatarUrl: String? = null,
     val isAvailable: Boolean = true,
     val profile: WorkerProfile? = null,
     val activeJobs: List<Booking> = emptyList(),       // IN_PROGRESS + PENDING_COMPLETION
@@ -82,10 +84,22 @@ class WorkerHomeViewModel @Inject constructor(
             // release step. Idempotent and quiet.
             val recovered = runCatching { releasePendingEscrows() }.getOrDefault(0)
 
-            val user = authRepository.getCurrentUser()
-            val userName = user?.fullName ?: ""
+            // Tải thông tin cá nhân và dữ liệu dashboard song song để tối ưu hiệu năng
+            val userDeferred = async { authRepository.getCurrentUser() }
+            val dashboardDeferred = async { getDashboardUseCase() }
 
-            when (val result = getDashboardUseCase()) {
+            // Cập nhật thông tin cá nhân ngay khi tải xong (thường cực nhanh từ local cache) để tránh delay UI
+            val user = userDeferred.await()
+            val userName = user?.fullName ?: ""
+            val avatarUrl = user?.avatarUrl
+            _uiState.update {
+                it.copy(
+                    userName = userName,
+                    avatarUrl = avatarUrl
+                )
+            }
+
+            when (val result = dashboardDeferred.await()) {
                 is Resource.Success -> {
                     val data = result.data
 
@@ -97,6 +111,7 @@ class WorkerHomeViewModel @Inject constructor(
                         it.copy(
                             isLoading = false,
                             userName = userName,
+                            avatarUrl = avatarUrl,
                             isAvailable = data.profile?.isAvailable ?: true,
                             profile = data.profile,
                             activeJobs = data.activeJobs,
@@ -125,6 +140,7 @@ class WorkerHomeViewModel @Inject constructor(
                         it.copy(
                             isLoading = false,
                             userName = userName,
+                            avatarUrl = avatarUrl,
                             errorMessage = if (hasData) null else result.message
                         )
                     }

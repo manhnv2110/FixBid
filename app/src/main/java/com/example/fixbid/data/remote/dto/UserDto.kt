@@ -27,6 +27,18 @@ data class UserDto(
     )
 }
 
+/**
+ * DTO chỉ dùng cho UPDATE profile — không chứa created_at, id, email
+ * để tránh lỗi "date/time field value out of range" khi gửi timestamp
+ * dạng Long lên Supabase.
+ */
+@Serializable
+data class UpdateProfileDto(
+    @SerialName("full_name") val fullName: String,
+    @SerialName("phone_number") val phoneNumber: String? = null,
+    @SerialName("avatar_url") val avatarUrl: String? = null
+)
+
 fun User.toDto() = UserDto(
     id = id,
     email = email,
@@ -35,4 +47,11 @@ fun User.toDto() = UserDto(
     avatarUrl = avatarUrl,
     role = role.name.lowercase(),
     createdAt = createdAt.toString()
+)
+
+/** Chuyển User thành DTO chỉ chứa các trường có thể cập nhật. */
+fun User.toUpdateDto() = UpdateProfileDto(
+    fullName = fullName,
+    phoneNumber = phoneNumber,
+    avatarUrl = avatarUrl
 )

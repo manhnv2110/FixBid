@@ -1,7 +1,10 @@
 package com.example.fixbid.presentation.worker.profile
 
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.rememberScrollState
@@ -10,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Build
@@ -24,7 +28,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -32,6 +38,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
 import com.example.fixbid.core.components.AppHeader
 import com.example.fixbid.domain.model.ServiceCategory
 import com.example.fixbid.ui.theme.AccentGreen
@@ -55,6 +62,16 @@ fun WorkerProfileEditScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+
+    // Image picker launcher
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            val bytes = context.contentResolver.openInputStream(it)?.readBytes()
+            if (bytes != null) viewModel.uploadAvatar(bytes)
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -120,7 +137,10 @@ fun WorkerProfileEditScreen(
                 .padding(top = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            ProfileHeroCard(uiState = uiState)
+            ProfileHeroCard(
+                uiState = uiState,
+                onAvatarClick = { imagePickerLauncher.launch("image/*") }
+            )
 
             ProfileSectionCard(
                 icon = Icons.Outlined.Description,
@@ -288,7 +308,10 @@ fun WorkerProfileEditScreen(
 // ─── Hero card ───────────────────────────────────────────────────────────────
 
 @Composable
-private fun ProfileHeroCard(uiState: WorkerProfileEditUiState) {
+private fun ProfileHeroCard(
+    uiState: WorkerProfileEditUiState,
+    onAvatarClick: () -> Unit = {}
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
@@ -297,22 +320,68 @@ private fun ProfileHeroCard(uiState: WorkerProfileEditUiState) {
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // Avatar with the worker's first initial. We don't yet have a
-                // user object here so we fall back to a generic mark when the
-                // existing profile is missing identifying info.
+                // Avatar with camera edit badge
                 Box(
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.18f)),
-                    contentAlignment = Alignment.Center
+                    modifier = Modifier.size(72.dp),
+                    contentAlignment = Alignment.BottomEnd
                 ) {
-                    Text(
-                        text = "T",
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 26.sp
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.18f))
+                            .clickable { onAvatarClick() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (uiState.avatarUrl != null) {
+                            AsyncImage(
+                                model = uiState.avatarUrl,
+                                contentDescription = "Avatar",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Text(
+                                text = "T",
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 26.sp
+                            )
+                        }
+                        // Upload loading overlay
+                        if (uiState.isUploadingAvatar) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Black.copy(alpha = 0.45f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(
+                                    color = Color.White,
+                                    modifier = Modifier.size(24.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            }
+                        }
+                    }
+                    // Camera badge
+                    if (!uiState.isUploadingAvatar) {
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.onPrimary)
+                                .clickable { onAvatarClick() },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.CameraAlt,
+                                contentDescription = "Chỉnh sửa ảnh đại diện",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(13.dp)
+                            )
+                        }
+                    }
                 }
                 Spacer(Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {

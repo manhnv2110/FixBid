@@ -21,4 +21,5 @@ interface AuthRepository {
     suspend fun resetPassword(email: String): Resource<Unit>
     suspend fun getCurrentUser(): User?
     suspend fun updateProfile(user: User): Resource<User>
+    suspend fun uploadAvatar(userId: String, imageBytes: ByteArray, fileName: String): Resource<String>
 }

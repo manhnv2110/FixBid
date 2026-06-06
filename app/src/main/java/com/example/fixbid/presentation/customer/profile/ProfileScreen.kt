@@ -1,5 +1,8 @@
 package com.example.fixbid.presentation.customer.profile
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,11 +24,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImagePainter
+import coil.compose.SubcomposeAsyncImage
+import coil.compose.SubcomposeAsyncImageContent
+import coil.request.ImageRequest
 import com.example.fixbid.core.components.PrimaryTopBar
 import com.example.fixbid.domain.model.UserRole
 
@@ -41,6 +50,25 @@ fun ProfileScreen(
     val uiState by viewModel.uiState.collectAsState()
     val currentTheme by viewModel.appTheme.collectAsState(initial = "system")
     val isDark = isSystemInDarkTheme()
+    val context = LocalContext.current
+
+    // Hiển thị Toast khi có thông báo thành công
+    LaunchedEffect(uiState.successMessage) {
+        uiState.successMessage?.let { msg ->
+            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+            viewModel.clearMessages()
+        }
+    }
+
+    // Image picker launcher
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            val bytes = context.contentResolver.openInputStream(it)?.readBytes()
+            if (bytes != null) viewModel.uploadAvatar(bytes)
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -90,21 +118,93 @@ fun ProfileScreen(
                                 .padding(24.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            // Avatar
+                            // Avatar with edit button
                             Box(
-                                modifier = Modifier
-                                    .size(80.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primaryContainer)
-                                    .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape),
-                                contentAlignment = Alignment.Center
+                                modifier = Modifier.size(88.dp),
+                                contentAlignment = Alignment.BottomEnd
                             ) {
-                                Text(
-                                    text = user.fullName.firstOrNull()?.uppercase() ?: "?",
-                                    fontSize = 32.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
+                                // Avatar circle
+                                Box(
+                                    modifier = Modifier
+                                        .size(80.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primaryContainer)
+                                        .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                                        .clickable { imagePickerLauncher.launch("image/*") },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (user.avatarUrl != null) {
+                                        SubcomposeAsyncImage(
+                                            model = ImageRequest.Builder(LocalContext.current)
+                                                .data(user.avatarUrl)
+                                                .crossfade(true)
+                                                .build(),
+                                            contentDescription = "Avatar",
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentScale = ContentScale.Crop
+                                        ) {
+                                            when (painter.state) {
+                                                is AsyncImagePainter.State.Loading -> {
+                                                    CircularProgressIndicator(
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(24.dp).align(Alignment.Center),
+                                                        strokeWidth = 2.dp
+                                                    )
+                                                }
+                                                is AsyncImagePainter.State.Error -> {
+                                                    Text(
+                                                        text = user.fullName.firstOrNull()?.uppercase() ?: "?",
+                                                        fontSize = 32.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                        modifier = Modifier.align(Alignment.Center)
+                                                    )
+                                                }
+                                                else -> SubcomposeAsyncImageContent()
+                                            }
+                                        }
+                                    } else {
+                                        Text(
+                                            text = user.fullName.firstOrNull()?.uppercase() ?: "?",
+                                            fontSize = 32.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                    }
+                                    // Upload overlay
+                                    if (uiState.isUploadingAvatar) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .background(Color.Black.copy(alpha = 0.45f)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            CircularProgressIndicator(
+                                                color = Color.White,
+                                                modifier = Modifier.size(28.dp),
+                                                strokeWidth = 2.5.dp
+                                            )
+                                        }
+                                    }
+                                }
+                                // Camera badge
+                                if (!uiState.isUploadingAvatar) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primary)
+                                            .clickable { imagePickerLauncher.launch("image/*") },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.CameraAlt,
+                                            contentDescription = "Chỉnh sửa ảnh đại diện",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                    }
+                                }
                             }
 
                             Spacer(modifier = Modifier.height(12.dp))
@@ -295,35 +395,6 @@ fun ProfileScreen(
                                         }
                                     }
                                 }
-                            }
-                        }
-                    }
-
-                    // Success message
-                    if (uiState.successMessage != null) {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = MaterialTheme.shapes.medium,
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (isDark) Color(0xFF1B5E20) else Color(0xFFE8F5E9)
-                            )
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                              ) {
-                                Icon(
-                                    Icons.Default.CheckCircle,
-                                    contentDescription = null,
-                                    tint = if (isDark) Color(0xFF81C784) else Color(0xFF43A047),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = uiState.successMessage!!,
-                                    color = if (isDark) Color(0xFFC8E6C9) else Color(0xFF2E7D32),
-                                    fontSize = 14.sp
-                                )
                             }
                         }
                     }
