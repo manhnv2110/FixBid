@@ -11,6 +11,7 @@ data class MessageDto(
     val id: String = "",
     @SerialName("conversation_id") val conversationId: String = "",
     @SerialName("sender_id") val senderId: String = "",
+    @SerialName("recipient_id") val recipientId: String = "",
     val content: String = "",
     val type: String = "text",
     @SerialName("image_url") val imageUrl: String? = null,
@@ -21,6 +22,7 @@ data class MessageDto(
         id = id,
         conversationId = conversationId,
         senderId = senderId,
+        recipientId = recipientId,
         content = content,
         type = runCatching { MessageType.valueOf(type.uppercase()) }
             .getOrDefault(MessageType.TEXT),

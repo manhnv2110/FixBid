@@ -1,5 +1,6 @@
 package com.example.fixbid.presentation.customer.chat
 
+import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -10,14 +11,19 @@ import com.example.fixbid.domain.repository.AuthRepository
 import com.example.fixbid.domain.repository.ChatRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+private const val TAG = "ChatVM"
+private const val POLL_INTERVAL_MS = 3000L
 
 data class ChatUiState(
     val messages: List<Message> = emptyList(),
@@ -54,61 +60,96 @@ class ChatViewModel @Inject constructor(
     val events: SharedFlow<ChatEvent> = _events.asSharedFlow()
 
     private var realtimeJob: Job? = null
+    private var pollJob: Job? = null
 
     init {
         viewModelScope.launch {
             val user = authRepository.getCurrentUser()
             _uiState.value = _uiState.value.copy(currentUserId = user?.id ?: "")
-            loadMessages()
-            startRealtimeUpdates()
             markAsRead()
         }
-    }
-
-    private suspend fun loadMessages() {
-        if (conversationId.isBlank()) {
-            _uiState.value = _uiState.value.copy(isLoading = false)
-            return
-        }
-        _uiState.value = _uiState.value.copy(isLoading = true)
-        when (val result = chatRepository.getMessages(conversationId)) {
-            is Resource.Success -> {
-                _uiState.value = _uiState.value.copy(
-                    messages = result.data,
-                    isLoading = false
-                )
-                if (result.data.isNotEmpty()) {
-                    _events.emit(ChatEvent.ScrollToBottom)
-                }
-            }
-            is Resource.Error -> {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    errorMessage = result.message
-                )
-            }
-            is Resource.Loading -> {}
-        }
+        // 1. Start Realtime WebSocket subscription (may take a second to connect)
+        startRealtimeUpdates()
+        // 2. Also start polling as immediate fallback — this guarantees the UI
+        //    refreshes even if the Realtime channel hasn't connected yet or there
+        //    is an RLS/publication issue on the server.
+        startPolling()
     }
 
     private fun startRealtimeUpdates() {
         if (conversationId.isBlank()) return
+        Log.d(TAG, "startRealtimeUpdates: subscribing to conversationId=$conversationId")
+        realtimeJob?.cancel()
         realtimeJob = viewModelScope.launch {
             chatRepository.observeMessages(conversationId).collect { messages ->
-                // Realtime/DB is authoritative — but keep any optimistic message
-                // that hasn't been persisted/echoed yet so it never disappears.
-                val serverIds = messages.map { it.id }.toSet()
-                val pendingLocal = _uiState.value.messages.filter {
-                    it.id.startsWith(LOCAL_PREFIX) && messages.none { m -> m.sameContent(it) }
-                }
-                _uiState.value = _uiState.value.copy(
-                    messages = (messages + pendingLocal).sortedBy { it.createdAt },
-                    isLoading = false
-                )
-                _events.emit(ChatEvent.ScrollToBottom)
-                markAsRead()
+                Log.d(TAG, "Realtime: received ${messages.size} messages")
+                updateMessages(messages)
             }
         }
+    }
+
+    /**
+     * Polling fallback — polls the DB every [POLL_INTERVAL_MS] milliseconds.
+     * This guarantees the chat appears live even if Supabase Realtime has any
+     * configuration issue (table not in publication, RLS blocking WS, etc.).
+     *
+     * When Realtime is working correctly, the two sources will emit the same
+     * data and [updateMessages] will be a no-op for duplicate lists.
+     */
+    private fun startPolling() {
+        if (conversationId.isBlank()) {
+            _uiState.value = _uiState.value.copy(isLoading = false)
+            return
+        }
+        Log.d(TAG, "startPolling: starting ${POLL_INTERVAL_MS}ms poll for conversationId=$conversationId")
+        pollJob?.cancel()
+        pollJob = viewModelScope.launch {
+            // Initial fetch immediately
+            fetchAndUpdate()
+            // Then poll repeatedly
+            while (isActive) {
+                delay(POLL_INTERVAL_MS)
+                fetchAndUpdate()
+            }
+        }
+    }
+
+    private suspend fun fetchAndUpdate() {
+        when (val result = chatRepository.getMessages(conversationId)) {
+            is Resource.Success -> {
+                Log.d(TAG, "Poll: fetched ${result.data.size} messages")
+                updateMessages(result.data)
+            }
+            is Resource.Error -> Log.e(TAG, "Poll fetch error: ${result.message}")
+            is Resource.Loading -> {}
+        }
+    }
+
+    /**
+     * Merges server messages with any pending local (optimistic) messages.
+     * Idempotent — if the list hasn't changed, the UI is not updated.
+     */
+    private fun updateMessages(serverMessages: List<Message>) {
+        val pendingLocal = _uiState.value.messages.filter { local ->
+            local.id.startsWith(LOCAL_PREFIX) &&
+                serverMessages.none { m -> m.sameContent(local) }
+        }
+        val merged = (serverMessages + pendingLocal)
+            .sortedBy { it.createdAt }
+            .distinctBy { it.id }
+
+        // Only update UI if content changed (avoid unnecessary recompositions)
+        val current = _uiState.value.messages
+        if (merged.size != current.size || merged != current) {
+            _uiState.value = _uiState.value.copy(
+                messages = merged,
+                isLoading = false
+            )
+            if (merged.isNotEmpty()) {
+                viewModelScope.launch { _events.emit(ChatEvent.ScrollToBottom) }
+            }
+        }
+        markAsRead()
     }
 
     private fun Message.sameContent(other: Message): Boolean =
@@ -134,13 +175,12 @@ class ChatViewModel @Inject constructor(
         if (text.isBlank() || state.isSending) return
         if (conversationId.isBlank() || state.currentUserId.isBlank()) return
 
-        // 1. Optimistic update — show the message immediately with a local id so
-        //    sending feels instant regardless of realtime/DB round-trip latency.
         val now = System.currentTimeMillis()
         val optimistic = Message(
             id             = "$LOCAL_PREFIX$now",
             conversationId = conversationId,
             senderId       = state.currentUserId,
+            recipientId    = workerId,
             content        = text,
             type           = MessageType.TEXT,
             imageUrl       = null,
@@ -154,11 +194,10 @@ class ChatViewModel @Inject constructor(
         )
         viewModelScope.launch { _events.emit(ChatEvent.ScrollToBottom) }
 
-        // 2. Persist. On success, swap the local copy for the server row; realtime
-        //    will also reconcile. On failure, drop the optimistic message.
         viewModelScope.launch {
             when (val result = chatRepository.sendMessage(optimistic.copy(id = ""))) {
                 is Resource.Success -> {
+                    Log.d(TAG, "sendMessage: success id=${result.data.id}")
                     _uiState.value = _uiState.value.copy(
                         isSending = false,
                         messages = _uiState.value.messages
@@ -166,8 +205,11 @@ class ChatViewModel @Inject constructor(
                             .distinctBy { it.id }
                             .sortedBy { it.createdAt }
                     )
+                    // Force immediate poll so the recipient sees the new message quickly
+                    fetchAndUpdate()
                 }
                 is Resource.Error -> {
+                    Log.e(TAG, "sendMessage: failed ${result.message}")
                     _uiState.value = _uiState.value.copy(
                         isSending = false,
                         messages = _uiState.value.messages.filterNot { it.id == optimistic.id }
@@ -182,6 +224,7 @@ class ChatViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         realtimeJob?.cancel()
+        pollJob?.cancel()
     }
 
     private companion object {

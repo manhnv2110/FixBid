@@ -1,5 +1,6 @@
 package com.example.fixbid.data.repository
 
+import android.util.Log
 import com.example.fixbid.data.remote.dto.MessageDto
 import com.example.fixbid.data.remote.supabase.Tables
 import com.example.fixbid.data.remote.supabase.liveFlow
@@ -13,14 +14,22 @@ import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.realtime.PostgresAction
 import io.github.jan.supabase.realtime.channel
+import io.github.jan.supabase.realtime.decodeOldRecord
+import io.github.jan.supabase.realtime.decodeRecord
 import io.github.jan.supabase.realtime.postgresChangeFlow
 import io.github.jan.supabase.realtime.realtime
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.onStart
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import javax.inject.Inject
-import io.github.jan.supabase.postgrest.query.filter.FilterOperator
+
+private const val TAG = "ChatRepo"
 
 class ChatRepositoryImpl @Inject constructor(
     private val client: SupabaseClient
@@ -30,6 +39,7 @@ class ChatRepositoryImpl @Inject constructor(
         val dto = MessageDto(
             conversationId = message.conversationId,
             senderId       = message.senderId,
+            recipientId    = message.recipientId,
             content        = message.content,
             type           = message.type.name.lowercase(),
             imageUrl       = message.imageUrl
@@ -52,23 +62,113 @@ class ChatRepositoryImpl @Inject constructor(
             Resource.Success(msgs)
         }.getOrElse { Resource.Error(it.message ?: "Lỗi tải tin nhắn") }
 
-    override fun observeMessages(conversationId: String): Flow<List<Message>> {
-        val channel = client.realtime.channel("messages_$conversationId")
-        val changes = channel
-            .postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
-                table = Tables.MESSAGES
-                filter("conversation_id", FilterOperator.EQ, conversationId)
-            }
-            .map {
-                client.postgrest[Tables.MESSAGES]
-                    .select(Columns.ALL) {
-                        filter { eq("conversation_id", conversationId) }
-                        order("created_at", Order.ASCENDING)
+    /**
+     * Observes messages using the exact pattern from supabase-kt 3.x docs:
+     *   1. Create channel
+     *   2. Build changeFlow with .onEach { ... }.launchIn(scope)
+     *   3. call channel.subscribe()
+     *
+     * Using callbackFlow gives us a ProducerScope that IS a CoroutineScope,
+     * so launchIn(this) works correctly — no deadlock risk.
+     *
+     * Full Log.d logging at every step so we can diagnose via Logcat.
+     */
+    override fun observeMessages(conversationId: String): Flow<List<Message>> = callbackFlow {
+        Log.d(TAG, "observeMessages: START for conversationId=$conversationId")
+
+        // 1. Fetch and emit initial messages
+        val initial = runCatching {
+            client.postgrest[Tables.MESSAGES]
+                .select(Columns.ALL) {
+                    filter { eq("conversation_id", conversationId) }
+                    order("created_at", Order.ASCENDING)
+                }
+                .decodeList<MessageDto>()
+                .map { it.toDomain() }
+        }.onFailure { Log.e(TAG, "observeMessages: initial fetch failed", it) }
+            .getOrDefault(emptyList())
+
+        Log.d(TAG, "observeMessages: emitting ${initial.size} initial messages")
+        send(initial)
+
+        // 2. Create a unique channel name to avoid reuse conflicts on re-navigation
+        val channelName = "messages_${conversationId}_${System.currentTimeMillis()}"
+        Log.d(TAG, "observeMessages: creating channel '$channelName'")
+        val channel = client.realtime.channel(channelName)
+
+        // 3. Build the change flow with launchIn — this is the EXACT pattern from
+        //    the supabase-kt 3.x documentation. Using launchIn(this) ties the
+        //    collection lifecycle to the callbackFlow's producer scope.
+        channel.postgresChangeFlow<PostgresAction>(schema = "public") {
+            table = Tables.MESSAGES
+        }.onEach { action ->
+            Log.d(TAG, "observeMessages: received PostgresAction ${action::class.simpleName}")
+
+            // Client-side filter: only process events for this conversation
+            val eventConvId = runCatching {
+                when (action) {
+                    is PostgresAction.Insert -> {
+                        val dto = action.decodeRecord<MessageDto>()
+                        Log.d(TAG, "observeMessages: INSERT conversationId=${dto.conversationId} content='${dto.content}'")
+                        dto.conversationId
                     }
-                    .decodeList<MessageDto>()
-                    .map { it.toDomain() }
+                    is PostgresAction.Update -> {
+                        val dto = action.decodeRecord<MessageDto>()
+                        Log.d(TAG, "observeMessages: UPDATE conversationId=${dto.conversationId} isRead=${dto.isRead}")
+                        dto.conversationId
+                    }
+                    is PostgresAction.Delete -> {
+                        val dto = action.decodeOldRecord<MessageDto>()
+                        Log.d(TAG, "observeMessages: DELETE conversationId=${dto.conversationId}")
+                        dto.conversationId
+                    }
+                    else -> {
+                        Log.d(TAG, "observeMessages: SELECT event (ignored)")
+                        null
+                    }
+                }
+            }.onFailure { Log.e(TAG, "observeMessages: failed to decode action", it) }
+                .getOrNull()
+
+            if (eventConvId == null || eventConvId == conversationId) {
+                Log.d(TAG, "observeMessages: filter matched, re-fetching messages")
+                val updated = runCatching {
+                    client.postgrest[Tables.MESSAGES]
+                        .select(Columns.ALL) {
+                            filter { eq("conversation_id", conversationId) }
+                            order("created_at", Order.ASCENDING)
+                        }
+                        .decodeList<MessageDto>()
+                        .map { it.toDomain() }
+                }.onFailure { Log.e(TAG, "observeMessages: re-fetch failed", it) }
+                    .getOrNull()
+
+                if (updated != null) {
+                    Log.d(TAG, "observeMessages: sending ${updated.size} updated messages")
+                    send(updated)
+                }
+            } else {
+                Log.d(TAG, "observeMessages: filter skipped event (eventConvId=$eventConvId, expected=$conversationId)")
             }
-        return channel.liveFlow(changes)
+        }.launchIn(this) // 'this' = ProducerScope = CoroutineScope of callbackFlow
+
+        // 4. Subscribe AFTER launchIn (collector is already registered by launchIn)
+        Log.d(TAG, "observeMessages: subscribing to channel '$channelName'")
+        runCatching {
+            channel.subscribe(blockUntilSubscribed = true)
+        }.onSuccess {
+            Log.d(TAG, "observeMessages: channel '$channelName' subscribed successfully ✓")
+        }.onFailure {
+            Log.e(TAG, "observeMessages: channel subscription FAILED", it)
+        }
+
+        // 5. Keep the flow alive until cancelled, then clean up
+        awaitClose {
+            Log.d(TAG, "observeMessages: closing channel '$channelName'")
+            runCatching { kotlinx.coroutines.runBlocking { channel.unsubscribe() } }
+                .onSuccess { Log.d(TAG, "observeMessages: channel '$channelName' unsubscribed") }
+                .onFailure { Log.e(TAG, "observeMessages: unsubscribe failed", it) }
+        }
     }
 
     override fun observeConversations(userId: String): Flow<List<Conversation>> {
@@ -81,7 +181,12 @@ class ChatRepositoryImpl @Inject constructor(
                 table = Tables.MESSAGES
             }
             .map {
+                Log.d(TAG, "observeConversations: message change detected, re-fetching conversations")
                 (getConversations(userId) as? Resource.Success)?.data ?: emptyList()
+            }
+            .onStart {
+                Log.d(TAG, "observeConversations: onStart — emitting initial conversations")
+                emit((getConversations(userId) as? Resource.Success)?.data ?: emptyList())
             }
         return channel.liveFlow(changes)
     }
@@ -140,8 +245,6 @@ class ChatRepositoryImpl @Inject constructor(
                 .distinctBy { it["id"] }
                 .map { row ->
                     val convId = row["id"] ?: ""
-                    // Pull last message + unread count for this conversation so the
-                    // list preview and badge are accurate for whoever is viewing.
                     val messages = runCatching {
                         client.postgrest[Tables.MESSAGES]
                             .select(Columns.ALL) {
