@@ -46,6 +46,7 @@ import com.example.fixbid.presentation.customer.history.BookingHistoryScreen
 import com.example.fixbid.presentation.customer.profile.ProfileScreen
 import com.example.fixbid.presentation.customer.chat.ConversationListScreen
 import com.example.fixbid.presentation.customer.chat.ConversationListViewModel
+import com.example.fixbid.presentation.customer.booking.AddressPickerSheet
 
 private object CustomerTab {
     const val HOME = "tab_home"
@@ -86,6 +87,8 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val chatUnreadCount by chatListViewModel.unreadCount.collectAsState()
+
+    var showLocationPicker by remember { mutableStateOf(false) }
 
     val tabNavController = rememberNavController()
     val currentRoute = tabNavController
@@ -146,6 +149,7 @@ fun HomeScreen(
                         unreadNotificationCount = unreadNotificationCount,
                         onFindWorkersClick = onFindWorkersClick,
                         onCategoryClick = onCategoryClick,
+                        onLocationClick = { showLocationPicker = true },
                         onRetryNotifications = viewModel::loadNotifications
                     )
                 }
@@ -195,6 +199,21 @@ fun HomeScreen(
                     )
                 }
             }
+
+            if (showLocationPicker) {
+                AddressPickerSheet(
+                    initialLatitude = uiState.latitude,
+                    initialLongitude = uiState.longitude,
+                    initialAddress = "",
+                    locationRepository = viewModel.locator,
+                    geocoderRepository = viewModel.geocoder,
+                    onDismiss = { showLocationPicker = false },
+                    onConfirm = { latitude, longitude, _ ->
+                        viewModel.updateLocation(latitude, longitude)
+                        showLocationPicker = false
+                    }
+                )
+            }
         }
     }
 }
@@ -208,12 +227,14 @@ private fun HomeTabContent(
     unreadNotificationCount: Int,
     onFindWorkersClick: () -> Unit,
     onCategoryClick: (ServiceCategory) -> Unit,
+    onLocationClick: () -> Unit,
     onRetryNotifications: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         PrimaryTopBar(
-            title = "Hà Nội",
+            title = uiState.cityName,
             subtitle = "Vị trí của bạn",
+            modifier = Modifier.clickable { onLocationClick() },
             actions = {
                 NotificationBell(
                     unreadCount = unreadNotificationCount,

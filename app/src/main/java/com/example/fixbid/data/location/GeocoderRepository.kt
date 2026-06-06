@@ -70,6 +70,25 @@ class GeocoderRepository @Inject constructor(
         }
 
     /**
+     * Reverse-geocode to get only the city/province name.
+     */
+    suspend fun getCityName(latitude: Double, longitude: Double): String? =
+        withContext(Dispatchers.IO) {
+            if (!Geocoder.isPresent()) return@withContext null
+            val geocoder = Geocoder(context, Locale.getDefault())
+            runCatching {
+                @Suppress("DEPRECATION")
+                val results: List<Address>? = geocoder.getFromLocation(latitude, longitude, 1)
+                results?.firstOrNull()?.let { address ->
+                    val city = address.adminArea?.takeIf { it.isNotBlank() }
+                        ?: address.locality?.takeIf { it.isNotBlank() }
+                    city?.replace("Thành phố ", "")?.replace("Tỉnh ", "")?.trim()
+                }
+            }.getOrNull()
+        }
+
+
+    /**
      * Glue every populated address-line into a single comma-separated string. The
      * `getAddressLine` API only ever returns one line on most devices, so we
      * concatenate the structured fields ourselves to provide a fuller result.

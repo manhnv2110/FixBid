@@ -693,6 +693,9 @@ fun BookingScreen(
     // need to plumb a navigation route. Saved bitmaps replace the original
     // selection in-place; cancelling leaves it untouched.
     editingUri?.let { uri ->
+        androidx.activity.compose.BackHandler {
+            editingUri = null
+        }
         PhotoEditorScreen(
             sourceUri = uri,
             onCancel = { editingUri = null },

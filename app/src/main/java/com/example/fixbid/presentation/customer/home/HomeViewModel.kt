@@ -7,6 +7,8 @@ import com.example.fixbid.domain.model.Resource
 import com.example.fixbid.domain.model.ServiceCategory
 import com.example.fixbid.domain.usecase.shared.GetNotificationsUseCase
 import com.example.fixbid.core.utils.ServiceCategoryMapper
+import com.example.fixbid.data.location.LocationRepository
+import com.example.fixbid.data.location.GeocoderRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,19 +24,53 @@ sealed class NotificationUiState {
 
 data class HomeUiState(
     val categories: List<ServiceCategory> = ServiceCategoryMapper.homeCategories,
-    val notificationState: NotificationUiState = NotificationUiState.Loading
+    val notificationState: NotificationUiState = NotificationUiState.Loading,
+    val cityName: String = "Hà Nội",
+    val latitude: Double? = null,
+    val longitude: Double? = null
 )
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val getNotificationsUseCase: GetNotificationsUseCase
+    private val getNotificationsUseCase: GetNotificationsUseCase,
+    private val locationRepository: LocationRepository,
+    private val geocoderRepository: GeocoderRepository
 ) : ViewModel() {
+
+    val locator: LocationRepository get() = locationRepository
+    val geocoder: GeocoderRepository get() = geocoderRepository
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
     init {
         loadNotifications()
+        fetchCurrentLocation()
+    }
+
+    fun fetchCurrentLocation() {
+        viewModelScope.launch {
+            val loc = locationRepository.getCurrentLocation()
+            if (loc != null) {
+                val city = geocoderRepository.getCityName(loc.latitude, loc.longitude)
+                _uiState.value = _uiState.value.copy(
+                    cityName = city ?: "Hà Nội",
+                    latitude = loc.latitude,
+                    longitude = loc.longitude
+                )
+            }
+        }
+    }
+
+    fun updateLocation(latitude: Double, longitude: Double) {
+        viewModelScope.launch {
+            val city = geocoderRepository.getCityName(latitude, longitude)
+            _uiState.value = _uiState.value.copy(
+                cityName = city ?: "Hà Nội",
+                latitude = latitude,
+                longitude = longitude
+            )
+        }
     }
 
     fun loadNotifications() {
