@@ -4,35 +4,45 @@ import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.fixbid.core.chat.ActiveChatTracker
+import com.example.fixbid.domain.model.ChatPresence
 import com.example.fixbid.domain.model.Message
 import com.example.fixbid.domain.model.MessageType
 import com.example.fixbid.domain.model.Resource
+import com.example.fixbid.domain.notification.NotificationContentFactory
 import com.example.fixbid.domain.repository.AuthRepository
 import com.example.fixbid.domain.repository.ChatRepository
+import com.example.fixbid.domain.usecase.shared.SendNotificationUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.isActive
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 private const val TAG = "ChatVM"
-private const val POLL_INTERVAL_MS = 3000L
+
+/** Quiet period after the last keystroke before we broadcast "stopped typing". */
+private const val TYPING_DEBOUNCE_MS = 1_500L
+
+/** Min interval between successive "started typing" broadcasts (rate-limit). */
+private const val TYPING_BROADCAST_INTERVAL_MS = 2_000L
 
 data class ChatUiState(
     val messages: List<Message> = emptyList(),
     val isLoading: Boolean = true,
     val isSending: Boolean = false,
+    val isUploadingImage: Boolean = false,
     val inputText: String = "",
     val currentUserId: String = "",
     val errorMessage: String? = null,
-    val counterpartAvatarUrl: String? = null
+    val counterpartAvatarUrl: String? = null,
+    val presence: ChatPresence = ChatPresence()
 )
 
 sealed class ChatEvent {
@@ -40,11 +50,34 @@ sealed class ChatEvent {
     object ScrollToBottom : ChatEvent()
 }
 
+/**
+ * Drives the realtime chat screen.
+ *
+ * Pipeline:
+ *  1. `observeMessages` (Postgres CDC, delta-applied) feeds the bubble list.
+ *  2. `observePresence` (Realtime presence + typing broadcast) feeds the
+ *     header — green dot, "Đang nhập…", "Hoạt động N phút trước".
+ *  3. `sendMessage` runs an optimistic insert, awaits the server echo, then
+ *     fires a NEW_MESSAGE notification to the recipient.
+ *  4. `attachImage` uploads via Storage and sends an IMAGE-typed message.
+ *  5. The screen is registered with [ActiveChatTracker] for the entire
+ *     lifetime so [com.example.fixbid.presentation.notification.AppNotificationsViewModel]
+ *     can suppress redundant push notifications while the user is looking
+ *     at this thread.
+ *
+ * No polling. The previous fallback poll made every send round-trip costly
+ * and masked Realtime bugs; the migration scripts (0009, 0010) ensure the
+ * realtime publication is correctly configured so polling is no longer
+ * required.
+ */
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     private val chatRepository: ChatRepository,
     private val authRepository: AuthRepository,
     private val profileRepository: com.example.fixbid.data.repository.ProfileRepository,
+    private val sendNotification: SendNotificationUseCase,
+    private val activeChatTracker: ActiveChatTracker,
+    @com.example.fixbid.core.di.ApplicationScope private val applicationScope: kotlinx.coroutines.CoroutineScope,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -62,12 +95,18 @@ class ChatViewModel @Inject constructor(
     val events: SharedFlow<ChatEvent> = _events.asSharedFlow()
 
     private var realtimeJob: Job? = null
-    private var pollJob: Job? = null
+    private var presenceJob: Job? = null
+    private var typingDebounceJob: Job? = null
+    private var lastTypingBroadcastAt: Long = 0L
+    private var senderName: String = ""
 
     init {
+        if (conversationId.isNotBlank()) activeChatTracker.enter(conversationId)
+
         viewModelScope.launch {
             val user = authRepository.getCurrentUser()
             _uiState.value = _uiState.value.copy(currentUserId = user?.id ?: "")
+            senderName = user?.fullName ?: "Người dùng"
             markAsRead()
 
             if (workerId.isNotBlank()) {
@@ -76,66 +115,44 @@ class ChatViewModel @Inject constructor(
                 }
             }
         }
-        // 1. Start Realtime WebSocket subscription (may take a second to connect)
-        startRealtimeUpdates()
-        // 2. Also start polling as immediate fallback — this guarantees the UI
-        //    refreshes even if the Realtime channel hasn't connected yet or there
-        //    is an RLS/publication issue on the server.
-        startPolling()
+        observeRealtimeMessages()
+        observePresence()
     }
 
-    private fun startRealtimeUpdates() {
-        if (conversationId.isBlank()) return
-        Log.d(TAG, "startRealtimeUpdates: subscribing to conversationId=$conversationId")
-        realtimeJob?.cancel()
-        realtimeJob = viewModelScope.launch {
-            chatRepository.observeMessages(conversationId).collect { messages ->
-                Log.d(TAG, "Realtime: received ${messages.size} messages")
-                updateMessages(messages)
-            }
-        }
-    }
-
-    /**
-     * Polling fallback — polls the DB every [POLL_INTERVAL_MS] milliseconds.
-     * This guarantees the chat appears live even if Supabase Realtime has any
-     * configuration issue (table not in publication, RLS blocking WS, etc.).
-     *
-     * When Realtime is working correctly, the two sources will emit the same
-     * data and [updateMessages] will be a no-op for duplicate lists.
-     */
-    private fun startPolling() {
+    private fun observeRealtimeMessages() {
         if (conversationId.isBlank()) {
             _uiState.value = _uiState.value.copy(isLoading = false)
             return
         }
-        Log.d(TAG, "startPolling: starting ${POLL_INTERVAL_MS}ms poll for conversationId=$conversationId")
-        pollJob?.cancel()
-        pollJob = viewModelScope.launch {
-            // Initial fetch immediately
-            fetchAndUpdate()
-            // Then poll repeatedly
-            while (isActive) {
-                delay(POLL_INTERVAL_MS)
-                fetchAndUpdate()
+        realtimeJob?.cancel()
+        realtimeJob = viewModelScope.launch {
+            chatRepository.observeMessages(conversationId).collect { serverMessages ->
+                updateMessages(serverMessages)
             }
         }
     }
 
-    private suspend fun fetchAndUpdate() {
-        when (val result = chatRepository.getMessages(conversationId)) {
-            is Resource.Success -> {
-                Log.d(TAG, "Poll: fetched ${result.data.size} messages")
-                updateMessages(result.data)
+    private fun observePresence() {
+        viewModelScope.launch {
+            val uid = _uiState.value.currentUserId
+                .takeIf { it.isNotBlank() }
+                ?: authRepository.getCurrentUser()?.id
+                ?: return@launch
+            if (conversationId.isBlank()) return@launch
+
+            presenceJob?.cancel()
+            presenceJob = viewModelScope.launch {
+                chatRepository.observePresence(conversationId, uid).collect { presence ->
+                    _uiState.value = _uiState.value.copy(presence = presence)
+                }
             }
-            is Resource.Error -> Log.e(TAG, "Poll fetch error: ${result.message}")
-            is Resource.Loading -> {}
         }
     }
 
     /**
-     * Merges server messages with any pending local (optimistic) messages.
-     * Idempotent — if the list hasn't changed, the UI is not updated.
+     * Merge server messages with any pending local (optimistic) entries so the
+     * UI never blanks while the round-trip is in flight. Idempotent — equal
+     * lists do not retrigger a state copy.
      */
     private fun updateMessages(serverMessages: List<Message>) {
         val pendingLocal = _uiState.value.messages.filter { local ->
@@ -146,13 +163,9 @@ class ChatViewModel @Inject constructor(
             .sortedBy { it.createdAt }
             .distinctBy { it.id }
 
-        // Only update UI if content changed or if we need to dismiss the initial loading state
         val current = _uiState.value.messages
         if (merged.size != current.size || merged != current || _uiState.value.isLoading) {
-            _uiState.value = _uiState.value.copy(
-                messages = merged,
-                isLoading = false
-            )
+            _uiState.value = _uiState.value.copy(messages = merged, isLoading = false)
             if (merged.isNotEmpty()) {
                 viewModelScope.launch { _events.emit(ChatEvent.ScrollToBottom) }
             }
@@ -175,6 +188,34 @@ class ChatViewModel @Inject constructor(
 
     fun onInputChange(text: String) {
         _uiState.value = _uiState.value.copy(inputText = text)
+        scheduleTypingBroadcast(text)
+    }
+
+    /**
+     * Throttle "started typing" broadcasts to one every [TYPING_BROADCAST_INTERVAL_MS]
+     * and follow up with a single "stopped typing" after [TYPING_DEBOUNCE_MS] of
+     * keyboard silence. This is the standard chat-app pattern and avoids spamming
+     * the receiver every keystroke.
+     */
+    private fun scheduleTypingBroadcast(currentText: String) {
+        val uid = _uiState.value.currentUserId.takeIf { it.isNotBlank() } ?: return
+        if (conversationId.isBlank()) return
+
+        if (currentText.isNotBlank()) {
+            val now = System.currentTimeMillis()
+            if (now - lastTypingBroadcastAt > TYPING_BROADCAST_INTERVAL_MS) {
+                lastTypingBroadcastAt = now
+                viewModelScope.launch {
+                    chatRepository.sendTypingIndicator(conversationId, uid, isTyping = true)
+                }
+            }
+        }
+
+        typingDebounceJob?.cancel()
+        typingDebounceJob = viewModelScope.launch {
+            delay(TYPING_DEBOUNCE_MS)
+            chatRepository.sendTypingIndicator(conversationId, uid, isTyping = false)
+        }
     }
 
     fun sendMessage() {
@@ -183,12 +224,20 @@ class ChatViewModel @Inject constructor(
         if (text.isBlank() || state.isSending) return
         if (conversationId.isBlank() || state.currentUserId.isBlank()) return
 
+        // Cancel any pending typing-stopped broadcast — sending a message
+        // implicitly stops typing, and we want the receiver to see that
+        // immediately.
+        typingDebounceJob?.cancel()
+        viewModelScope.launch {
+            chatRepository.sendTypingIndicator(conversationId, state.currentUserId, isTyping = false)
+        }
+
         val now = System.currentTimeMillis()
         val optimistic = Message(
             id             = "$LOCAL_PREFIX$now",
             conversationId = conversationId,
             senderId       = state.currentUserId,
-            recipientId    = workerId,
+            recipientId    = recipientId(state.currentUserId),
             content        = text,
             type           = MessageType.TEXT,
             imageUrl       = null,
@@ -205,16 +254,15 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             when (val result = chatRepository.sendMessage(optimistic.copy(id = ""))) {
                 is Resource.Success -> {
-                    Log.d(TAG, "sendMessage: success id=${result.data.id}")
+                    val server = result.data
                     _uiState.value = _uiState.value.copy(
                         isSending = false,
                         messages = _uiState.value.messages
-                            .map { if (it.id == optimistic.id) result.data else it }
+                            .map { if (it.id == optimistic.id) server else it }
                             .distinctBy { it.id }
                             .sortedBy { it.createdAt }
                     )
-                    // Force immediate poll so the recipient sees the new message quickly
-                    fetchAndUpdate()
+                    notifyRecipient(text)
                 }
                 is Resource.Error -> {
                     Log.e(TAG, "sendMessage: failed ${result.message}")
@@ -229,10 +277,101 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Pick + upload an image, then send an IMAGE message referencing it.
+     * The screen passes raw bytes already loaded from the user's gallery.
+     */
+    fun sendImage(bytes: ByteArray, fileName: String) {
+        val state = _uiState.value
+        if (state.isUploadingImage || state.isSending) return
+        if (conversationId.isBlank() || state.currentUserId.isBlank()) return
+
+        _uiState.value = state.copy(isUploadingImage = true)
+        viewModelScope.launch {
+            when (val upload = chatRepository.uploadChatImage(conversationId, bytes, fileName)) {
+                is Resource.Success -> {
+                    val now = System.currentTimeMillis()
+                    val msg = Message(
+                        id             = "",
+                        conversationId = conversationId,
+                        senderId       = state.currentUserId,
+                        recipientId    = recipientId(state.currentUserId),
+                        content        = "",
+                        type           = MessageType.IMAGE,
+                        imageUrl       = upload.data,
+                        isRead         = false,
+                        createdAt      = now
+                    )
+                    when (val sendRes = chatRepository.sendMessage(msg)) {
+                        is Resource.Success -> {
+                            _uiState.value = _uiState.value.copy(isUploadingImage = false)
+                            notifyRecipient("📷 Đã gửi 1 ảnh")
+                        }
+                        is Resource.Error -> {
+                            _uiState.value = _uiState.value.copy(isUploadingImage = false)
+                            _events.emit(ChatEvent.Toast(sendRes.message))
+                        }
+                        is Resource.Loading -> {}
+                    }
+                }
+                is Resource.Error -> {
+                    _uiState.value = _uiState.value.copy(isUploadingImage = false)
+                    _events.emit(ChatEvent.Toast(upload.message))
+                }
+                is Resource.Loading -> {}
+            }
+        }
+    }
+
+    /**
+     * Fan-out a NEW_MESSAGE notification to the recipient. We rely on the
+     * existing notification pipeline (Realtime + push when configured) so
+     * the recipient gets a heads-up bubble unless they're already on this
+     * thread (in which case [ActiveChatTracker] suppresses the in-app
+     * heads-up at the receiver side).
+     */
+    private fun notifyRecipient(preview: String) {
+        val recipient = workerId.takeIf { it.isNotBlank() } ?: return
+        viewModelScope.launch {
+            runCatching {
+                sendNotification(
+                    NotificationContentFactory.newMessageForRecipient(
+                        recipientId = recipient,
+                        conversationId = conversationId,
+                        senderName = senderName,
+                        preview = preview
+                    )
+                )
+            }
+        }
+    }
+
+    /**
+     * The route always passes the *counterparty* id as `workerId`, so the
+     * recipient is exactly that — we don't need to know whether we're the
+     * customer or the worker side.
+     */
+    private fun recipientId(currentUserId: String): String =
+        if (workerId.isNotBlank() && workerId != currentUserId) workerId else ""
+
     override fun onCleared() {
         super.onCleared()
+        if (conversationId.isNotBlank()) activeChatTracker.leave(conversationId)
         realtimeJob?.cancel()
-        pollJob?.cancel()
+        presenceJob?.cancel()
+        typingDebounceJob?.cancel()
+        // Best-effort "I left" typing pulse — the presence channel auto-emits
+        // a leave event when the WebSocket closes, but stop typing too. We
+        // hop to the long-lived application scope because viewModelScope is
+        // already cancelling at this point.
+        val uid = _uiState.value.currentUserId
+        if (uid.isNotBlank() && conversationId.isNotBlank()) {
+            applicationScope.launch {
+                runCatching {
+                    chatRepository.sendTypingIndicator(conversationId, uid, isTyping = false)
+                }
+            }
+        }
     }
 
     private companion object {
