@@ -3,7 +3,6 @@ package com.example.fixbid.data.location
 import android.content.Context
 import android.location.Address
 import android.location.Geocoder
-import android.os.Build
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -25,15 +24,13 @@ class GeocoderRepository @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
 
-    data class GeoPoint(
-        val latitude: Double,
-        val longitude: Double,
-        /** Formatted, human-readable address. May be blank when unavailable. */
-        val formattedAddress: String = ""
-    )
-
     /**
-     * Forward-geocode: street address → lat/lng.
+     * Forward-geocode result. Returned as a [GeoPoint] so callers in the
+     * presentation layer can keep working in SDK-neutral coordinates without
+     * depending on the rendering library (osmdroid / MapLibre / Mapbox / …).
+     *
+     * The resolved formatted address is only used as a UX nicety today; if a
+     * caller needs it back we can add a sibling result type.
      */
     suspend fun resolveAddress(address: String): GeoPoint? = withContext(Dispatchers.IO) {
         if (!Geocoder.isPresent() || address.isBlank()) return@withContext null
@@ -45,11 +42,7 @@ class GeocoderRepository @Inject constructor(
             @Suppress("DEPRECATION")
             val results: List<Address>? = geocoder.getFromLocationName(address, 1)
             results?.firstOrNull()?.let {
-                GeoPoint(
-                    latitude = it.latitude,
-                    longitude = it.longitude,
-                    formattedAddress = it.formatLines()
-                )
+                GeoPoint(latitude = it.latitude, longitude = it.longitude)
             }
         }.getOrNull()
     }

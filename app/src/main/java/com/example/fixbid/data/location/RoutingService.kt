@@ -3,7 +3,6 @@ package com.example.fixbid.data.location
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import org.osmdroid.util.GeoPoint
 import java.net.HttpURLConnection
 import java.net.URL
 import javax.inject.Inject
@@ -21,6 +20,10 @@ import javax.inject.Singleton
  *
  * The implementation uses `HttpURLConnection` so we don't pull in additional Ktor
  * client transitive dependencies.
+ *
+ * Geometry is returned in the SDK-neutral [GeoPoint] format so the worker's map
+ * screen can hand the points to MapLibre (or any future rendering library)
+ * without touching this file.
  */
 @Singleton
 class RoutingService @Inject constructor() {
