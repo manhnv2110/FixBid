@@ -130,6 +130,11 @@ dependencies {
     // Image Loading
     implementation("io.coil-kt:coil-compose:2.6.0")
 
+    // Markdown rendering for AI assistant bubbles. Renders Markdown to Compose
+    // text — supports bold, italic, lists, code spans, links. Lightweight
+    // (no Markwon transitive android-only Java weight) and Compose-native.
+    implementation("com.github.jeziellago:compose-markdown:0.5.4")
+
     // Maps & Navigation — MapLibre Native rendering OpenStreetMap raster tiles.
     // Routing comes from the public OSRM demo server (see RoutingService); both
     // are fully open-source and require no API key, matching the project's

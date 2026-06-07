@@ -1,22 +1,32 @@
 package com.example.fixbid.presentation.chatbot
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.RestartAlt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -24,6 +34,9 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.fixbid.domain.model.ChatbotMessage
 import com.example.fixbid.domain.model.ChatbotRole
+import com.example.fixbid.domain.model.ToolProgress
+import com.example.fixbid.domain.repository.ProactivePrompt
+import dev.jeziellago.compose.markdowntext.MarkdownText
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -43,9 +56,11 @@ fun ChatbotScreen(
         }
     }
 
-    // Auto-scroll to the newest message / thinking indicator.
-    LaunchedEffect(uiState.messages.size, uiState.isThinking) {
-        val count = uiState.messages.size + if (uiState.isThinking) 1 else 0
+    // Auto-scroll: tail the latest message AND keep scrolling while it's
+    // streaming so each delta lands at the bottom of the viewport.
+    val streamingTextLen = uiState.messages.lastOrNull()?.takeIf { it.isStreaming }?.text?.length ?: 0
+    LaunchedEffect(uiState.messages.size, streamingTextLen) {
+        val count = uiState.messages.size
         if (count > 0) listState.animateScrollToItem(count - 1)
     }
 
@@ -84,10 +99,22 @@ fun ChatbotScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại")
                     }
                 },
+                actions = {
+                    IconButton(
+                        onClick = viewModel::resetConversation,
+                        enabled = !uiState.isThinking
+                    ) {
+                        Icon(
+                            Icons.Outlined.RestartAlt,
+                            contentDescription = "Bắt đầu hội thoại mới"
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
+                    actionIconContentColor = MaterialTheme.colorScheme.onPrimary
                 )
             )
         },
@@ -102,6 +129,20 @@ fun ChatbotScreen(
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
+
+            // Proactive prompt card — shown above the message list when the
+            // assistant has something contextual to suggest (new bid arrived,
+            // worker on the way, payment received…).
+            AnimatedVisibility(visible = uiState.proactivePrompt != null) {
+                uiState.proactivePrompt?.let { prompt ->
+                    ProactivePromptCard(
+                        prompt = prompt,
+                        onAccept = viewModel::acceptProactivePrompt,
+                        onDismiss = viewModel::dismissProactivePrompt
+                    )
+                }
+            }
+
             LazyColumn(
                 state = listState,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -116,12 +157,10 @@ fun ChatbotScreen(
                         onDismissAction = { viewModel.dismissAction(msg.id) }
                     )
                 }
-                if (uiState.isThinking) {
-                    item(key = "thinking") { ThinkingBubble() }
-                }
             }
 
-            // Suggestion chips while the conversation is fresh.
+            // Suggestion chips while the conversation is fresh (one assistant
+            // greeting, no user messages yet).
             if (uiState.messages.count { it.role == ChatbotRole.USER } == 0 && !uiState.isThinking) {
                 FlowRow(
                     modifier = Modifier
@@ -131,7 +170,7 @@ fun ChatbotScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    viewModel.suggestions.forEach { s ->
+                    uiState.suggestions.forEach { s ->
                         SuggestionChip(
                             onClick = { viewModel.sendSuggestion(s) },
                             label = { Text(s, fontSize = 12.sp) }
@@ -142,6 +181,8 @@ fun ChatbotScreen(
         }
     }
 }
+
+// ─── Bubble ─────────────────────────────────────────────────────────────────
 
 @Composable
 private fun MessageBubble(
@@ -174,7 +215,7 @@ private fun MessageBubble(
         }
         Column(
             horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
-            modifier = Modifier.widthIn(max = 300.dp)
+            modifier = Modifier.widthIn(max = 320.dp)
         ) {
             Surface(
                 color = when {
@@ -189,20 +230,35 @@ private fun MessageBubble(
                     bottomEnd = if (isUser) 4.dp else 16.dp
                 )
             ) {
-                Text(
-                    text = msg.text,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                    color = when {
-                        msg.isError -> MaterialTheme.colorScheme.onErrorContainer
-                        isUser -> MaterialTheme.colorScheme.onPrimary
-                        else -> MaterialTheme.colorScheme.onSurface
-                    },
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp
-                )
+                Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                    // Live tool-progress chips appear ABOVE the streamed text
+                    // so the user sees what the agent is doing in real time.
+                    if (msg.toolProgress.isNotEmpty()) {
+                        msg.toolProgress.forEach { tp ->
+                            ToolProgressLine(
+                                progress = tp,
+                                onSurface = !isUser
+                            )
+                        }
+                        if (msg.text.isNotEmpty()) Spacer(Modifier.height(6.dp))
+                    }
+
+                    if (msg.text.isNotEmpty()) {
+                        AssistantOrUserText(
+                            text = msg.text,
+                            isUser = isUser,
+                            isError = msg.isError,
+                            isStreaming = msg.isStreaming
+                        )
+                    } else if (msg.isStreaming && msg.toolProgress.isEmpty()) {
+                        // No text + no tool yet → typing dots so the bubble
+                        // never looks empty.
+                        TypingDots()
+                    }
+                }
             }
-            // Inline navigation suggestion (open_screen tool).
-            if (!msg.navigationRoute.isNullOrBlank()) {
+            // Inline navigation suggestion (open_screen tool / post-action route).
+            if (!msg.navigationRoute.isNullOrBlank() && !msg.isStreaming) {
                 Spacer(Modifier.height(6.dp))
                 AssistChip(
                     onClick = { onNavigate(msg.navigationRoute) },
@@ -217,9 +273,9 @@ private fun MessageBubble(
                 )
             }
 
-            // Pending action confirmation card (cancel / review / bid).
+            // Pending action confirmation card (cancel / review / bid…).
             val action = msg.pendingAction
-            if (action != null && !msg.actionResolved) {
+            if (action != null && !msg.actionResolved && !msg.isStreaming) {
                 Spacer(Modifier.height(8.dp))
                 ConfirmActionCard(
                     title = action.title,
@@ -228,6 +284,102 @@ private fun MessageBubble(
                     onDismiss = onDismissAction
                 )
             }
+        }
+    }
+}
+
+/** Markdown rendering for the assistant; plain text for the user. */
+@Composable
+private fun AssistantOrUserText(
+    text: String,
+    isUser: Boolean,
+    isError: Boolean,
+    isStreaming: Boolean
+) {
+    val color = when {
+        isError -> MaterialTheme.colorScheme.onErrorContainer
+        isUser -> MaterialTheme.colorScheme.onPrimary
+        else -> MaterialTheme.colorScheme.onSurface
+    }
+    if (isUser) {
+        // Users never type Markdown intentionally — render verbatim so a
+        // `*` doesn't suddenly italicise their message.
+        Text(
+            text = text,
+            color = color,
+            fontSize = 14.sp,
+            lineHeight = 20.sp
+        )
+    } else {
+        // Assistant: full Markdown — bold/italic/lists/code/links.
+        // We append a soft caret (▌) while streaming so the user sees the
+        // bubble actively grow.
+        val displayText = if (isStreaming) "$text ▌" else text
+        MarkdownText(
+            markdown = displayText,
+            style = MaterialTheme.typography.bodyMedium.copy(
+                color = color,
+                fontSize = 14.sp,
+                lineHeight = 20.sp
+            ),
+            // Tap a link → fall through to default OS handler.
+            linkColor = MaterialTheme.colorScheme.primary
+        )
+    }
+}
+
+@Composable
+private fun ToolProgressLine(progress: ToolProgress, onSurface: Boolean) {
+    val baseColor = if (onSurface) MaterialTheme.colorScheme.onSurfaceVariant
+    else MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f)
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(vertical = 1.dp)
+    ) {
+        if (progress.finished) {
+            Icon(
+                imageVector = if (progress.success) Icons.Outlined.Check else Icons.Filled.Close,
+                contentDescription = null,
+                tint = if (progress.success) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(13.dp)
+            )
+        } else {
+            CircularProgressIndicator(
+                modifier = Modifier.size(12.dp),
+                strokeWidth = 1.5.dp,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = if (progress.finished) "Đã ${progress.displayName}"
+            else "Đang ${progress.displayName}…",
+            fontSize = 11.sp,
+            color = baseColor
+        )
+    }
+}
+
+@Composable
+private fun TypingDots() {
+    val transition = rememberInfiniteTransition(label = "typing")
+    val alpha by transition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(700), RepeatMode.Reverse),
+        label = "typing_alpha"
+    )
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        repeat(3) { i ->
+            Box(
+                modifier = Modifier
+                    .alpha(alpha)
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.onSurfaceVariant)
+            )
+            if (i < 2) Spacer(Modifier.width(4.dp))
         }
     }
 }
@@ -244,7 +396,7 @@ private fun ConfirmActionCard(
         shape = RoundedCornerShape(14.dp),
         tonalElevation = 2.dp,
         shadowElevation = 1.dp,
-        modifier = Modifier.widthIn(max = 300.dp)
+        modifier = Modifier.widthIn(max = 320.dp)
     ) {
         Column(Modifier.padding(14.dp)) {
             Text(
@@ -278,38 +430,61 @@ private fun ConfirmActionCard(
 }
 
 @Composable
-private fun ThinkingBubble() {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
+private fun ProactivePromptCard(
+    prompt: ProactivePrompt,
+    onAccept: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .clip(RoundedCornerShape(14.dp)),
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        tonalElevation = 1.dp
+    ) {
+        Row(
             modifier = Modifier
-                .size(30.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center
+                .clickable(onClick = onAccept)
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                Icons.Filled.AutoAwesome,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(16.dp)
-            )
-        }
-        Spacer(Modifier.width(8.dp))
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.tertiary),
+                contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(16.dp),
-                    strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.primary
+                Icon(
+                    Icons.Filled.AutoAwesome,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onTertiary,
+                    modifier = Modifier.size(18.dp)
                 )
-                Spacer(Modifier.width(10.dp))
-                Text("Đang soạn...", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Spacer(Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = prompt.title,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer
+                )
+                Text(
+                    text = prompt.body,
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.85f)
+                )
+            }
+            IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                Icon(
+                    Icons.Filled.Close,
+                    contentDescription = "Bỏ qua",
+                    tint = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
+                    modifier = Modifier.size(16.dp)
+                )
             }
         }
     }

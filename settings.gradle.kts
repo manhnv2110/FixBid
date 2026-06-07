@@ -19,6 +19,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // compose-markdown is published only on JitPack.
+        maven { setUrl("https://jitpack.io") }
     }
 }
 
