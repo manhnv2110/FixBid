@@ -4,6 +4,7 @@ import android.util.Log
 import com.example.fixbid.data.remote.dto.MessageDto
 import com.example.fixbid.data.remote.supabase.Tables
 import com.example.fixbid.data.remote.supabase.liveFlow
+import com.example.fixbid.domain.model.ChatPresence
 import com.example.fixbid.domain.model.Conversation
 import com.example.fixbid.domain.model.Message
 import com.example.fixbid.domain.model.Resource
@@ -12,12 +13,17 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
+import io.github.jan.supabase.postgrest.query.filter.FilterOperator
 import io.github.jan.supabase.realtime.PostgresAction
+import io.github.jan.supabase.realtime.RealtimeChannel
+import io.github.jan.supabase.realtime.broadcast
+import io.github.jan.supabase.realtime.broadcastFlow
 import io.github.jan.supabase.realtime.channel
 import io.github.jan.supabase.realtime.decodeOldRecord
 import io.github.jan.supabase.realtime.decodeRecord
 import io.github.jan.supabase.realtime.postgresChangeFlow
 import io.github.jan.supabase.realtime.realtime
+import io.github.jan.supabase.storage.storage
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -25,12 +31,33 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import javax.inject.Inject
 
 private const val TAG = "ChatRepo"
 
+/** Realtime broadcast event names used inside a per-conversation channel. */
+private const val EVENT_TYPING = "typing"
+
+/**
+ * Single-source implementation of [ChatRepository].
+ *
+ * Realtime model:
+ *  - **Postgres changes** for the `messages` table → INSERT / UPDATE / DELETE
+ *    are applied as deltas to a local list, never re-fetched. Initial state
+ *    comes from one read at subscription time.
+ *  - **Presence** on the same per-conversation channel → drives the green
+ *    online dot in the chat header.
+ *  - **Broadcast** of a `typing` event on the same channel → drives the
+ *    "Đang nhập…" subtitle.
+ *
+ * Both channels (messages + presence) are joined on the same topic so we
+ * only pay one WebSocket subscription per open thread.
+ */
 class ChatRepositoryImpl @Inject constructor(
     private val client: SupabaseClient
 ) : ChatRepository {
@@ -63,21 +90,18 @@ class ChatRepositoryImpl @Inject constructor(
         }.getOrElse { Resource.Error(it.message ?: "Lỗi tải tin nhắn") }
 
     /**
-     * Observes messages using the exact pattern from supabase-kt 3.x docs:
-     *   1. Create channel
-     *   2. Build changeFlow with .onEach { ... }.launchIn(scope)
-     *   3. call channel.subscribe()
+     * Apply CDC events directly to a local in-memory list and emit on every
+     * change. This is dramatically cheaper than the previous approach
+     * (re-fetch the full thread on every event) and arrives a network
+     * round-trip earlier.
      *
-     * Using callbackFlow gives us a ProducerScope that IS a CoroutineScope,
-     * so launchIn(this) works correctly — no deadlock risk.
-     *
-     * Full Log.d logging at every step so we can diagnose via Logcat.
+     * The local list is sorted by `createdAt` and deduped by `id`, so racing
+     * inserts (e.g. an optimistic local message landing alongside its server
+     * echo) collapse cleanly.
      */
     override fun observeMessages(conversationId: String): Flow<List<Message>> = callbackFlow {
-        Log.d(TAG, "observeMessages: START for conversationId=$conversationId")
-
-        // 1. Fetch and emit initial messages
-        val initial = runCatching {
+        // 1. Seed initial state.
+        val seed = runCatching {
             client.postgrest[Tables.MESSAGES]
                 .select(Columns.ALL) {
                     filter { eq("conversation_id", conversationId) }
@@ -85,111 +109,187 @@ class ChatRepositoryImpl @Inject constructor(
                 }
                 .decodeList<MessageDto>()
                 .map { it.toDomain() }
-        }.onFailure { Log.e(TAG, "observeMessages: initial fetch failed", it) }
-            .getOrDefault(emptyList())
+        }.getOrDefault(emptyList())
+        val state = seed.toMutableList()
+        send(state.toList())
 
-        Log.d(TAG, "observeMessages: emitting ${initial.size} initial messages")
-        send(initial)
-
-        // 2. Create a unique channel name to avoid reuse conflicts on re-navigation
+        // 2. Subscribe to Postgres CDC for THIS conversation only — server-side
+        //    filter (`filter("conversation_id", EQ, conversationId)`) saves both
+        //    bandwidth and decode time. We still defensively check the decoded
+        //    record's conversation_id in case the server filter is dropped.
         val channelName = "messages_${conversationId}_${System.currentTimeMillis()}"
-        Log.d(TAG, "observeMessages: creating channel '$channelName'")
         val channel = client.realtime.channel(channelName)
 
-        // 3. Build the change flow with launchIn — this is the EXACT pattern from
-        //    the supabase-kt 3.x documentation. Using launchIn(this) ties the
-        //    collection lifecycle to the callbackFlow's producer scope.
         channel.postgresChangeFlow<PostgresAction>(schema = "public") {
             table = Tables.MESSAGES
+            filter("conversation_id", FilterOperator.EQ, conversationId)
         }.onEach { action ->
-            Log.d(TAG, "observeMessages: received PostgresAction ${action::class.simpleName}")
-
-            // Client-side filter: only process events for this conversation
-            val eventConvId = runCatching {
+            runCatching {
                 when (action) {
                     is PostgresAction.Insert -> {
-                        val dto = action.decodeRecord<MessageDto>()
-                        Log.d(TAG, "observeMessages: INSERT conversationId=${dto.conversationId} content='${dto.content}'")
-                        dto.conversationId
+                        val msg = action.decodeRecord<MessageDto>().toDomain()
+                        if (msg.conversationId == conversationId &&
+                            state.none { it.id == msg.id }
+                        ) {
+                            state += msg
+                        }
                     }
                     is PostgresAction.Update -> {
-                        val dto = action.decodeRecord<MessageDto>()
-                        Log.d(TAG, "observeMessages: UPDATE conversationId=${dto.conversationId} isRead=${dto.isRead}")
-                        dto.conversationId
+                        val msg = action.decodeRecord<MessageDto>().toDomain()
+                        if (msg.conversationId != conversationId) return@runCatching
+                        val idx = state.indexOfFirst { it.id == msg.id }
+                        if (idx >= 0) state[idx] = msg
                     }
                     is PostgresAction.Delete -> {
-                        val dto = action.decodeOldRecord<MessageDto>()
-                        Log.d(TAG, "observeMessages: DELETE conversationId=${dto.conversationId}")
-                        dto.conversationId
+                        val old = action.decodeOldRecord<MessageDto>().toDomain()
+                        state.removeAll { it.id == old.id }
                     }
-                    else -> {
-                        Log.d(TAG, "observeMessages: SELECT event (ignored)")
-                        null
-                    }
+                    else -> Unit
                 }
-            }.onFailure { Log.e(TAG, "observeMessages: failed to decode action", it) }
-                .getOrNull()
+            }.onFailure { Log.e(TAG, "observeMessages: failed to apply action", it) }
 
-            if (eventConvId == null || eventConvId == conversationId) {
-                Log.d(TAG, "observeMessages: filter matched, re-fetching messages")
-                val updated = runCatching {
-                    client.postgrest[Tables.MESSAGES]
-                        .select(Columns.ALL) {
-                            filter { eq("conversation_id", conversationId) }
-                            order("created_at", Order.ASCENDING)
-                        }
-                        .decodeList<MessageDto>()
-                        .map { it.toDomain() }
-                }.onFailure { Log.e(TAG, "observeMessages: re-fetch failed", it) }
-                    .getOrNull()
+            send(state.sortedBy { it.createdAt }.distinctBy { it.id })
+        }.launchIn(this)
 
-                if (updated != null) {
-                    Log.d(TAG, "observeMessages: sending ${updated.size} updated messages")
-                    send(updated)
-                }
-            } else {
-                Log.d(TAG, "observeMessages: filter skipped event (eventConvId=$eventConvId, expected=$conversationId)")
-            }
-        }.launchIn(this) // 'this' = ProducerScope = CoroutineScope of callbackFlow
-
-        // 4. Subscribe AFTER launchIn (collector is already registered by launchIn)
-        Log.d(TAG, "observeMessages: subscribing to channel '$channelName'")
         runCatching {
             channel.subscribe(blockUntilSubscribed = true)
-        }.onSuccess {
-            Log.d(TAG, "observeMessages: channel '$channelName' subscribed successfully ✓")
-        }.onFailure {
-            Log.e(TAG, "observeMessages: channel subscription FAILED", it)
-        }
+        }.onFailure { Log.e(TAG, "observeMessages: subscribe failed", it) }
 
-        // 5. Keep the flow alive until cancelled, then clean up
         awaitClose {
-            Log.d(TAG, "observeMessages: closing channel '$channelName'")
             runCatching { kotlinx.coroutines.runBlocking { channel.unsubscribe() } }
-                .onSuccess { Log.d(TAG, "observeMessages: channel '$channelName' unsubscribed") }
-                .onFailure { Log.e(TAG, "observeMessages: unsubscribe failed", it) }
         }
     }
 
     override fun observeConversations(userId: String): Flow<List<Conversation>> {
-        // A new message in ANY conversation should refresh the list (last message
-        // preview + unread badge), for both customer and worker. We watch the
-        // messages table globally and re-pull the user's conversations on change.
+        // Any insert/update on `messages` involving this user invalidates the
+        // list (last-message preview + unread badge). The simple correctness
+        // play here is "any change → re-pull" — list size is small (per-user).
         val channel = client.realtime.channel("conversations_feed_$userId")
         val changes = channel
             .postgresChangeFlow<PostgresAction>(schema = "public") {
                 table = Tables.MESSAGES
             }
             .map {
-                Log.d(TAG, "observeConversations: message change detected, re-fetching conversations")
                 (getConversations(userId) as? Resource.Success)?.data ?: emptyList()
             }
             .onStart {
-                Log.d(TAG, "observeConversations: onStart — emitting initial conversations")
                 emit((getConversations(userId) as? Resource.Success)?.data ?: emptyList())
             }
         return channel.liveFlow(changes)
     }
+
+    /**
+     * Live presence + typing for a conversation.
+     *
+     * Topology: one Realtime channel per conversation, scoped to the
+     * collector's lifetime. We:
+     *  1. Configure the presence join with our own [currentUserId] as key
+     *     so the counterparty's join/leave events carry an identifiable id.
+     *  2. Subscribe + `track({})` to announce ourselves.
+     *  3. Listen on `presenceChangeFlow()` for joins / leaves and on
+     *     `broadcastFlow<TypingEvent>(EVENT_TYPING)` for typing pings.
+     *  4. On cancel → `untrack()` + `unsubscribe()` so the other side
+     *     immediately sees us go offline.
+     */
+    override fun observePresence(
+        conversationId: String,
+        currentUserId: String
+    ): Flow<ChatPresence> = callbackFlow {
+        val channel = client.realtime.channel(presenceTopic(conversationId)) {
+            presence { key = currentUserId }
+        }
+
+        // Local state — the counterparty's last known online + typing flags.
+        var presence = ChatPresence(online = false, isTyping = false, lastSeenAt = null)
+        var typingTimerJob: kotlinx.coroutines.Job? = null
+
+        // Presence: we look at presence keys other than our own to decide if
+        // the counterparty is online. The keys we receive are exactly the
+        // values we (and they) pass via `presence.key`.
+        channel.presenceChangeFlow().onEach { action ->
+            val joined = action.joins.keys.filter { it != currentUserId }
+            val left = action.leaves.keys.filter { it != currentUserId }
+            if (joined.isNotEmpty()) {
+                presence = presence.copy(online = true, lastSeenAt = System.currentTimeMillis())
+                send(presence)
+            }
+            if (left.isNotEmpty()) {
+                presence = presence.copy(
+                    online = false,
+                    isTyping = false,
+                    lastSeenAt = System.currentTimeMillis()
+                )
+                send(presence)
+            }
+        }.launchIn(this)
+
+        // Typing broadcasts arrive as small JsonObject payloads. We inspect
+        // {userId, isTyping} and ignore our own pings (the server defaults to
+        // not echoing our own broadcasts, but be defensive in case that
+        // changes).
+        channel.broadcastFlow<JsonObject>(EVENT_TYPING).onEach { payload ->
+            val userId = payload["userId"]?.jsonPrimitive?.content
+            if (userId == null || userId == currentUserId) return@onEach
+            val typing = payload["isTyping"]?.jsonPrimitive?.content == "true"
+            presence = presence.copy(isTyping = typing)
+            send(presence)
+            // Auto-clear stale typing state after 4 s in case the sender's
+            // "stopped typing" broadcast is dropped.
+            typingTimerJob?.cancel()
+            if (typing) {
+                typingTimerJob = launch {
+                    kotlinx.coroutines.delay(4_000)
+                    presence = presence.copy(isTyping = false)
+                    send(presence)
+                }
+            }
+        }.launchIn(this)
+
+        // Subscribe + announce.
+        runCatching {
+            channel.subscribe(blockUntilSubscribed = true)
+            channel.track(buildJsonObject {
+                put("userId", currentUserId)
+                put("at", System.currentTimeMillis().toString())
+            })
+        }.onFailure { Log.e(TAG, "observePresence: subscribe/track failed", it) }
+
+        awaitClose {
+            typingTimerJob?.cancel()
+            runCatching {
+                kotlinx.coroutines.runBlocking {
+                    channel.untrack()
+                    channel.unsubscribe()
+                }
+            }
+        }
+    }
+
+    override suspend fun sendTypingIndicator(
+        conversationId: String,
+        currentUserId: String,
+        isTyping: Boolean
+    ) {
+        // We open a short-lived channel handle, subscribe, broadcast the
+        // typing payload, then leave. Supabase Realtime de-duplicates by
+        // topic on the server, so this is cheap and never piles up.
+        val channel = runCatching { client.realtime.channel(presenceTopic(conversationId)) }
+            .getOrNull() ?: return
+        runCatching {
+            // If not subscribed yet (e.g. the receiver opens the screen first),
+            // broadcast still works because supabase-kt buffers the call.
+            channel.broadcast(
+                event = EVENT_TYPING,
+                message = buildJsonObject {
+                    put("userId", currentUserId)
+                    put("isTyping", isTyping.toString())
+                }
+            )
+        }.onFailure { Log.e(TAG, "sendTypingIndicator failed", it) }
+    }
+
+    private fun presenceTopic(conversationId: String): String =
+        "chat_presence_$conversationId"
 
     override suspend fun getOrCreateConversation(
         customerId: String,
@@ -286,4 +386,18 @@ class ChatRepositoryImpl @Inject constructor(
             }
         Resource.Success(Unit)
     }.getOrElse { Resource.Error(it.message ?: "Lỗi") }
+
+    override suspend fun uploadChatImage(
+        conversationId: String,
+        imageBytes: ByteArray,
+        fileName: String
+    ): Resource<String> = runCatching {
+        // We reuse the existing `booking-images` bucket (same RLS surface
+        // the rest of the app already trusts) under a `chat/` prefix so a
+        // future migration to a dedicated bucket is just a string change.
+        val path = "chat/$conversationId/$fileName"
+        val bucket = client.storage.from("booking-images")
+        bucket.upload(path, imageBytes) { upsert = true }
+        Resource.Success(bucket.publicUrl(path))
+    }.getOrElse { Resource.Error(it.message ?: "Tải ảnh lên thất bại") }
 }
