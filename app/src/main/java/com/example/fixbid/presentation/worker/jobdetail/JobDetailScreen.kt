@@ -584,8 +584,9 @@ private fun StatCell(
 
 @Composable
 private fun DescriptionCard(booking: Booking) {
-    val note = booking.customerNote?.takeIf { it.isNotBlank() }
-    if (note == null) return
+    val rawNote = booking.customerNote?.takeIf { it.isNotBlank() }
+    val realNote = extractNotesFromNote(rawNote).takeIf { it.isNotBlank() }
+    if (realNote == null) return
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -611,7 +612,7 @@ private fun DescriptionCard(booking: Booking) {
             }
             Spacer(modifier = Modifier.height(10.dp))
             Text(
-                text = note,
+                text = realNote,
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurface,
                 lineHeight = 20.sp
@@ -735,6 +736,9 @@ private fun DescriptionImagesCard(images: List<String>) {
 
 @Composable
 private fun InfoCard(booking: Booking) {
+    val customerName = extractNameFromNote(booking.customerNote)
+    val customerPhone = extractPhoneFromNote(booking.customerNote)
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
@@ -749,6 +753,28 @@ private fun InfoCard(booking: Booking) {
                 color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.height(12.dp))
+            if (customerName.isNotBlank()) {
+                DetailRow(
+                    icon = Icons.Outlined.Person,
+                    label = "Tên",
+                    value = customerName
+                )
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                    modifier = Modifier.padding(vertical = 10.dp)
+                )
+            }
+            if (customerPhone.isNotBlank()) {
+                DetailRow(
+                    icon = Icons.Outlined.Phone,
+                    label = "SĐT",
+                    value = customerPhone
+                )
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                    modifier = Modifier.padding(vertical = 10.dp)
+                )
+            }
             DetailRow(
                 icon = Icons.Outlined.LocationOn,
                 label = "Địa chỉ",
@@ -2371,4 +2397,29 @@ private fun QuoteDirectBookingBottomSheet(
             }
         }
     }
+}
+
+private fun extractNameFromNote(note: String?): String {
+    if (note == null) return ""
+    val lines = note.lines()
+    val nameLine = lines.find { it.startsWith("Tên: ") }
+    return nameLine?.substringAfter("Tên: ") ?: ""
+}
+
+private fun extractPhoneFromNote(note: String?): String {
+    if (note == null) return ""
+    val lines = note.lines()
+    val phoneLine = lines.find { it.startsWith("SĐT: ") }
+    return phoneLine?.substringAfter("SĐT: ") ?: ""
+}
+
+private fun extractNotesFromNote(note: String?): String {
+    if (note == null) return ""
+    val lines = note.lines()
+    val notesLine = lines.find { it.startsWith("Ghi chú: ") }
+    if (notesLine != null) {
+        return notesLine.substringAfter("Ghi chú: ")
+    }
+    val hasNameOrPhone = lines.any { it.startsWith("Tên: ") || it.startsWith("SĐT: ") }
+    return if (hasNameOrPhone) "" else note
 }

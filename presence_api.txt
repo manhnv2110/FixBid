@@ -1,0 +1,22 @@
+RealtimeChannel methods:
+addPostgresChange
+broadcast
+broadcastFlowInternal
+getCallbackManager
+getRealtime
+getStatus
+getSupabaseClient
+getTopic
+postgresChangeFlowInternal
+presenceChangeFlow
+removePostgresChange
+subscribe
+track
+unsubscribe
+untrack
+updateAuth
+updateStatus
+
+PresenceAction methods:
+getJoins
+getLeaves
