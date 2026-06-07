@@ -436,7 +436,7 @@ private fun JitsiWebView(roomName: String, displayName: String) {
                 val safeDisplay = displayName.replace("\"", "\\\"")
                 val html = jitsiIframeHostHtml(safeRoom, safeDisplay)
                 loadDataWithBaseURL(
-                    "https://meet.jit.si",
+                    JITSI_BASE_URL,
                     html,
                     "text/html",
                     "utf-8",
@@ -463,6 +463,33 @@ private fun JitsiWebView(roomName: String, displayName: String) {
 }
 
 /**
+ * Public Jitsi instance we point the WebView at.
+ *
+ * Why **not** `meet.jit.si`: the official 8x8-hosted instance now requires
+ * the moderator (first person to create the room) to sign in via Google/
+ * GitHub/Facebook. Inside an embedded WebView that auth flow can't
+ * complete cleanly — the user sees a "Please log in" landing page and is
+ * stuck.
+ *
+ * Why `meet.ffmuc.net`: Munich Free Software's public Jitsi deployment
+ * runs the same JVB stack but without the moderator-auth gate. It's been
+ * a stable anonymous public instance since 2020 and is the most commonly
+ * recommended fallback in the Jitsi community for embedded use cases.
+ *
+ * If `ffmuc` ever goes down, alternatives that also allow anonymous
+ * meetings (kept as a doc note for future maintainers — don't change
+ * silently):
+ *   - https://meet.golem.de   (Golem.de's instance)
+ *   - https://jitsi.riot.im   (Element ecosystem)
+ *   - https://jitsi.weimarnetz.de
+ *
+ * The constant is intentionally module-private so any future swap goes
+ * through this single location.
+ */
+private const val JITSI_HOST = "meet.ffmuc.net"
+private const val JITSI_BASE_URL = "https://$JITSI_HOST"
+
+/**
  * Minimal HTML host that loads Jitsi's official IFrame API and creates
  * the meeting embed. Same approach the Jitsi docs recommend for non-
  * native integrations — gives us a stable contract that survives
@@ -486,10 +513,10 @@ private fun jitsiIframeHostHtml(roomName: String, displayName: String): String =
     </head>
     <body>
         <div id="jitsi-container"></div>
-        <script src="https://meet.jit.si/external_api.js"></script>
+        <script src="$JITSI_BASE_URL/external_api.js"></script>
         <script>
             (function () {
-                var domain = "meet.jit.si";
+                var domain = "$JITSI_HOST";
                 var options = {
                     roomName: "$roomName",
                     parentNode: document.getElementById("jitsi-container"),
@@ -503,7 +530,11 @@ private fun jitsiIframeHostHtml(roomName: String, displayName: String): String =
                         disableDeepLinking: true,
                         disableInviteFunctions: true,
                         // Don't show the "you can also use the mobile app" banner.
-                        enableClosePage: false
+                        enableClosePage: false,
+                        // Skip lobby and any moderator-required dance — both
+                        // peers must be able to join anonymously.
+                        enableLobbyChat: false,
+                        requireDisplayName: false
                     },
                     interfaceConfigOverwrite: {
                         MOBILE_APP_PROMO: false,
