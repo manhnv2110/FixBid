@@ -32,7 +32,8 @@ class AppNotificationsViewModel @Inject constructor(
     private val preferences: UserPreferencesDataStore,
     private val appNotificationManager: AppNotificationManager,
     private val registerFcmTokenUseCase: com.example.fixbid.domain.usecase.shared.RegisterFcmTokenUseCase,
-    private val proactiveAssistant: com.example.fixbid.data.repository.ProactiveAssistantCoordinator
+    private val proactiveAssistant: com.example.fixbid.data.repository.ProactiveAssistantCoordinator,
+    private val activeChatTracker: com.example.fixbid.core.chat.ActiveChatTracker
 ) : ViewModel() {
 
     val unreadCount: StateFlow<Int> = observeUnreadCount()
@@ -71,6 +72,16 @@ class AppNotificationsViewModel @Inject constructor(
             notificationRepository.observeNewNotifications(user.id).collect { notification ->
                 val masterEnabled = preferences.notificationsEnabled.first()
                 if (!masterEnabled) return@collect
+
+                // Skip in-app heads-up for chat messages when the user is
+                // already looking at that exact conversation — the new
+                // bubble lands on screen via Realtime so a notification on
+                // top would be redundant noise.
+                if (
+                    notification.type == com.example.fixbid.domain.model.NotificationType.NEW_MESSAGE &&
+                    activeChatTracker.isActive(notification.referenceId)
+                ) return@collect
+
                 val sound = preferences.notificationSoundEnabled.first()
                 val vibrate = preferences.notificationVibrateEnabled.first()
                 appNotificationManager.show(

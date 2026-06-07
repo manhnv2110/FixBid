@@ -267,4 +267,25 @@ object NotificationContentFactory {
         type = NotificationType.NEW_REVIEW,
         referenceId = bookingId
     )
+
+    /**
+     * Người dùng nhận được một tin nhắn mới trong cuộc trò chuyện 1-1.
+     *
+     * - [referenceId] là `conversationId` (không phải `messageId`) — khi user
+     *   tap notification, deep-link vào màn hình chat tương ứng.
+     * - [preview] là nội dung gọn (đã trim/clip) hiển thị trong body. Nếu là
+     *   ảnh, truyền sẵn "📷 Đã gửi 1 ảnh".
+     */
+    fun newMessageForRecipient(
+        recipientId: String,
+        conversationId: String,
+        senderName: String,
+        preview: String
+    ) = NotificationContent(
+        recipientUserId = recipientId,
+        title = senderName.ifBlank { "Tin nhắn mới" },
+        body = preview.trim().ifBlank { "Đã gửi tin nhắn" }.take(140),
+        type = NotificationType.NEW_MESSAGE,
+        referenceId = conversationId
+    )
 }
