@@ -13,6 +13,9 @@ object NotificationIconMapper {
         NotificationType.BOOKING_CONFIRMED -> Icons.Outlined.CheckCircle
         NotificationType.BOOKING_CANCELLED -> Icons.Outlined.Cancel
         NotificationType.BOOKING_REMINDER  -> Icons.Outlined.Alarm
+        NotificationType.BOOKING_QUOTED    -> Icons.Outlined.RequestQuote
+        NotificationType.BOOKING_QUOTE_ACCEPTED -> Icons.Outlined.Handshake
+        NotificationType.BOOKING_QUOTE_REJECTED -> Icons.Outlined.Replay
         NotificationType.BID_RECEIVED      -> Icons.Outlined.Gavel
         NotificationType.BID_ACCEPTED      -> Icons.Outlined.ThumbUp
         NotificationType.WORKER_ON_THE_WAY -> Icons.Outlined.DirectionsCar
@@ -29,6 +32,9 @@ object NotificationIconMapper {
         NotificationType.BOOKING_CONFIRMED  -> 0xFF1565C0
         NotificationType.BOOKING_CANCELLED  -> 0xFFC62828
         NotificationType.BOOKING_REMINDER   -> 0xFFEF6C00
+        NotificationType.BOOKING_QUOTED,
+        NotificationType.BOOKING_QUOTE_ACCEPTED,
+        NotificationType.BOOKING_QUOTE_REJECTED -> 0xFF7B1FA2
         NotificationType.BID_RECEIVED,
         NotificationType.BID_ACCEPTED       -> 0xFF6A1B9A
         NotificationType.WORKER_ON_THE_WAY  -> 0xFF00838F
@@ -45,6 +51,9 @@ object NotificationIconMapper {
         NotificationType.BOOKING_CONFIRMED  -> 0xFFE3F0FF
         NotificationType.BOOKING_CANCELLED  -> 0xFFFFEBEE
         NotificationType.BOOKING_REMINDER   -> 0xFFFFF3E0
+        NotificationType.BOOKING_QUOTED,
+        NotificationType.BOOKING_QUOTE_ACCEPTED,
+        NotificationType.BOOKING_QUOTE_REJECTED -> 0xFFF3E5F5
         NotificationType.BID_RECEIVED,
         NotificationType.BID_ACCEPTED       -> 0xFFF3E5F5
         NotificationType.WORKER_ON_THE_WAY  -> 0xFFE0F7FA
@@ -62,6 +71,9 @@ object NotificationIconMapper {
         NotificationType.BOOKING_CONFIRMED -> "Đã xác nhận"
         NotificationType.BOOKING_CANCELLED -> "Đã hủy"
         NotificationType.BOOKING_REMINDER  -> "Nhắc lịch"
+        NotificationType.BOOKING_QUOTED    -> "Có báo giá"
+        NotificationType.BOOKING_QUOTE_ACCEPTED -> "Khách đồng ý giá"
+        NotificationType.BOOKING_QUOTE_REJECTED -> "Khách yêu cầu báo lại"
         NotificationType.BID_RECEIVED      -> "Báo giá mới"
         NotificationType.BID_ACCEPTED      -> "Được chọn"
         NotificationType.WORKER_ON_THE_WAY -> "Thợ đang đến"

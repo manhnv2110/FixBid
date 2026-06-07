@@ -76,6 +76,62 @@ object NotificationContentFactory {
         referenceId = bookingId
     )
 
+    // ── Direct-booking quote flow ────────────────────────────────────────────
+    // Khi khách đặt trực tiếp một thợ, thợ phải báo giá trước khi khách thanh
+    // toán. 3 hàm dưới đây phát thông báo cho mỗi bước (báo giá / chấp nhận /
+    // từ chối) — mỗi thông báo đều dẫn về màn chi tiết booking để user có thể
+    // thực hiện tiếp action mong muốn.
+
+    /** Khách được báo thợ vừa gửi báo giá cho đơn đặt trực tiếp. */
+    fun directBookingQuotedForCustomer(
+        customerId: String,
+        bookingId: String,
+        categoryName: String,
+        workerName: String?,
+        priceLabel: String
+    ) = NotificationContent(
+        recipientUserId = customerId,
+        title = "Thợ đã báo giá",
+        body = buildString {
+            append(workerName?.takeIf { it.isNotBlank() } ?: "Thợ")
+            append(" báo giá $priceLabel cho yêu cầu \"$categoryName\". ")
+            append("Xem và chọn chấp nhận hoặc yêu cầu báo lại.")
+        },
+        type = NotificationType.BOOKING_QUOTED,
+        referenceId = bookingId
+    )
+
+    /** Thợ được báo khách đã chấp nhận báo giá — đang chờ khách thanh toán. */
+    fun directQuoteAcceptedForWorker(
+        workerId: String,
+        bookingId: String,
+        categoryName: String
+    ) = NotificationContent(
+        recipientUserId = workerId,
+        title = "Khách đã chấp nhận báo giá",
+        body = "Khách đã đồng ý báo giá cho \"$categoryName\". Hệ thống đang chờ khách thanh toán để bạn có thể bắt đầu công việc.",
+        type = NotificationType.BOOKING_QUOTE_ACCEPTED,
+        referenceId = bookingId
+    )
+
+    /** Thợ được báo khách từ chối báo giá — có thể gửi lại với mức khác. */
+    fun directQuoteRejectedForWorker(
+        workerId: String,
+        bookingId: String,
+        categoryName: String,
+        reason: String?
+    ) = NotificationContent(
+        recipientUserId = workerId,
+        title = "Khách từ chối báo giá",
+        body = buildString {
+            append("Khách chưa đồng ý báo giá cho \"$categoryName\".")
+            if (!reason.isNullOrBlank()) append(" Lý do: $reason")
+            append(" Bạn có thể gửi báo giá khác hoặc từ chối đơn.")
+        },
+        type = NotificationType.BOOKING_QUOTE_REJECTED,
+        referenceId = bookingId
+    )
+
     /** Khách được báo thợ từ chối đơn đặt trực tiếp. */
     fun directBookingDeclinedForCustomer(
         customerId: String,
