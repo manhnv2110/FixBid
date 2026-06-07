@@ -82,6 +82,7 @@ fun WorkerHomeScreen(
     onWalletClick: () -> Unit = {},
     onChatClick: () -> Unit = {},
     onChatbotClick: () -> Unit = {},
+    onChatbotPrefill: (String) -> Unit = {},
     onSignOut: () -> Unit = {},
     showWorkTab: Boolean = false,
     onNotificationSettingsClick: () -> Unit = {},
@@ -168,6 +169,21 @@ fun WorkerHomeScreen(
                 modifier = Modifier.fillMaxSize()
             ) {
                 composable(WorkerTab.HOME) {
+                    // ── AI shortcut state for the dashboard ──────────────
+                    val aiInlineState by viewModel.aiController.inlineState.collectAsState()
+                    val aiPendingPrefill by viewModel.aiController.pendingChatPrefill.collectAsState()
+                    LaunchedEffect(aiPendingPrefill) {
+                        aiPendingPrefill?.let {
+                            onChatbotPrefill(it)
+                            viewModel.aiController.consumeChatPrefill()
+                        }
+                    }
+                    val aiSuggestions = remember(
+                        uiState.pendingDirectRequests.size,
+                        uiState.openRequests.size,
+                        uiState.activeJobs.size
+                    ) { viewModel.aiSuggestions() }
+
                     WorkerDashboard(
                         uiState = uiState,
                         bottomPadding = innerPadding.calculateBottomPadding(),
@@ -190,7 +206,13 @@ fun WorkerHomeScreen(
                         onStartJob = viewModel::startJob,
                         onCompleteJob = viewModel::completeJob,
                         onSendQuote = viewModel::quoteDirectBooking,
-                        onDeclineDirect = viewModel::declineDirectBooking
+                        onDeclineDirect = viewModel::declineDirectBooking,
+                        aiSuggestions = aiSuggestions,
+                        aiInlineState = aiInlineState,
+                        onAiSuggestionClick = { viewModel.aiController.onSuggestionTapped(it) },
+                        onAiInlineRetry = { viewModel.aiController.retryInline() },
+                        onAiInlineDismiss = { viewModel.aiController.dismissInline() },
+                        onAiInlineOpenChat = { viewModel.aiController.openInlineInChat() }
                     )
                 }
                 composable(WorkerTab.REQUESTS) {
@@ -255,7 +277,14 @@ private fun WorkerDashboard(
     onStartJob: (String) -> Unit,
     onCompleteJob: (String) -> Unit,
     onSendQuote: (bookingId: String, price: Double, message: String, durationHours: Double?) -> Unit,
-    onDeclineDirect: (bookingId: String, reason: String) -> Unit
+    onDeclineDirect: (bookingId: String, reason: String) -> Unit,
+    aiSuggestions: List<com.example.fixbid.domain.model.AiSuggestion> = emptyList(),
+    aiInlineState: com.example.fixbid.presentation.ai.InlineAiState =
+        com.example.fixbid.presentation.ai.InlineAiState.Idle,
+    onAiSuggestionClick: (com.example.fixbid.domain.model.AiSuggestion) -> Unit = {},
+    onAiInlineRetry: () -> Unit = {},
+    onAiInlineDismiss: () -> Unit = {},
+    onAiInlineOpenChat: () -> Unit = {}
 ) {
     // Local UI state for the decline-reason dialog. The viewmodel already
     // exposes `respondingDirectId` for the in-flight indicator on the card,
@@ -318,6 +347,20 @@ private fun WorkerDashboard(
                             .padding(top = 16.dp, bottom = bottomPadding + 24.dp),
                         verticalArrangement = Arrangement.spacedBy(20.dp)
                     ) {
+                        // 0. AI shortcuts — top of the scroll so the worker
+                        // sees suggestions (price recommendation, summary,
+                        // analytics insights) right after the header.
+                        com.example.fixbid.presentation.ai.AiSuggestionStrip(
+                            suggestions = aiSuggestions,
+                            onSuggestionClick = onAiSuggestionClick
+                        )
+                        com.example.fixbid.presentation.ai.InlineAiAnalysisCard(
+                            state = aiInlineState,
+                            onRetry = onAiInlineRetry,
+                            onDismiss = onAiInlineDismiss,
+                            onOpenChat = onAiInlineOpenChat
+                        )
+
                         // 1. Earnings summary — slim entry-point to analytics.
                         EarningsSummaryCard(
                             monthlyEarnings = uiState.monthlyEarnings,

@@ -62,7 +62,9 @@ class WorkerHomeViewModel @Inject constructor(
     private val quoteDirectBookingUseCase: QuoteDirectBookingUseCase,
     private val releasePendingEscrows: ReleasePendingEscrowsUseCase,
     private val workerRepository: WorkerRepository,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val aiAgentRepository: com.example.fixbid.domain.repository.AiAgentRepository,
+    private val aiSuggestionEngine: com.example.fixbid.domain.usecase.shared.AiSuggestionEngine
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(WorkerHomeUiState())
@@ -70,6 +72,30 @@ class WorkerHomeViewModel @Inject constructor(
 
     private val _events = Channel<WorkerHomeEvent>(Channel.BUFFERED)
     val events = _events.receiveAsFlow()
+
+    /** AI shortcut bridge — strips on the dashboard. */
+    val aiController: com.example.fixbid.presentation.ai.AiSuggestionController by lazy {
+        com.example.fixbid.presentation.ai.AiSuggestionController(
+            scope = viewModelScope,
+            aiAgentRepository = aiAgentRepository,
+            role = com.example.fixbid.domain.model.UserRole.WORKER
+        )
+    }
+
+    fun aiSuggestions(): List<com.example.fixbid.domain.model.AiSuggestion> {
+        val state = _uiState.value
+        return aiSuggestionEngine(
+            com.example.fixbid.domain.model.AiContext(
+                screen = com.example.fixbid.domain.model.AiContextScreen.WORKER_HOME,
+                userRole = com.example.fixbid.domain.model.UserRole.WORKER,
+                data = mapOf(
+                    "pendingDirectCount" to state.pendingDirectRequests.size,
+                    "openRequestCount" to state.openRequests.size,
+                    "activeJobsCount" to state.activeJobs.size
+                )
+            )
+        )
+    }
 
     init {
         loadDashboard()
