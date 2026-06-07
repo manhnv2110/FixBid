@@ -333,7 +333,8 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                     runCatching { navController.navigate("chatbot?prefill=$encoded") }
                 },
                 onWalletClick = { navController.navigate("customer_wallet") },
-                onHelpSupportClick = { navController.navigate("help_support") }
+                onHelpSupportClick = { navController.navigate("help_support") },
+                onAboutClick = { navController.navigate("about") }
             )
         }
 
@@ -386,7 +387,8 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                 onNotificationSettingsClick = { navController.navigate("notification_settings") },
                 onWorkerProfileEditClick = { navController.navigate("worker_profile_edit") },
                 onVerifyIdentityClick = { navController.navigate("worker_verify_identity") },
-                onHelpSupportClick = { navController.navigate("help_support") }
+                onHelpSupportClick = { navController.navigate("help_support") },
+                onAboutClick = { navController.navigate("about") }
             )
         }
 
@@ -429,6 +431,12 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                 onBackClick = { navController.popBackStack() },
                 onJobClick = { bookingId ->
                     navController.navigate("worker_job_detail/$bookingId")
+                },
+                onBrowseRequestsClick = {
+                    // Empty-state CTA jumps to the open requests list so the
+                    // worker can pick a job to bid on without going through
+                    // the dashboard.
+                    navController.navigate("worker_requests")
                 }
             )
         }
@@ -504,6 +512,12 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
 
         composable("help_support") {
             HelpSupportScreen(
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        composable("about") {
+            com.example.fixbid.presentation.support.AboutScreen(
                 onBackClick = { navController.popBackStack() }
             )
         }

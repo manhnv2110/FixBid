@@ -236,36 +236,9 @@ private fun ConversationItem(
 
 @Composable
 private fun EmptyConversations() {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(80.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.ChatBubbleOutline,
-                    contentDescription = null,
-                    modifier = Modifier.size(40.dp),
-                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
-                )
-            }
-            Text(
-                text = "Chưa có cuộc trò chuyện",
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 16.sp,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = "Chọn thợ và bắt đầu nhắn tin ngay!",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
+    com.example.fixbid.core.components.RichEmptyState(
+        icon = Icons.Outlined.ChatBubbleOutline,
+        title = "Chưa có cuộc trò chuyện",
+        subtitle = "Khi bạn đặt thợ hoặc nhận yêu cầu, các cuộc trò chuyện sẽ xuất hiện tại đây để bạn trao đổi nhanh trước, trong và sau khi làm việc."
+    )
 }

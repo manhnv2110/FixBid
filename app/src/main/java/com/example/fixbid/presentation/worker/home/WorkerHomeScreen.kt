@@ -89,6 +89,7 @@ fun WorkerHomeScreen(
     onWorkerProfileEditClick: () -> Unit = {},
     onVerifyIdentityClick: () -> Unit = {},
     onHelpSupportClick: () -> Unit = {},
+    onAboutClick: () -> Unit = {},
     viewModel: WorkerHomeViewModel = hiltViewModel(),
     chatListViewModel: com.example.fixbid.presentation.customer.chat.ConversationListViewModel = hiltViewModel()
 ) {
@@ -238,7 +239,8 @@ fun WorkerHomeScreen(
                             onSignOut = onSignOut,
                             onNotificationSettingsClick = onNotificationSettingsClick,
                             onWorkerProfileClick = onWorkerProfileEditClick,
-                            onHelpSupportClick = onHelpSupportClick
+                            onHelpSupportClick = onHelpSupportClick,
+                            onAboutClick = onAboutClick
                         )
                     }
                 }

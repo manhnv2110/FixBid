@@ -82,6 +82,7 @@ fun HomeScreen(
     onChatbotPrefill: (String) -> Unit = {},
     onWalletClick: () -> Unit = {},
     onHelpSupportClick: () -> Unit = {},
+    onAboutClick: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
     chatListViewModel: ConversationListViewModel = hiltViewModel()
 ) {
@@ -162,7 +163,16 @@ fun HomeScreen(
                             onPaymentClick = onPaymentClick,
                             onReviewClick = onReviewClick,
                             onWorkerProfileClick = onWorkerProfileClick,
-                            onOpenChatWithPrefill = onChatbotPrefill
+                            onOpenChatWithPrefill = onChatbotPrefill,
+                            onCreateBookingClick = {
+                                // Empty state CTA — pop the customer back to
+                                // the Home tab where the category picker lives.
+                                tabNavController.navigate(CustomerTab.HOME) {
+                                    popUpTo(CustomerTab.HOME) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            }
                         )
                     }
                 }
@@ -180,7 +190,8 @@ fun HomeScreen(
                             onSignOut = onSignOut,
                             onNotificationSettingsClick = onNotificationSettingsClick,
                             onWalletClick = onWalletClick,
-                            onHelpSupportClick = onHelpSupportClick
+                            onHelpSupportClick = onHelpSupportClick,
+                            onAboutClick = onAboutClick
                         )
                     }
                 }

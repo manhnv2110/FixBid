@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -47,6 +48,7 @@ fun BookingHistoryScreen(
     onReviewClick: (String) -> Unit = {},
     onWorkerProfileClick: (String) -> Unit = {},
     onOpenChatWithPrefill: (String) -> Unit = {},
+    onCreateBookingClick: () -> Unit = {},
     viewModel: BookingHistoryViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -200,7 +202,7 @@ fun BookingHistoryScreen(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
-                            EmptyState(tab = selectedTab)
+                            EmptyState(tab = selectedTab, onCreateBookingClick = onCreateBookingClick)
                         }
                     } else {
                         LazyColumn(
@@ -255,46 +257,24 @@ fun BookingHistoryScreen(
 }
 
 @Composable
-private fun EmptyState(tab: Int) {
-    val (icon, title, subtitle) = when (tab) {
-        0 -> Triple(
-            Icons.Outlined.Assignment,
-            "Chưa có đơn nào đang xử lý",
-            "Đặt dịch vụ ngay để bắt đầu!"
+private fun EmptyState(tab: Int, onCreateBookingClick: () -> Unit = {}) {
+    when (tab) {
+        0 -> com.example.fixbid.core.components.RichEmptyState(
+            icon = Icons.AutoMirrored.Filled.Assignment,
+            title = "Chưa có đơn nào đang xử lý",
+            subtitle = "Đặt dịch vụ đầu tiên để bắt đầu — bạn có thể chọn thẳng một thợ hoặc đăng yêu cầu để nhận báo giá cạnh tranh.",
+            primaryActionLabel = "Đặt dịch vụ ngay",
+            onPrimaryAction = onCreateBookingClick
         )
-        1 -> Triple(
-            Icons.Outlined.CheckCircleOutline,
-            "Chưa có đơn hoàn thành",
-            "Các đơn hoàn thành sẽ hiển thị ở đây"
+        1 -> com.example.fixbid.core.components.RichEmptyState(
+            icon = Icons.Outlined.CheckCircleOutline,
+            title = "Chưa có đơn hoàn thành",
+            subtitle = "Khi thợ làm xong và bạn xác nhận, đơn sẽ được lưu tại đây để bạn xem lại biên lai và đánh giá."
         )
-        else -> Triple(
-            Icons.Outlined.Block,
-            "Chưa có đơn bị hủy",
-            "Đơn bị hủy hoặc tranh chấp sẽ hiển thị ở đây"
-        )
-    }
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.padding(32.dp)
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
-            modifier = Modifier.size(56.dp)
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = title,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = subtitle,
-            fontSize = 13.sp,
-            color = MaterialTheme.colorScheme.outline
+        else -> com.example.fixbid.core.components.RichEmptyState(
+            icon = Icons.Outlined.Block,
+            title = "Chưa có đơn bị hủy",
+            subtitle = "Đơn bị huỷ hoặc tranh chấp (kèm hoàn tiền) sẽ hiển thị tại đây để bạn tra cứu sau này."
         )
     }
 }

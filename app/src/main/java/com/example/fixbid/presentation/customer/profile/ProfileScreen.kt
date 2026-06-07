@@ -45,6 +45,7 @@ fun ProfileScreen(
     onWorkerProfileClick: (() -> Unit)? = null,
     onWalletClick: (() -> Unit)? = null,
     onHelpSupportClick: () -> Unit = {},
+    onAboutClick: () -> Unit = {},
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -486,7 +487,8 @@ fun ProfileScreen(
                             ProfileMenuItem(
                                 icon = Icons.Outlined.Info,
                                 title = "Về FixBid",
-                                subtitle = "Phiên bản 1.0.0"
+                                subtitle = "Phiên bản ${com.example.fixbid.BuildConfig.VERSION_NAME}",
+                                onClick = onAboutClick
                             )
                         }
                     }

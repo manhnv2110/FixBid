@@ -103,24 +103,20 @@ fun JobRequestsScreen(
                     modifier = Modifier.fillMaxSize()
                 ) {
                     if (uiState.jobs.isEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(24.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            EmptyStateCard(
-                                icon = Icons.Outlined.Inbox,
-                                title = "Chưa có yêu cầu nào",
-                                message = if (uiState.onlyMySkills)
-                                    "Hãy thử bỏ lọc theo kỹ năng hoặc đổi danh mục để xem thêm"
-                                else "Hãy quay lại sau nhé",
-                                asCard = false,
-                                actionLabel = if (uiState.onlyMySkills) "Bỏ lọc kỹ năng" else null,
-                                onActionClick = if (uiState.onlyMySkills)
-                                    viewModel::toggleSkillsFilter else null
-                            )
-                        }
+                        com.example.fixbid.core.components.RichEmptyState(
+                            icon = Icons.Outlined.Inbox,
+                            title = if (uiState.onlyMySkills)
+                                "Không có yêu cầu phù hợp với kỹ năng của bạn"
+                            else "Chưa có yêu cầu nào",
+                            subtitle = if (uiState.onlyMySkills)
+                                "Hãy thử bỏ lọc kỹ năng để xem thêm cơ hội, hoặc bổ sung kỹ năng vào hồ sơ để mở rộng phạm vi nhận việc."
+                            else "Yêu cầu mới sẽ xuất hiện tại đây. Hãy quay lại sau ít phút.",
+                            primaryActionLabel = if (uiState.onlyMySkills) "Bỏ lọc kỹ năng" else null,
+                            onPrimaryAction = if (uiState.onlyMySkills)
+                                viewModel::toggleSkillsFilter else null,
+                            secondaryActionLabel = "Làm mới",
+                            onSecondaryAction = viewModel::refresh
+                        )
                     } else {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),

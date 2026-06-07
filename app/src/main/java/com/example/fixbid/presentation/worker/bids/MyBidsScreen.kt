@@ -56,6 +56,7 @@ import com.example.fixbid.ui.theme.StatusColorsTheme
 fun MyBidsScreen(
     onBackClick: () -> Unit = {},
     onJobClick: (String) -> Unit = {},
+    onBrowseRequestsClick: () -> Unit = {},
     viewModel: MyBidsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -134,7 +135,10 @@ fun MyBidsScreen(
             ) {
                 val bids = uiState.filteredBids
                 if (bids.isEmpty()) {
-                    EmptyBids(filter = uiState.filter)
+                    EmptyBids(
+                        filter = uiState.filter,
+                        onBrowseRequestsClick = onBrowseRequestsClick
+                    )
                 } else {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
@@ -488,51 +492,36 @@ private fun MetaRow(icon: ImageVector, text: String) {
 }
 
 @Composable
-private fun EmptyBids(filter: MyBidsFilter) {
-    val (title, subtitle) = when (filter) {
-        MyBidsFilter.ALL -> "Chưa có báo giá nào" to
-            "Tìm việc phù hợp và gửi báo giá để bắt đầu nhận công việc"
-        MyBidsFilter.PENDING -> "Không có báo giá đang chờ" to
-            "Khi bạn gửi báo giá mới, chúng sẽ hiện ở đây"
-        MyBidsFilter.ACCEPTED -> "Chưa có báo giá nào trúng" to
-            "Cứ kiên trì — báo giá phù hợp giá và thời gian sẽ được khách chọn"
-        MyBidsFilter.REJECTED -> "Không có báo giá nào trong mục này" to
-            "Báo giá bị từ chối hoặc đã rút sẽ hiện ở đây"
+private fun EmptyBids(filter: MyBidsFilter, onBrowseRequestsClick: () -> Unit = {}) {
+    val (title, subtitle, primaryLabel) = when (filter) {
+        MyBidsFilter.ALL -> Triple(
+            "Chưa có báo giá nào",
+            "Tìm việc phù hợp và gửi báo giá để bắt đầu nhận công việc — trợ lý AI có thể gợi ý mức giá hợp lý.",
+            "Tìm việc"
+        )
+        MyBidsFilter.PENDING -> Triple(
+            "Không có báo giá đang chờ",
+            "Khi bạn gửi báo giá mới, chúng sẽ hiện ở đây và bạn có thể theo dõi tiến trình tới khi khách phản hồi.",
+            null
+        )
+        MyBidsFilter.ACCEPTED -> Triple(
+            "Chưa có báo giá nào trúng",
+            "Cứ kiên trì — báo giá phù hợp về giá và thời gian sẽ được khách chọn. Hãy thử dùng AI để cải thiện báo giá.",
+            null
+        )
+        MyBidsFilter.REJECTED -> Triple(
+            "Không có báo giá nào trong mục này",
+            "Báo giá bị khách từ chối hoặc bạn chủ động rút sẽ được lưu tại đây để tham khảo sau.",
+            null
+        )
     }
-    Box(Modifier.fillMaxSize().padding(24.dp), Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(
-                modifier = Modifier
-                    .size(80.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Outlined.Gavel,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(40.dp)
-                )
-            }
-            Spacer(Modifier.height(14.dp))
-            Text(
-                text = title,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = subtitle,
-                fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 24.dp),
-                textAlign = TextAlign.Center,
-                lineHeight = 18.sp
-            )
-        }
-    }
+    com.example.fixbid.core.components.RichEmptyState(
+        icon = Icons.Outlined.Gavel,
+        title = title,
+        subtitle = subtitle,
+        primaryActionLabel = primaryLabel,
+        onPrimaryAction = if (primaryLabel != null) onBrowseRequestsClick else null
+    )
 }
 
 @Composable
