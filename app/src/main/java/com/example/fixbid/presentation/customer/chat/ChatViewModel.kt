@@ -42,7 +42,9 @@ data class ChatUiState(
     val currentUserId: String = "",
     val errorMessage: String? = null,
     val counterpartAvatarUrl: String? = null,
-    val presence: ChatPresence = ChatPresence()
+    val presence: ChatPresence = ChatPresence(),
+    /** True from when the video-call button is tapped until the call screen opens. */
+    val isStartingCall: Boolean = false
 )
 
 sealed class ChatEvent {
@@ -77,6 +79,7 @@ class ChatViewModel @Inject constructor(
     private val profileRepository: com.example.fixbid.data.repository.ProfileRepository,
     private val sendNotification: SendNotificationUseCase,
     private val activeChatTracker: ActiveChatTracker,
+    private val callRepository: com.example.fixbid.domain.repository.CallRepository,
     @com.example.fixbid.core.di.ApplicationScope private val applicationScope: kotlinx.coroutines.CoroutineScope,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -353,6 +356,48 @@ class ChatViewModel @Inject constructor(
      */
     private fun recipientId(currentUserId: String): String =
         if (workerId.isNotBlank() && workerId != currentUserId) workerId else ""
+
+    /**
+     * Place a video call to [workerId]. Inserts a `ringing` row and
+     * forwards the new call id to the navigator so the caller drops into
+     * the live call screen. Backend realtime then surfaces the row to the
+     * callee's [com.example.fixbid.presentation.call.IncomingCallController].
+     */
+    fun startVideoCall(onCallCreated: (callId: String) -> Unit) {
+        val state = _uiState.value
+        if (state.isStartingCall) return
+        if (conversationId.isBlank() || workerId.isBlank()) return
+        val currentUserId = state.currentUserId.ifBlank {
+            // Cold path — typically already populated by observeRealtimeMessages,
+            // but if the user taps the call button very quickly we still want to
+            // resolve it before placing a call.
+            null
+        }
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isStartingCall = true, errorMessage = null)
+            val resolvedCaller = currentUserId ?: authRepository.getCurrentUser()?.id
+            if (resolvedCaller.isNullOrBlank()) {
+                _uiState.value = _uiState.value.copy(isStartingCall = false)
+                _events.tryEmit(ChatEvent.Toast("Không xác định được người dùng"))
+                return@launch
+            }
+            when (val res = callRepository.startCall(
+                conversationId = conversationId,
+                callerId = resolvedCaller,
+                calleeId = workerId
+            )) {
+                is com.example.fixbid.domain.model.Resource.Success -> {
+                    _uiState.value = _uiState.value.copy(isStartingCall = false)
+                    onCallCreated(res.data.id)
+                }
+                is com.example.fixbid.domain.model.Resource.Error -> {
+                    _uiState.value = _uiState.value.copy(isStartingCall = false)
+                    _events.tryEmit(ChatEvent.Toast("Không gọi được: ${res.message}"))
+                }
+                is com.example.fixbid.domain.model.Resource.Loading -> Unit
+            }
+        }
+    }
 
     override fun onCleared() {
         super.onCleared()

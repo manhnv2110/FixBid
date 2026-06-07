@@ -18,6 +18,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.DoneAll
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.MoreVert
@@ -59,6 +60,7 @@ import java.util.Locale
 @Composable
 fun ChatScreen(
     onBackClick: () -> Unit = {},
+    onStartVideoCall: (callId: String) -> Unit = {},
     viewModel: ChatViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -115,7 +117,11 @@ fun ChatScreen(
             workerName = viewModel.workerName,
             avatarUrl = uiState.counterpartAvatarUrl,
             presence = uiState.presence,
-            onBackClick = onBackClick
+            isStartingCall = uiState.isStartingCall,
+            onBackClick = onBackClick,
+            onVideoCallClick = {
+                viewModel.startVideoCall { callId -> onStartVideoCall(callId) }
+            }
         )
 
         Box(
@@ -210,7 +216,9 @@ private fun ChatHeader(
     workerName: String,
     avatarUrl: String?,
     presence: ChatPresence,
-    onBackClick: () -> Unit
+    isStartingCall: Boolean,
+    onBackClick: () -> Unit,
+    onVideoCallClick: () -> Unit
 ) {
     Surface(
         color = MaterialTheme.colorScheme.primary,
@@ -298,12 +306,20 @@ private fun ChatHeader(
                 )
             }
 
-            IconButton(onClick = { /* reserved for future actions */ }) {
-                Icon(
-                    imageVector = Icons.Outlined.MoreVert,
-                    contentDescription = "Tuỳ chọn",
-                    tint = MaterialTheme.colorScheme.onPrimary
-                )
+            IconButton(onClick = onVideoCallClick, enabled = !isStartingCall) {
+                if (isStartingCall) {
+                    CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(20.dp)
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Filled.Videocam,
+                        contentDescription = "Gọi video",
+                        tint = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
             }
         }
     }

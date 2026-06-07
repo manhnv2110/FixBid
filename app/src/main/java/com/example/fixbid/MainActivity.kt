@@ -127,6 +127,28 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
     val appNotificationsViewModel: AppNotificationsViewModel = hiltViewModel()
     val unreadNotificationCount by appNotificationsViewModel.unreadCount.collectAsState()
 
+    // ── Incoming video call ─────────────────────────────────────────────────
+    // Global controller — listens for incoming calls regardless of which
+    // screen the user is on. The dialog overlays everything else, much like
+    // the AI FAB.
+    val incomingCallController: com.example.fixbid.presentation.call.IncomingCallController =
+        hiltViewModel()
+    val incomingCallState by incomingCallController.uiState.collectAsState()
+    LaunchedEffect(uiState.isAuthenticated) {
+        if (uiState.isAuthenticated) {
+            incomingCallController.start()
+        }
+    }
+    LaunchedEffect(Unit) {
+        incomingCallController.events.collect { event ->
+            when (event) {
+                is com.example.fixbid.presentation.call.IncomingCallEvent.Accepted -> {
+                    runCatching { navController.navigate("call/${event.callId}") }
+                }
+            }
+        }
+    }
+
     // Ask for POST_NOTIFICATIONS once, on Android 13+, after the user is in.
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -195,6 +217,7 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
         currentRoute?.startsWith("chatbot") == true ||
         currentRoute?.startsWith("payment/") == true ||
         currentRoute?.startsWith("vnpay_return/") == true ||
+        currentRoute?.startsWith("call/") == true ||
         currentRoute in setOf(
             AuthRoutes.Welcome,
             AuthRoutes.Login,
@@ -523,6 +546,15 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
         }
 
         composable(
+            route = "call/{callId}",
+            arguments = listOf(navArgument("callId") { type = NavType.StringType })
+        ) {
+            com.example.fixbid.presentation.call.CallScreen(
+                onClose = { navController.popBackStack() }
+            )
+        }
+
+        composable(
             route = "worker_job_detail/{bookingId}",
             arguments = listOf(navArgument("bookingId") { type = NavType.StringType })
         ) {
@@ -763,7 +795,10 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
             )
         ) {
             ChatScreen(
-                onBackClick = { navController.popBackStack() }
+                onBackClick = { navController.popBackStack() },
+                onStartVideoCall = { callId ->
+                    runCatching { navController.navigate("call/$callId") }
+                }
             )
         }
         }
@@ -780,6 +815,20 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                     }
                 },
                 storageKey = "global_ai_fab_v2"
+            )
+        }
+    }
+
+    // ── Incoming call overlay ───────────────────────────────────────────────
+    // Sits OUTSIDE the navhost Box so it covers everything (including the AI
+    // FAB). Hidden when the user is already inside the call screen — the
+    // post-accept navigate handles transitioning into the live call.
+    incomingCallState.incomingCall?.let { call ->
+        if (currentRoute?.startsWith("call/") != true) {
+            com.example.fixbid.presentation.call.IncomingCallDialog(
+                callerName = incomingCallState.callerName,
+                onAccept = { incomingCallController.acceptIncoming() },
+                onReject = { incomingCallController.rejectIncoming() }
             )
         }
     }

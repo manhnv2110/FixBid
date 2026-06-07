@@ -44,5 +44,10 @@ abstract class RepositoryModule {
     abstract fun bindWalletRepository(impl: WalletRepositoryImpl): WalletRepository
 
     @Binds @Singleton
+    abstract fun bindCallRepository(
+        impl: com.example.fixbid.data.repository.CallRepositoryImpl
+    ): com.example.fixbid.domain.repository.CallRepository
+
+    @Binds @Singleton
     abstract fun bindPushTokenProvider(impl: FirebasePushTokenProvider): PushTokenProvider
 }

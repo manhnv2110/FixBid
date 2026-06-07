@@ -24,6 +24,8 @@ object Tables {
     const val WALLET_TRANSACTIONS  = "wallet_transactions"
     const val WALLET_TOPUPS        = "wallet_topups"
     const val WALLET_WITHDRAWALS   = "wallet_withdrawals"
+    const val VIDEO_CALLS          = "video_calls"
+
 }
 
 fun createFixBidSupabaseClient(): SupabaseClient = createSupabaseClient(
