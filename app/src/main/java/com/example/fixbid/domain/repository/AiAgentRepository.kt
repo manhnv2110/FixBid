@@ -86,6 +86,14 @@ interface AiAgentRepository {
         role: UserRole
     ): Flow<AiStreamEvent>
 
+    /**
+     * Single-turn, no-history "inline" call used by the suggestion engine to
+     * render a short answer right on a domain screen. The model can call read
+     * tools but action tools are filtered out to keep the call side-effect
+     * free. Returns the plain text reply (no pending action / no navigation).
+     */
+    suspend fun analyze(prompt: String, role: UserRole): Resource<String>
+
     /** Runs a previously-confirmed action tool and returns a short result message. */
     suspend fun confirmAction(action: AiPendingAction, role: UserRole): Resource<AiReply>
 }

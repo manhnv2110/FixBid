@@ -114,6 +114,116 @@ class AiAgentRepositoryImpl @Inject constructor(
         }
     }
 
+    /**
+     * Inline, single-turn analysis used by [AiSuggestionEngine][com.example.fixbid.domain.usecase.shared.AiSuggestionEngine]
+     * cards. Differences vs [sendMessageStream]:
+     *   - No conversation history (callers pass a fully self-contained prompt).
+     *   - Action tools are stripped from the tool list so the model can't fire
+     *     a side-effect (we don't want a "đánh giá báo giá" chip to accidentally
+     *     accept a quote).
+     *   - Non-streaming so the screen can `await` and render a static block.
+     *   - Tool-result loop reuses the same [runReadTool] / [chatWithRetry]
+     *     plumbing, including rate-limit retry + model fallback.
+     *
+     * Returns a plain string ready to render with markdown. On failure surfaces
+     * a friendly Vietnamese message instead of leaking the exception.
+     */
+    override suspend fun analyze(prompt: String, role: UserRole): Resource<String> = try {
+        val text = runInlineAnalysis(prompt, role).trim()
+            .ifBlank { "Mình chưa có đủ dữ liệu để trả lời. Bạn thử hỏi cụ thể hơn nhé." }
+        Resource.Success(text)
+    } catch (rl: GroqRateLimitException) {
+        Resource.Error(RATE_LIMIT_ERROR)
+    } catch (e: Exception) {
+        Resource.Error(GENERIC_ERROR)
+    }
+
+    private suspend fun runInlineAnalysis(prompt: String, role: UserRole): String {
+        val messages = mutableListOf<GroqMessage>()
+        messages += GroqMessage(role = "system", content = inlineSystemPrompt(role))
+        messages += GroqMessage(role = "user", content = prompt)
+
+        // Inline analysis must be side-effect free, so action tools are filtered
+        // out of the tool list. Read tools (search_workers, get_booking_status, …)
+        // remain available so the model can ground its answer in real data.
+        val readTools = AiToolRegistry.toolsFor(role)
+            .filterNot { AiToolRegistry.isActionTool(it.function.name) }
+
+        repeat(MAX_INLINE_TOOL_ROUNDS) {
+            val response = chatWithRetry(
+                GroqChatRequest(
+                    model = GroqApi.DEFAULT_MODEL,
+                    messages = messages,
+                    tools = readTools,
+                    toolChoice = "auto",
+                    maxTokens = INLINE_MAX_TOKENS
+                )
+            )
+            val msg = response.choices.firstOrNull()?.message
+            val toolCalls = msg?.toolCalls.orEmpty()
+
+            if (toolCalls.isEmpty()) {
+                return msg?.content?.takeIf { it.isNotBlank() } ?: ""
+            }
+
+            // Surface read tools but ignore any action tool the model tries to
+            // sneak in — defence in depth on top of the tool-list filter.
+            messages += GroqMessage(
+                role = "assistant",
+                content = msg?.content.orEmpty(),
+                toolCalls = toolCalls
+            )
+            for (call in toolCalls) {
+                if (AiToolRegistry.isActionTool(call.function.name)) {
+                    messages += GroqMessage(
+                        role = "tool",
+                        toolCallId = call.id,
+                        name = call.function.name,
+                        content = """{"error":"Inline analysis chỉ được gọi tool đọc, không thực hiện hành động."}"""
+                    )
+                    continue
+                }
+                val args = parseArgs(call.function)
+                val result = runCatching { toolExecutor.execute(call.function.name, args) }
+                    .getOrElse { ToolRunResult("""{"error":"Lỗi thực thi công cụ"}""") }
+                messages += GroqMessage(
+                    role = "tool",
+                    toolCallId = call.id,
+                    name = call.function.name,
+                    content = result.resultJson
+                )
+            }
+        }
+
+        // Tool budget exhausted — ask the model to summarise with whatever it has.
+        val finalResp = chatWithRetry(
+            GroqChatRequest(
+                model = GroqApi.DEFAULT_MODEL,
+                messages = messages,
+                maxTokens = INLINE_MAX_TOKENS
+            )
+        )
+        return finalResp.choices.firstOrNull()?.message?.content.orEmpty()
+    }
+
+    /**
+     * Trimmed system prompt for inline analysis: the model already sees a
+     * fully-formed question + read-only tool list, so we skip the long agent
+     * playbook. Asks for short, action-oriented Vietnamese.
+     */
+    private fun inlineSystemPrompt(role: UserRole): String {
+        val who = if (role == UserRole.WORKER) "thợ dịch vụ" else "khách hàng"
+        return """
+            Bạn là trợ lý AI FixBid hỗ trợ $who. Đây là một câu hỏi đơn lẻ — không có
+            lịch sử trò chuyện. Trả lời ngắn gọn (≤ 8 dòng), tiếng Việt, có thể dùng
+            Markdown (**bold**, gạch đầu dòng, link).
+
+            - Cần dữ liệu cụ thể → GỌI tool đọc tương ứng. Không bịa số liệu.
+            - Tiền VND. Nếu so sánh giá hãy nêu mức và lý do ngắn.
+            - Kết thúc bằng 1 câu hành động cụ thể tôi nên làm tiếp theo.
+        """.trimIndent()
+    }
+
     // ── Streaming conversation loop ─────────────────────────────────────────
 
     private suspend fun runConversation(
@@ -633,6 +743,8 @@ class AiAgentRepositoryImpl @Inject constructor(
         const val MAX_TOOL_ROUNDS = 4
         const val MAX_HISTORY_TURNS = 6
         const val MAX_TOKENS = 768
+        const val MAX_INLINE_TOOL_ROUNDS = 2
+        const val INLINE_MAX_TOKENS = 512
         const val MAX_RATE_LIMIT_RETRIES = 2
         const val GENERIC_ERROR = "Mình đang gặp trục trặc kết nối, bạn thử lại sau giây lát nhé."
         const val RATE_LIMIT_ERROR = "Trợ lý đang bận quá tải. Bạn thử lại sau ít giây nhé — " +
