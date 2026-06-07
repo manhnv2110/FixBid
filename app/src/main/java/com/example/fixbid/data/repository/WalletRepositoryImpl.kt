@@ -124,7 +124,7 @@ class WalletRepositoryImpl @Inject constructor(
 
     override fun observeMyWallet(): Flow<Wallet?> {
         val userId = client.auth.currentUserOrNull()?.id ?: return kotlinx.coroutines.flow.flowOf(null)
-        val channel = client.realtime.channel("wallet_$userId")
+        val channel = client.realtime.channel("wallet_${userId}_${System.currentTimeMillis()}")
 
         val changes = channel.postgresChangeFlow<PostgresAction>(schema = "public") {
             table = Tables.WALLETS

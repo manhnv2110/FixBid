@@ -416,7 +416,7 @@ class BookingRepositoryImpl @Inject constructor(
         }.getOrElse { Resource.Error(it.message ?: "Cập nhật trạng thái thất bại") }
 
     override fun observeBooking(bookingId: String): Flow<Booking?> {
-        val channel = client.realtime.channel("booking_updates_$bookingId")
+        val channel = client.realtime.channel("booking_updates_${bookingId}_${System.currentTimeMillis()}")
 
         val changes = channel.postgresChangeFlow<PostgresAction.Update>(schema = "public") {
             table = Tables.BOOKINGS

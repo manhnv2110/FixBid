@@ -3,7 +3,7 @@ package com.example.fixbid.data.remote.groq
 import com.example.fixbid.BuildConfig
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
-import io.ktor.client.engine.android.Android
+import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.header
@@ -59,7 +59,7 @@ class GroqApi @Inject constructor() {
         explicitNulls = false
     }
 
-    private val client = HttpClient(Android) {
+    private val client = HttpClient(OkHttp) {
         // Disable Ktor's default 4xx auto-throw — we want to inspect the
         // response body / headers ourselves to extract the retry-after hint.
         expectSuccess = false

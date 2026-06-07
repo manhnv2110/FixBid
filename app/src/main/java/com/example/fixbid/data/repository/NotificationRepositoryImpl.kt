@@ -95,7 +95,7 @@ class NotificationRepositoryImpl @Inject constructor(
     }.getOrElse { Resource.Error(it.message ?: "Gửi thông báo thất bại") }
 
     override fun observeNotifications(userId: String): Flow<List<Notification>> {
-        val channel = client.realtime.channel("notification_updates_$userId")
+        val channel = client.realtime.channel("notification_updates_${userId}_${System.currentTimeMillis()}")
 
         val changes = channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
             table  = Tables.NOTIFICATIONS
@@ -108,7 +108,7 @@ class NotificationRepositoryImpl @Inject constructor(
     }
 
     override fun observeNewNotifications(userId: String): Flow<Notification> {
-        val channel = client.realtime.channel("notification_push_$userId")
+        val channel = client.realtime.channel("notification_push_${userId}_${System.currentTimeMillis()}")
 
         val changes = channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
             table  = Tables.NOTIFICATIONS

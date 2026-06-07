@@ -127,7 +127,7 @@ class WorkerRepositoryImpl @Inject constructor(
         }.getOrElse { Resource.Error(it.message ?: "Lỗi") }
 
     override fun observeWorkerProfile(workerId: String): Flow<WorkerProfile?> {
-        val channel = client.realtime.channel("worker_profile_$workerId")
+        val channel = client.realtime.channel("worker_profile_${workerId}_${System.currentTimeMillis()}")
         val changes = channel
             .postgresChangeFlow<PostgresAction.Update>(schema = "public") {
                 table = Tables.WORKER_PROFILES

@@ -82,7 +82,7 @@ class BidRepositoryImpl @Inject constructor(
     }.getOrElse { Resource.Error(it.message ?: "Rút bid thất bại") }
 
     override fun observeBidsForBooking(bookingId: String): Flow<List<Bid>> {
-        val channel = client.realtime.channel("bids_$bookingId")
+        val channel = client.realtime.channel("bids_${bookingId}_${System.currentTimeMillis()}")
         val changes = channel
             .postgresChangeFlow<PostgresAction>(schema = "public") {
                 table = Tables.BIDS

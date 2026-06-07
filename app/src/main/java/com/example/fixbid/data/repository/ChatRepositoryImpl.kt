@@ -168,7 +168,7 @@ class ChatRepositoryImpl @Inject constructor(
         // We multiplex both on a single channel and re-pull the list on every
         // event. List size is small (a handful of threads per user), so a
         // refetch is acceptably cheap and keeps the merge logic trivial.
-        val channel = client.realtime.channel("conversations_feed_$userId")
+        val channel = client.realtime.channel("conversations_feed_${userId}_${System.currentTimeMillis()}")
 
         val messageChanges = channel
             .postgresChangeFlow<PostgresAction>(schema = "public") {
