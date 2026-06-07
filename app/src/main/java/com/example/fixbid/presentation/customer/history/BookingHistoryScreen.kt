@@ -46,12 +46,24 @@ fun BookingHistoryScreen(
     onPaymentClick: (String) -> Unit = {},
     onReviewClick: (String) -> Unit = {},
     onWorkerProfileClick: (String) -> Unit = {},
+    onOpenChatWithPrefill: (String) -> Unit = {},
     viewModel: BookingHistoryViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     val tabs = listOf("Đang xử lý", "Hoàn thành", "Đã hủy")
+
+    // ── AI shortcuts ─────────────────────────────────────────────────────
+    val aiInlineState by viewModel.aiController.inlineState.collectAsState()
+    val aiPendingPrefill by viewModel.aiController.pendingChatPrefill.collectAsState()
+    LaunchedEffect(aiPendingPrefill) {
+        aiPendingPrefill?.let {
+            onOpenChatWithPrefill(it)
+            viewModel.aiController.consumeChatPrefill()
+        }
+    }
+    val aiSuggestions = remember(uiState) { viewModel.aiSuggestions() }
 
     // Auto refresh khi screen hiển thị lại
     LaunchedEffect(Unit) {
@@ -192,6 +204,27 @@ fun BookingHistoryScreen(
                             contentPadding = PaddingValues(16.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
+                            // AI shortcut header — only on the "Đang xử lý"
+                            // tab where it has the most signal (priority
+                            // analysis, summary). Other tabs stay clean.
+                            if (selectedTab == 0 && aiSuggestions.isNotEmpty()) {
+                                item(key = "ai-strip") {
+                                    com.example.fixbid.presentation.ai.AiSuggestionStrip(
+                                        suggestions = aiSuggestions,
+                                        onSuggestionClick = {
+                                            viewModel.aiController.onSuggestionTapped(it)
+                                        }
+                                    )
+                                }
+                                item(key = "ai-inline") {
+                                    com.example.fixbid.presentation.ai.InlineAiAnalysisCard(
+                                        state = aiInlineState,
+                                        onRetry = { viewModel.aiController.retryInline() },
+                                        onDismiss = { viewModel.aiController.dismissInline() },
+                                        onOpenChat = { viewModel.aiController.openInlineInChat() }
+                                    )
+                                }
+                            }
                             items(items = items, key = { it.id }) { booking ->
                                 BookingCard(
                                     booking = booking,

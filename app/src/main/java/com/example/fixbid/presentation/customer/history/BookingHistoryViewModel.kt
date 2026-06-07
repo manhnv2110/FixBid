@@ -30,7 +30,9 @@ sealed class HistoryUiState {
 class BookingHistoryViewModel @Inject constructor(
     private val getMyBookingsUseCase: GetMyBookingsUseCase,
     private val authRepository: AuthRepository,
-    private val reviewRepository: ReviewRepository
+    private val reviewRepository: ReviewRepository,
+    private val aiAgentRepository: com.example.fixbid.domain.repository.AiAgentRepository,
+    private val aiSuggestionEngine: com.example.fixbid.domain.usecase.shared.AiSuggestionEngine
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<HistoryUiState>(HistoryUiState.Loading)
@@ -38,6 +40,29 @@ class BookingHistoryViewModel @Inject constructor(
 
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+    /** Per-screen AI shortcut bridge. */
+    val aiController: com.example.fixbid.presentation.ai.AiSuggestionController by lazy {
+        com.example.fixbid.presentation.ai.AiSuggestionController(
+            scope = viewModelScope,
+            aiAgentRepository = aiAgentRepository,
+            role = com.example.fixbid.domain.model.UserRole.CUSTOMER
+        )
+    }
+
+    fun aiSuggestions(): List<com.example.fixbid.domain.model.AiSuggestion> {
+        val state = _uiState.value as? HistoryUiState.Success ?: return emptyList()
+        return aiSuggestionEngine(
+            com.example.fixbid.domain.model.AiContext(
+                screen = com.example.fixbid.domain.model.AiContextScreen.CUSTOMER_BOOKING_HISTORY,
+                userRole = com.example.fixbid.domain.model.UserRole.CUSTOMER,
+                data = mapOf(
+                    "activeCount" to state.activeBookings.size,
+                    "completedCount" to state.completedBookings.size
+                )
+            )
+        )
+    }
 
     private var hasLoadedOnce = false
 

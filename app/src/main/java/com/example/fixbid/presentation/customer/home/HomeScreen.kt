@@ -79,6 +79,7 @@ fun HomeScreen(
     onNotificationSettingsClick: () -> Unit = {},
     onFindWorkersClick: () -> Unit = {},
     onChatbotClick: () -> Unit = {},
+    onChatbotPrefill: (String) -> Unit = {},
     onWalletClick: () -> Unit = {},
     onHelpSupportClick: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
@@ -160,7 +161,8 @@ fun HomeScreen(
                             onCompletionConfirmClick = onCompletionConfirmClick,
                             onPaymentClick = onPaymentClick,
                             onReviewClick = onReviewClick,
-                            onWorkerProfileClick = onWorkerProfileClick
+                            onWorkerProfileClick = onWorkerProfileClick,
+                            onOpenChatWithPrefill = onChatbotPrefill
                         )
                     }
                 }
