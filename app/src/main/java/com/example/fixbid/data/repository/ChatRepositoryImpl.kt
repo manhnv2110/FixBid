@@ -161,21 +161,31 @@ class ChatRepositoryImpl @Inject constructor(
     }
 
     override fun observeConversations(userId: String): Flow<List<Conversation>> {
-        // Any insert/update on `messages` involving this user invalidates the
-        // list (last-message preview + unread badge). The simple correctness
-        // play here is "any change → re-pull" — list size is small (per-user).
+        // Two CDC sources can change the conversation list:
+        //   1. Inserts on `conversations` — a new chat thread was opened.
+        //   2. Inserts/updates on `messages` — a thread's last-message preview
+        //      or unread badge changed.
+        // We multiplex both on a single channel and re-pull the list on every
+        // event. List size is small (a handful of threads per user), so a
+        // refetch is acceptably cheap and keeps the merge logic trivial.
         val channel = client.realtime.channel("conversations_feed_$userId")
-        val changes = channel
+
+        val messageChanges = channel
             .postgresChangeFlow<PostgresAction>(schema = "public") {
                 table = Tables.MESSAGES
             }
-            .map {
-                (getConversations(userId) as? Resource.Success)?.data ?: emptyList()
+
+        val conversationChanges = channel
+            .postgresChangeFlow<PostgresAction>(schema = "public") {
+                table = Tables.CONVERSATIONS
             }
+
+        val merged = kotlinx.coroutines.flow.merge(messageChanges, conversationChanges)
+            .map { (getConversations(userId) as? Resource.Success)?.data ?: emptyList() }
             .onStart {
                 emit((getConversations(userId) as? Resource.Success)?.data ?: emptyList())
             }
-        return channel.liveFlow(changes)
+        return channel.liveFlow(merged)
     }
 
     /**

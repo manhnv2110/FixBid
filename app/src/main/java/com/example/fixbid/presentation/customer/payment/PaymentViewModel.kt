@@ -96,7 +96,24 @@ class PaymentViewModel @Inject constructor(
      */
     fun initiateVNPayPayment() {
         val booking = _uiState.value.booking ?: return
-        val amount = booking.agreedPrice ?: return
+        val amount = booking.agreedPrice
+        if (amount == null || amount <= 0.0) {
+            // Defensive guard: with the new direct-booking quote flow this
+            // should never happen — a booking only reaches AWAITING_PAYMENT
+            // after the customer accepts a worker quote (which copies
+            // quoted_price into agreed_price). But keep the message
+            // user-readable so a stale row doesn't fail silently.
+            _uiState.value = _uiState.value.copy(
+                isProcessing = false,
+                errorMessage = "Đơn này chưa có giá. Vui lòng đợi thợ báo giá hoặc liên hệ hỗ trợ."
+            )
+            viewModelScope.launch {
+                _events.emit(PaymentEvent.Toast(
+                    "Đơn này chưa có giá thanh toán."
+                ))
+            }
+            return
+        }
 
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isProcessing = true, errorMessage = null)
