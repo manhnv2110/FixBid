@@ -763,7 +763,7 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                         runCatching { navController.navigate("chatbot") }
                     }
                 },
-                storageKey = "global_ai_fab"
+                storageKey = "global_ai_fab_v2"
             )
         }
     }

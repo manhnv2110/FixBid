@@ -68,6 +68,13 @@ fun BoxScope.DraggableAiFab(
         // events on the emulator behaving the same as touch on a phone.
         val touchSlopPx = viewConfig.touchSlop
 
+        // Calculate bottom offset to clear the bottom navigation bar (approx 80.dp) and system navigation bar inset.
+        val navigationBarsPaddingPx = with(density) {
+            WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding().toPx()
+        }
+        val bottomNavBarHeightPx = with(density) { 80.dp.toPx() }
+        val defaultOffsetY = (maxYPx - bottomNavBarHeightPx - navigationBarsPaddingPx).coerceAtLeast(0f)
+
         // Default anchor: bottom-right corner. Persist the user's placement
         // across recompositions and process death.
         var offsetX by rememberSaveable(storageKey) { mutableFloatStateOf(Float.NaN) }
@@ -75,10 +82,10 @@ fun BoxScope.DraggableAiFab(
 
         LaunchedEffect(maxXPx, maxYPx) {
             if (maxXPx <= 0f || maxYPx <= 0f) return@LaunchedEffect
-            // First placement → anchor to bottom-right.
+            // First placement → anchor to bottom-right (above bottom navigation bar).
             if (offsetX.isNaN() || offsetY.isNaN()) {
                 offsetX = maxXPx
-                offsetY = maxYPx
+                offsetY = defaultOffsetY
             } else {
                 // Re-clamp on resize / orientation change so the FAB stays
                 // visible if the available area shrinks.
@@ -88,7 +95,7 @@ fun BoxScope.DraggableAiFab(
         }
 
         val safeOffsetX = if (offsetX.isNaN()) maxXPx else offsetX
-        val safeOffsetY = if (offsetY.isNaN()) maxYPx else offsetY
+        val safeOffsetY = if (offsetY.isNaN()) defaultOffsetY else offsetY
 
         Surface(
             modifier = modifier
@@ -141,7 +148,7 @@ fun BoxScope.DraggableAiFab(
                                 // relative to where the FAB currently is,
                                 // not where it was when the gesture started.
                                 val currentX = if (offsetX.isNaN()) maxXPx else offsetX
-                                val currentY = if (offsetY.isNaN()) maxYPx else offsetY
+                                val currentY = if (offsetY.isNaN()) defaultOffsetY else offsetY
                                 offsetX = (currentX + delta.x).coerceIn(0f, maxXPx)
                                 offsetY = (currentY + delta.y).coerceIn(0f, maxYPx)
                             }
