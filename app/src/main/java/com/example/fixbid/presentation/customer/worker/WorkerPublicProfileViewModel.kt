@@ -44,7 +44,9 @@ class WorkerPublicProfileViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val getWorkerPublicProfileUseCase: GetWorkerPublicProfileUseCase,
     private val chatRepository: ChatRepository,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val aiAgentRepository: com.example.fixbid.domain.repository.AiAgentRepository,
+    private val aiSuggestionEngine: com.example.fixbid.domain.usecase.shared.AiSuggestionEngine
 ) : ViewModel() {
 
     private val workerId: String = savedStateHandle.get<String>("workerId") ?: ""
@@ -54,6 +56,30 @@ class WorkerPublicProfileViewModel @Inject constructor(
 
     private val _events = Channel<WorkerPublicProfileEvent>(Channel.BUFFERED)
     val events = _events.receiveAsFlow()
+
+    /** AI shortcut bridge — drives the trust-check / fair-price chips. */
+    val aiController: com.example.fixbid.presentation.ai.AiSuggestionController by lazy {
+        com.example.fixbid.presentation.ai.AiSuggestionController(
+            scope = viewModelScope,
+            aiAgentRepository = aiAgentRepository,
+            role = com.example.fixbid.domain.model.UserRole.CUSTOMER
+        )
+    }
+
+    fun aiSuggestions(): List<com.example.fixbid.domain.model.AiSuggestion> {
+        val data = _uiState.value.data ?: return emptyList()
+        return aiSuggestionEngine(
+            com.example.fixbid.domain.model.AiContext(
+                screen = com.example.fixbid.domain.model.AiContextScreen.CUSTOMER_WORKER_PROFILE,
+                userRole = com.example.fixbid.domain.model.UserRole.CUSTOMER,
+                data = mapOf(
+                    "workerId" to workerId,
+                    "workerName" to data.displayName,
+                    "pricePerHour" to data.profile.pricePerHour
+                )
+            )
+        )
+    }
 
     init {
         load()

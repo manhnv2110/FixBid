@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,10 +54,22 @@ fun WorkerPublicProfileScreen(
     onBackClick: () -> Unit = {},
     onBookDirect: (workerId: String, categoryName: String) -> Unit = { _, _ -> },
     onOpenChat: (conversationId: String, workerId: String, workerName: String) -> Unit = { _, _, _ -> },
+    onOpenChatWithPrefill: (String) -> Unit = {},
     viewModel: WorkerPublicProfileViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = androidx.compose.ui.platform.LocalContext.current
+
+    // ── AI shortcuts ─────────────────────────────────────────────────────
+    val aiInlineState by viewModel.aiController.inlineState.collectAsState()
+    val aiPendingPrefill by viewModel.aiController.pendingChatPrefill.collectAsState()
+    LaunchedEffect(aiPendingPrefill) {
+        aiPendingPrefill?.let {
+            onOpenChatWithPrefill(it)
+            viewModel.aiController.consumeChatPrefill()
+        }
+    }
+    val aiSuggestions = remember(uiState.data?.workerId) { viewModel.aiSuggestions() }
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -129,6 +142,27 @@ fun WorkerPublicProfileScreen(
                         ) {
                             item { ProfileHeader(data) }
                             item { StatsGrid(data) }
+                            // AI shortcut surface — ngay sau header để khách
+                            // có thể "Hỏi thợ này có đáng tin không" ngay khi
+                            // đang xem hồ sơ.
+                            if (aiSuggestions.isNotEmpty()) {
+                                item {
+                                    com.example.fixbid.presentation.ai.AiSuggestionStrip(
+                                        suggestions = aiSuggestions,
+                                        onSuggestionClick = {
+                                            viewModel.aiController.onSuggestionTapped(it)
+                                        }
+                                    )
+                                }
+                                item {
+                                    com.example.fixbid.presentation.ai.InlineAiAnalysisCard(
+                                        state = aiInlineState,
+                                        onRetry = { viewModel.aiController.retryInline() },
+                                        onDismiss = { viewModel.aiController.dismissInline() },
+                                        onOpenChat = { viewModel.aiController.openInlineInChat() }
+                                    )
+                                }
+                            }
                             if (data.profile.bio.isNotBlank()) item { BioCard(data.profile.bio) }
                             if (data.profile.skills.isNotEmpty()) item { SkillsCard(data) }
                             item { RatingSummaryCard(data, uiState.distribution) }
