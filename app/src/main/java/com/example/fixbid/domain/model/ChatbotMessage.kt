@@ -14,7 +14,27 @@ data class ChatbotMessage(
     /** A write/destructive action awaiting the user's confirmation, if any. */
     val pendingAction: AiPendingAction? = null,
     /** Set true once a pending action has been confirmed or dismissed. */
-    val actionResolved: Boolean = false
+    val actionResolved: Boolean = false,
+    /**
+     * True while the assistant is still streaming this bubble's text. The UI
+     * uses this to render a caret (▌) and to disable the per-message action
+     * buttons until the stream finishes. Always false on persisted messages.
+     */
+    val isStreaming: Boolean = false,
+    /**
+     * Live tool-execution progress. Only populated on the assistant's current
+     * "in flight" message and rendered as small "🔧 Đang …" progress chips
+     * in the bubble. Cleared when [isStreaming] becomes false.
+     */
+    val toolProgress: List<ToolProgress> = emptyList()
 )
 
 enum class ChatbotRole { USER, ASSISTANT }
+
+/** Per-tool progress entry rendered inside a streaming assistant bubble. */
+data class ToolProgress(
+    val toolName: String,
+    val displayName: String,
+    val finished: Boolean = false,
+    val success: Boolean = true
+)
