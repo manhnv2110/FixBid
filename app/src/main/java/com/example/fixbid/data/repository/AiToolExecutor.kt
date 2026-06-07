@@ -548,6 +548,17 @@ class AiToolExecutor @Inject constructor(
             return ToolRunResult("""{"error":"workerId không phải UUID"}""")
         }
 
+        val customerNote = buildString {
+            append("SĐT: ${user.phoneNumber ?: ""}")
+            append("\nTên: ${user.fullName}")
+            val notes = args.str("notes") ?: ""
+            if (notes.isNotBlank()) {
+                append("\nGhi chú: Tạo qua trợ lý AI. $notes")
+            } else {
+                append("\nGhi chú: Tạo qua trợ lý AI")
+            }
+        }
+
         val now = System.currentTimeMillis()
         val booking = Booking(
             id = UUID.randomUUID().toString(),
@@ -563,7 +574,7 @@ class AiToolExecutor @Inject constructor(
             status = if (direct) BookingStatus.PENDING else BookingStatus.BIDDING,
             type = if (direct) BookingType.DIRECT else BookingType.BIDDING,
             agreedPrice = null,
-            customerNote = "Tạo qua trợ lý AI" + (args.str("notes")?.let { ". $it" } ?: ""),
+            customerNote = customerNote,
             workerNote = null,
             createdAt = now,
             updatedAt = now
