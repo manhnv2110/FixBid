@@ -49,6 +49,7 @@ fun ProfileScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val currentTheme by viewModel.appTheme.collectAsState(initial = "system")
+    val dynamicColorEnabled by viewModel.dynamicColorEnabled.collectAsState(initial = false)
     val isDark = isSystemInDarkTheme()
     val context = LocalContext.current
 
@@ -444,6 +445,20 @@ fun ProfileScreen(
                                 currentTheme = currentTheme,
                                 onThemeChange = viewModel::saveTheme
                             )
+                            // Material You — only show on devices that
+                            // support it (Android 12+). The flag is persisted
+                            // either way, so a user upgrading from Android 11
+                            // → 12 won't have to re-enable.
+                            if (com.example.fixbid.ui.theme.SupportsDynamicColor) {
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(horizontal = 20.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                                )
+                                MaterialYouMenuItem(
+                                    enabled = dynamicColorEnabled,
+                                    onToggle = viewModel::setDynamicColorEnabled
+                                )
+                            }
                             HorizontalDivider(
                                 modifier = Modifier.padding(horizontal = 20.dp),
                                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
@@ -676,5 +691,51 @@ private fun ThemeSelectorMenuItem(
                 }
             )
         }
+    }
+}
+
+/**
+ * Material You toggle — only rendered when the device supports dynamic colors
+ * (Android 12+). Tapping the row OR the trailing switch flips the preference;
+ * the theme recomposes immediately because [com.example.fixbid.MainActivity]
+ * collects the flag as Compose state.
+ */
+@Composable
+private fun MaterialYouMenuItem(
+    enabled: Boolean,
+    onToggle: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onToggle(!enabled) }
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.AutoAwesome,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(22.dp)
+        )
+        Spacer(modifier = Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Màu theo hình nền",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = if (enabled) "Đang đồng bộ với hình nền thiết bị"
+                else "Tắt — dùng màu thương hiệu mặc định",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(
+            checked = enabled,
+            onCheckedChange = onToggle
+        )
     }
 }
