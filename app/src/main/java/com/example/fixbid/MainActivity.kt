@@ -484,9 +484,16 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
         }
 
         composable(
-            route = "worker_public_profile/{workerId}",
-            arguments = listOf(navArgument("workerId") { type = NavType.StringType })
-        ) {
+            route = "worker_public_profile/{workerId}?showChat={showChat}",
+            arguments = listOf(
+                navArgument("workerId") { type = NavType.StringType },
+                navArgument("showChat") {
+                    type = NavType.BoolType
+                    defaultValue = true
+                }
+            )
+        ) { backStackEntry ->
+            val showChat = backStackEntry.arguments?.getBoolean("showChat") ?: true
             com.example.fixbid.presentation.customer.worker.WorkerPublicProfileScreen(
                 onBackClick = { navController.popBackStack() },
                 onBookDirect = { workerId, categoryName ->
@@ -502,7 +509,8 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                         java.nio.charset.StandardCharsets.UTF_8.name()
                     )
                     runCatching { navController.navigate("chatbot?prefill=$encoded") }
-                }
+                },
+                showChatButton = showChat
             )
         }
 
@@ -798,6 +806,9 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                 onBackClick = { navController.popBackStack() },
                 onStartVideoCall = { callId ->
                     runCatching { navController.navigate("call/$callId") }
+                },
+                onNavigateToWorkerProfile = { workerId ->
+                    navController.navigate("worker_public_profile/$workerId?showChat=false")
                 }
             )
         }

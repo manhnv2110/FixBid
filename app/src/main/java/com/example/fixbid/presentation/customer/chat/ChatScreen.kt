@@ -1,11 +1,17 @@
 package com.example.fixbid.presentation.customer.chat
 
+import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.material.icons.outlined.Call
+import androidx.compose.material.icons.outlined.Email
+import androidx.compose.material.icons.outlined.Phone
+import com.example.fixbid.domain.model.UserRole
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -57,16 +63,19 @@ import java.util.Locale
  *  - The 📎 button opens the system photo picker; selected images are
  *    uploaded to Storage and sent as `MessageType.IMAGE`.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
     onBackClick: () -> Unit = {},
     onStartVideoCall: (callId: String) -> Unit = {},
+    onNavigateToWorkerProfile: (workerId: String) -> Unit = {},
     viewModel: ChatViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
+    var showCustomerInfoSheet by remember { mutableStateOf(false) }
 
     // Photo picker — uses the system PickVisualMedia which doesn't require
     // any storage permission and respects user privacy on Android 13+.
@@ -121,6 +130,13 @@ fun ChatScreen(
             onBackClick = onBackClick,
             onVideoCallClick = {
                 viewModel.startVideoCall { callId -> onStartVideoCall(callId) }
+            },
+            onMenuClick = {
+                if (uiState.currentUserRole == UserRole.CUSTOMER) {
+                    onNavigateToWorkerProfile(viewModel.workerId)
+                } else if (uiState.currentUserRole == UserRole.WORKER) {
+                    showCustomerInfoSheet = true
+                }
             }
         )
 
@@ -207,6 +223,163 @@ fun ChatScreen(
             isSending = uiState.isSending || uiState.isUploadingImage
         )
     }
+
+    if (showCustomerInfoSheet && uiState.counterpartProfile != null) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val counterpart = uiState.counterpartProfile!!
+
+        ModalBottomSheet(
+            onDismissRequest = { showCustomerInfoSheet = false },
+            sheetState = sheetState,
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = { BottomSheetDefaults.DragHandle() }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp, vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Thông tin khách hàng",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Avatar
+                val initial = counterpart.fullName.trim().firstOrNull()?.uppercase() ?: "?"
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer)
+                        .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (!counterpart.avatarUrl.isNullOrBlank()) {
+                        AsyncImage(
+                            model = counterpart.avatarUrl,
+                            contentDescription = "Avatar",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Text(
+                            text = initial,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 28.sp
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    text = counterpart.fullName,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Role badge
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(MaterialTheme.colorScheme.secondaryContainer)
+                        .padding(horizontal = 12.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "Khách hàng",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Email Row
+                counterpart.email?.let { email ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Email,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(
+                                text = "Email",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = email,
+                                fontSize = 15.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                }
+
+                // Phone Row
+                val phone = counterpart.phoneNumber ?: "Chưa cập nhật"
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = counterpart.phoneNumber != null) {
+                            runCatching {
+                                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
+                                context.startActivity(intent)
+                            }
+                        }
+                        .padding(vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Phone,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Số điện thoại",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = phone,
+                            fontSize = 15.sp,
+                            color = if (counterpart.phoneNumber != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    if (counterpart.phoneNumber != null) {
+                        Icon(
+                            imageVector = Icons.Outlined.Call,
+                            contentDescription = "Gọi",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+        }
+    }
 }
 
 // ─── Header ──────────────────────────────────────────────────────────────────
@@ -218,7 +391,8 @@ private fun ChatHeader(
     presence: ChatPresence,
     isStartingCall: Boolean,
     onBackClick: () -> Unit,
-    onVideoCallClick: () -> Unit
+    onVideoCallClick: () -> Unit,
+    onMenuClick: () -> Unit
 ) {
     Surface(
         color = MaterialTheme.colorScheme.primary,
@@ -320,6 +494,14 @@ private fun ChatHeader(
                         tint = MaterialTheme.colorScheme.onPrimary
                     )
                 }
+            }
+
+            IconButton(onClick = onMenuClick) {
+                Icon(
+                    imageVector = Icons.Outlined.MoreVert,
+                    contentDescription = "Menu",
+                    tint = MaterialTheme.colorScheme.onPrimary
+                )
             }
         }
     }

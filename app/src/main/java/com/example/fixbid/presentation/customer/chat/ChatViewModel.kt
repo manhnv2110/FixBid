@@ -10,6 +10,8 @@ import com.example.fixbid.domain.model.Message
 import com.example.fixbid.domain.model.MessageType
 import com.example.fixbid.domain.model.Resource
 import com.example.fixbid.domain.notification.NotificationContentFactory
+import com.example.fixbid.domain.model.UserRole
+import com.example.fixbid.data.dto.ProfileDto
 import com.example.fixbid.domain.repository.AuthRepository
 import com.example.fixbid.domain.repository.ChatRepository
 import com.example.fixbid.domain.usecase.shared.SendNotificationUseCase
@@ -44,7 +46,9 @@ data class ChatUiState(
     val counterpartAvatarUrl: String? = null,
     val presence: ChatPresence = ChatPresence(),
     /** True from when the video-call button is tapped until the call screen opens. */
-    val isStartingCall: Boolean = false
+    val isStartingCall: Boolean = false,
+    val currentUserRole: UserRole? = null,
+    val counterpartProfile: ProfileDto? = null
 )
 
 sealed class ChatEvent {
@@ -108,13 +112,19 @@ class ChatViewModel @Inject constructor(
 
         viewModelScope.launch {
             val user = authRepository.getCurrentUser()
-            _uiState.value = _uiState.value.copy(currentUserId = user?.id ?: "")
+            _uiState.value = _uiState.value.copy(
+                currentUserId = user?.id ?: "",
+                currentUserRole = user?.role
+            )
             senderName = user?.fullName ?: "Người dùng"
             markAsRead()
 
             if (workerId.isNotBlank()) {
                 profileRepository.getProfile(workerId).onSuccess { profile ->
-                    _uiState.value = _uiState.value.copy(counterpartAvatarUrl = profile.avatarUrl)
+                    _uiState.value = _uiState.value.copy(
+                        counterpartAvatarUrl = profile.avatarUrl,
+                        counterpartProfile = profile
+                    )
                 }
             }
         }

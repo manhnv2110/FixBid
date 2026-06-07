@@ -55,6 +55,7 @@ fun WorkerPublicProfileScreen(
     onBookDirect: (workerId: String, categoryName: String) -> Unit = { _, _ -> },
     onOpenChat: (conversationId: String, workerId: String, workerName: String) -> Unit = { _, _, _ -> },
     onOpenChatWithPrefill: (String) -> Unit = {},
+    showChatButton: Boolean = true,
     viewModel: WorkerPublicProfileViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -103,6 +104,7 @@ fun WorkerPublicProfileScreen(
             if (data != null) {
                 WorkerProfileActionBar(
                     isOpeningChat = uiState.isOpeningChat,
+                    showChatButton = showChatButton,
                     onChat = { viewModel.openChat() },
                     onBook = {
                         val categoryName = data.profile.skills.firstOrNull()?.name
@@ -193,6 +195,7 @@ fun WorkerPublicProfileScreen(
 @Composable
 private fun WorkerProfileActionBar(
     isOpeningChat: Boolean,
+    showChatButton: Boolean,
     onChat: () -> Unit,
     onBook: () -> Unit
 ) {
@@ -208,24 +211,26 @@ private fun WorkerProfileActionBar(
                 .padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            OutlinedButton(
-                onClick = onChat,
-                enabled = !isOpeningChat,
-                modifier = Modifier.weight(1f).height(50.dp),
-                shape = RoundedCornerShape(14.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
-            ) {
-                if (isOpeningChat) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.primary)
-                } else {
-                    Icon(Icons.Outlined.ChatBubbleOutline, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Nhắn tin", fontWeight = FontWeight.SemiBold)
+            if (showChatButton) {
+                OutlinedButton(
+                    onClick = onChat,
+                    enabled = !isOpeningChat,
+                    modifier = Modifier.weight(1f).height(50.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+                ) {
+                    if (isOpeningChat) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.primary)
+                    } else {
+                        Icon(Icons.Outlined.ChatBubbleOutline, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Nhắn tin", fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
             Button(
                 onClick = onBook,
-                modifier = Modifier.weight(1f).height(50.dp),
+                modifier = Modifier.then(if (showChatButton) Modifier.weight(1f) else Modifier.fillMaxWidth()).height(50.dp),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
