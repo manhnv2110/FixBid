@@ -31,7 +31,8 @@ class AppNotificationsViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val preferences: UserPreferencesDataStore,
     private val appNotificationManager: AppNotificationManager,
-    private val registerFcmTokenUseCase: com.example.fixbid.domain.usecase.shared.RegisterFcmTokenUseCase
+    private val registerFcmTokenUseCase: com.example.fixbid.domain.usecase.shared.RegisterFcmTokenUseCase,
+    private val proactiveAssistant: com.example.fixbid.data.repository.ProactiveAssistantCoordinator
 ) : ViewModel() {
 
     val unreadCount: StateFlow<Int> = observeUnreadCount()
@@ -44,6 +45,9 @@ class AppNotificationsViewModel @Inject constructor(
         appNotificationManager.ensureChannels()
         observeIncomingForPush()
         syncPushToken()
+        // Kick off the AI proactive assistant — it tails the same realtime
+        // notification stream and turns actionable events into chatbot prompts.
+        proactiveAssistant.start()
     }
 
     fun markPermissionRequested() {
