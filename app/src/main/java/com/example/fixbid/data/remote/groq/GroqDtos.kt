@@ -18,7 +18,9 @@ data class GroqChatRequest(
     val tools: List<GroqTool>? = null,
     @SerialName("tool_choice") val toolChoice: String? = null,
     val temperature: Double = 0.3,
-    @SerialName("max_tokens") val maxTokens: Int = 1024
+    @SerialName("max_tokens") val maxTokens: Int = 1024,
+    /** Set true to receive incremental Server-Sent Events instead of one JSON body. */
+    val stream: Boolean = false
 )
 
 @Serializable
@@ -72,4 +74,48 @@ data class GroqResponseMessage(
     val role: String = "assistant",
     val content: String? = null,
     @SerialName("tool_calls") val toolCalls: List<GroqToolCall>? = null
+)
+
+
+// ── Streaming DTOs ──────────────────────────────────────────────────────────
+//
+// In stream mode, Groq sends one JSON object per SSE `data:` line. Each chunk
+// is shaped like `GroqStreamChunk` below. The terminating event is the literal
+// string `[DONE]` (handled at the parser layer, not here).
+
+@Serializable
+data class GroqStreamChunk(
+    val choices: List<GroqStreamChoice> = emptyList()
+)
+
+@Serializable
+data class GroqStreamChoice(
+    val delta: GroqStreamDelta = GroqStreamDelta(),
+    @SerialName("finish_reason") val finishReason: String? = null
+)
+
+@Serializable
+data class GroqStreamDelta(
+    val role: String? = null,
+    val content: String? = null,
+    @SerialName("tool_calls") val toolCalls: List<GroqStreamToolCall>? = null
+)
+
+/**
+ * Streaming shape of a tool call. Each chunk only carries the *delta* of the
+ * function name + arguments — the parser must concatenate them by `index`
+ * across consecutive chunks before deserializing the args JSON.
+ */
+@Serializable
+data class GroqStreamToolCall(
+    val index: Int = 0,
+    val id: String? = null,
+    val type: String? = null,
+    val function: GroqStreamFunctionCall? = null
+)
+
+@Serializable
+data class GroqStreamFunctionCall(
+    val name: String? = null,
+    val arguments: String? = null
 )
