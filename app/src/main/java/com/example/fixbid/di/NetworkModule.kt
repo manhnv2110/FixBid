@@ -27,6 +27,11 @@ object NetworkModule {
         install(Auth) {
             flowType = FlowType.PKCE
             alwaysAutoRefresh = true
+            // OAuth callback: fixbid://auth-callback. The matching intent
+            // filter on MainActivity handles the redirect; Supabase parses
+            // the URL via handleDeeplinks() to finish the PKCE exchange.
+            scheme = "fixbid"
+            host = "auth-callback"
         }
         install(Postgrest) {
             defaultSchema = "public"

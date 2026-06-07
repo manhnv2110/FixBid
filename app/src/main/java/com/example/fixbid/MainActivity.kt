@@ -31,6 +31,7 @@ import androidx.navigation.navArgument
 import com.example.fixbid.domain.model.UserRole
 import com.example.fixbid.presentation.auth.*
 import com.example.fixbid.core.components.DraggableAiFab
+import io.github.jan.supabase.auth.handleDeeplinks
 import com.example.fixbid.presentation.customer.bidding.BiddingWorkersScreen
 import com.example.fixbid.presentation.customer.booking.BookingScreen
 import com.example.fixbid.presentation.customer.booking.BookingSuccessScreen
@@ -52,9 +53,16 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var userPreferencesDataStore: com.example.fixbid.data.local.UserPreferencesDataStore
 
+    @Inject
+    lateinit var supabaseClient: io.github.jan.supabase.SupabaseClient
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Hand the *initial* intent (cold start) to Supabase so an OAuth
+        // redirect that wakes the app from scratch still completes the
+        // PKCE exchange.
+        intent?.let { supabaseClient.handleDeeplinks(it) }
         setContent {
             val appTheme by userPreferencesDataStore.appTheme.collectAsState(initial = "system")
             val dynamicColor by userPreferencesDataStore.dynamicColorEnabled
@@ -78,6 +86,9 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        // Warm-start case: the user finished the OAuth dance while the app
+        // was alive; hand the URI to Supabase so PKCE finalises the session.
+        supabaseClient.handleDeeplinks(intent)
     }
 }
 
@@ -97,6 +108,7 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
         AuthRoutes.Register,
         AuthRoutes.Otp,
         AuthRoutes.ForgotPassword,
+        AuthRoutes.OAuthRolePicker,
         "booking_success/{bookingId}",
         "vnpay_return/{encodedUri}"
     )
@@ -182,6 +194,14 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                 AuthEvent.NavigateBackToLogin -> {
                     navController.popBackStack(AuthRoutes.Login, inclusive = false)
                 }
+                AuthEvent.NavigateToOAuthRolePicker -> {
+                    navController.navigate(AuthRoutes.OAuthRolePicker) {
+                        // Pop the auth stack so back doesn't dump them on
+                        // the Welcome screen mid-onboarding.
+                        popUpTo(0) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
                 is AuthEvent.Toast -> {
                     Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show()
                 }
@@ -192,6 +212,7 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
     // Determine start destination based on auth state
     val startDestination = when {
         !uiState.isAuthenticated -> AuthRoutes.Welcome
+        uiState.needsOAuthRoleSelection -> AuthRoutes.OAuthRolePicker
         uiState.userRole == UserRole.WORKER -> "worker_home"
         else -> "home"
     }
@@ -223,7 +244,8 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
             AuthRoutes.Login,
             AuthRoutes.Register,
             AuthRoutes.Otp,
-            AuthRoutes.ForgotPassword
+            AuthRoutes.ForgotPassword,
+            AuthRoutes.OAuthRolePicker
         )
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -236,7 +258,9 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
         composable(AuthRoutes.Welcome) {
             WelcomeScreen(
                 onSignIn = { navController.navigate(AuthRoutes.Login) },
-                onCreateAccount = { navController.navigate(AuthRoutes.Register) }
+                onCreateAccount = { navController.navigate(AuthRoutes.Register) },
+                onSignInWithGoogle = { authViewModel.signInWithGoogle() },
+                isGoogleLoading = uiState.isGoogleSigningIn
             )
         }
 
@@ -299,6 +323,19 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                 onEmailChange = authViewModel::onForgotEmailChange,
                 onSubmit = authViewModel::submitForgotPassword,
                 onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(AuthRoutes.OAuthRolePicker) {
+            OAuthRoleSelectionScreen(
+                onSelect = { role -> authViewModel.completeOAuthRoleSelection(role) },
+                onSignOut = {
+                    authViewModel.signOut()
+                    navController.navigate(AuthRoutes.Welcome) {
+                        popUpTo(0) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
             )
         }
 

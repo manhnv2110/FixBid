@@ -9,6 +9,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.OtpType
 import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.providers.builtin.Phone
 import kotlinx.coroutines.Job
@@ -30,6 +31,8 @@ sealed interface AuthEvent {
     data object NavigateToOtp : AuthEvent
     data object NavigateToHome : AuthEvent
     data object NavigateBackToLogin : AuthEvent
+    /** Profile row missing — ask the OAuth user whether they're a customer or a worker. */
+    data object NavigateToOAuthRolePicker : AuthEvent
     data class Toast(val message: String) : AuthEvent
 }
 
@@ -47,27 +50,172 @@ class AuthViewModel @Inject constructor(
 
     private var resendJob: Job? = null
 
+    /**
+     * Tracks the auth user IDs we've already routed in this VM lifecycle to
+     * avoid double-navigating when the [SessionStatus] flow re-emits (which
+     * can happen on token refresh, Activity recreate, etc.).
+     */
+    private var lastHandledUserId: String? = null
+
     init {
         viewModelScope.launch {
-            // Đợi session load xong từ storage (không dùng currentSessionOrNull vì có thể chưa sẵn sàng)
-            val status = supabase.auth.sessionStatus.first { it !is io.github.jan.supabase.auth.status.SessionStatus.Initializing }
-            val isLoggedIn = status is io.github.jan.supabase.auth.status.SessionStatus.Authenticated
-            var role: UserRole? = null
-            if (isLoggedIn) {
-                val userId = supabase.auth.currentSessionOrNull()?.user?.id
-                if (userId != null) {
-                    role = profileRepository.getProfile(userId).getOrNull()?.role
-                }
+            // Wait until the session is loaded from storage. Only after this
+            // point do we know if we're actually logged in.
+            supabase.auth.sessionStatus.first {
+                it !is io.github.jan.supabase.auth.status.SessionStatus.Initializing
             }
+            _uiState.update { it.copy(isBootstrapping = false) }
+        }
+
+        // Single source of truth for "is there a session?" — covers the cold
+        // start path, the OAuth deep-link callback, and the email/password
+        // sign-in/up paths uniformly. We only emit navigation events here so
+        // every route into the app behaves the same.
+        viewModelScope.launch {
+            supabase.auth.sessionStatus.collect { status ->
+                if (status !is io.github.jan.supabase.auth.status.SessionStatus.Authenticated) {
+                    if (lastHandledUserId != null) {
+                        // Logged out — reset trackers.
+                        lastHandledUserId = null
+                        _uiState.update {
+                            it.copy(
+                                isAuthenticated = false,
+                                userRole = null,
+                                needsOAuthRoleSelection = false
+                            )
+                        }
+                    }
+                    return@collect
+                }
+
+                val userId = status.session.user?.id ?: return@collect
+                if (userId == lastHandledUserId) return@collect
+                lastHandledUserId = userId
+
+                handleAuthenticatedSession(userId)
+            }
+        }
+    }
+
+    /**
+     * Common post-auth wiring. Looks up the profile row; if it exists we
+     * dispatch the user straight to their home. If not, we surface the role
+     * picker so an OAuth user can pick customer vs worker before we create
+     * the row.
+     */
+    private suspend fun handleAuthenticatedSession(userId: String) {
+        val existing = profileRepository.getProfile(userId).getOrNull()
+        if (existing != null) {
             _uiState.update {
                 it.copy(
-                    isAuthenticated = isLoggedIn,
-                    isBootstrapping = false,
-                    userRole = role
+                    isGoogleSigningIn = false,
+                    isAuthenticated = true,
+                    userRole = existing.role,
+                    needsOAuthRoleSelection = false
                 )
             }
-            if (isLoggedIn) {
+            _events.tryEmit(AuthEvent.NavigateToHome)
+            return
+        }
+
+        // No profile yet → most likely a fresh OAuth signup. Pop the role
+        // picker so the user can pick customer / worker.
+        _uiState.update {
+            it.copy(
+                isGoogleSigningIn = false,
+                isAuthenticated = true,
+                userRole = null,
+                needsOAuthRoleSelection = true
+            )
+        }
+        _events.tryEmit(AuthEvent.NavigateToOAuthRolePicker)
+    }
+
+    // ─── Sign in with Google (Supabase OAuth via Custom Tabs) ─────────────────
+
+    /**
+     * Launches the Supabase OAuth flow. On Android with FlowType.PKCE the SDK
+     * opens a Chrome Custom Tab to Google's consent screen, then redirects
+     * back to fixbid://auth-callback. MainActivity hands the URI to
+     * supabase.handleDeeplinks(), which finishes the PKCE exchange.
+     *
+     * The session collector in `init` watches for the new session and
+     * navigates us either home or to the role picker.
+     */
+    fun signInWithGoogle() {
+        if (_uiState.value.isGoogleSigningIn) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isGoogleSigningIn = true) }
+            runCatching {
+                // Force the redirect to come back through our deep-link
+                // scheme. Without this Supabase falls back to its dashboard
+                // Site URL (often a localhost / web URL) and the user gets
+                // stranded in the browser instead of returning to the app.
+                supabase.auth.signInWith(
+                    provider = Google,
+                    redirectUrl = "fixbid://auth-callback"
+                )
+            }.onFailure { error ->
+                Log.w(TAG, "Google sign-in failed: ${error.message}", error)
+                _uiState.update { it.copy(isGoogleSigningIn = false) }
+                _events.tryEmit(AuthEvent.Toast(parseSupabaseError(error)))
+            }
+            // On success the Custom Tab takes over; sessionStatus flow above
+            // finishes the journey. Nothing more to do here.
+        }
+    }
+
+    /**
+     * Called from the Welcome screen if the user comes back without finishing
+     * (closes Custom Tab manually). Resets the loading flag so the button
+     * doesn't stay stuck.
+     */
+    fun cancelGoogleSignIn() = _uiState.update { it.copy(isGoogleSigningIn = false) }
+
+    /**
+     * Finalises an OAuth signup once the user has picked their role. Creates
+     * the matching `profiles` row, updates state, and triggers the home
+     * navigation event.
+     */
+    fun completeOAuthRoleSelection(role: UserRole) {
+        if (!_uiState.value.needsOAuthRoleSelection) return
+
+        viewModelScope.launch {
+            val authUser = supabase.auth.currentUserOrNull()
+            if (authUser == null) {
+                _events.tryEmit(AuthEvent.Toast("Phiên đăng nhập đã hết hạn, vui lòng thử lại"))
+                return@launch
+            }
+
+            val meta = authUser.userMetadata
+            fun metaString(vararg keys: String): String? = keys
+                .firstNotNullOfOrNull { key ->
+                    (meta?.get(key) as? kotlinx.serialization.json.JsonPrimitive)?.content
+                }
+            val fullName = metaString("full_name", "name")
+                ?: authUser.email?.substringBefore("@")
+                ?: "Người dùng"
+
+            val result = profileRepository.upsertProfile(
+                userId = authUser.id,
+                email = authUser.email,
+                fullName = fullName,
+                phoneNumber = null,
+                role = role
+            )
+
+            result.onSuccess {
+                _uiState.update {
+                    it.copy(
+                        userRole = role,
+                        needsOAuthRoleSelection = false
+                    )
+                }
                 _events.tryEmit(AuthEvent.NavigateToHome)
+            }.onFailure { error ->
+                Log.w(TAG, "Failed to create profile after OAuth: ${error.message}", error)
+                _events.tryEmit(AuthEvent.Toast("Không thể tạo hồ sơ, vui lòng thử lại"))
             }
         }
     }
@@ -392,6 +540,7 @@ class AuthViewModel @Inject constructor(
     fun signOut() {
         viewModelScope.launch {
             runCatching { supabase.auth.signOut() }
+            lastHandledUserId = null
             _uiState.update { AuthUiState(isBootstrapping = false) }
         }
     }

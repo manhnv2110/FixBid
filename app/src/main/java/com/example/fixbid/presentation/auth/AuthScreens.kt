@@ -63,7 +63,9 @@ import com.example.fixbid.ui.theme.FixBidTheme
 @Composable
 fun WelcomeScreen(
     onSignIn: () -> Unit,
-    onCreateAccount: () -> Unit
+    onCreateAccount: () -> Unit,
+    onSignInWithGoogle: () -> Unit = {},
+    isGoogleLoading: Boolean = false
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -139,7 +141,8 @@ fun WelcomeScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedButton(
-                onClick = {},
+                onClick = onSignInWithGoogle,
+                enabled = !isGoogleLoading,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
@@ -147,9 +150,19 @@ fun WelcomeScreen(
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.Transparent)
             ) {
-                AuthSocialIcon(label = "G", contentColor = Color(0xFF4285F4))
-                Spacer(modifier = Modifier.width(10.dp))
-                Text("Tiếp tục với Google", color = MaterialTheme.colorScheme.onSurface)
+                if (isGoogleLoading) {
+                    androidx.compose.material3.CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text("Đang kết nối Google…", color = MaterialTheme.colorScheme.onSurface)
+                } else {
+                    AuthSocialIcon(label = "G", contentColor = Color(0xFF4285F4))
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text("Tiếp tục với Google", color = MaterialTheme.colorScheme.onSurface)
+                }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -656,8 +669,154 @@ fun OtpVerificationScreen(
     }
 }
 
-// ─── ForgotPasswordScreen ──────────────────────────────────────────────────────
+// ─── OAuthRoleSelectionScreen ──────────────────────────────────────────────────
 
+/**
+ * Shown right after a successful OAuth (Google) sign-in if the user does not
+ * yet have a `profiles` row. Lets them pick whether they're a customer or a
+ * worker before we create the row and let them into the app.
+ */
+@Composable
+fun OAuthRoleSelectionScreen(
+    onSelect: (UserRole) -> Unit,
+    onSignOut: () -> Unit
+) {
+    val selected = androidx.compose.runtime.remember {
+        androidx.compose.runtime.mutableStateOf(UserRole.CUSTOMER)
+    }
+    val isSubmitting = androidx.compose.runtime.remember {
+        androidx.compose.runtime.mutableStateOf(false)
+    }
+
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets.safeDrawing
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 24.dp, vertical = 20.dp)
+        ) {
+            Spacer(modifier = Modifier.height(8.dp))
+            AuthLogo(modifier = Modifier.fillMaxWidth())
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Text(
+                text = "Bạn muốn dùng FixBid như?",
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Chọn vai trò để hoàn tất tài khoản. Bạn có thể đổi sau trong phần Hồ sơ.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                OAuthRoleCard(
+                    modifier = Modifier.weight(1f),
+                    title = UserRole.CUSTOMER.displayName,
+                    description = "Tìm và đặt thợ sửa chữa tin cậy",
+                    selected = selected.value == UserRole.CUSTOMER,
+                    enabled = !isSubmitting.value,
+                    onClick = { selected.value = UserRole.CUSTOMER }
+                )
+                OAuthRoleCard(
+                    modifier = Modifier.weight(1f),
+                    title = UserRole.WORKER.displayName,
+                    description = "Nhận đơn, báo giá và làm việc",
+                    selected = selected.value == UserRole.WORKER,
+                    enabled = !isSubmitting.value,
+                    onClick = { selected.value = UserRole.WORKER }
+                )
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            PrimaryButton(
+                text = "Tiếp tục",
+                onClick = {
+                    isSubmitting.value = true
+                    onSelect(selected.value)
+                },
+                enabled = !isSubmitting.value,
+                isLoading = isSubmitting.value
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Đăng xuất và quay lại",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = !isSubmitting.value) { onSignOut() }
+                    .padding(8.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun OAuthRoleCard(
+    title: String,
+    description: String,
+    selected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val border = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+    val background = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(background, RoundedCornerShape(16.dp))
+            .border(1.5.dp, border, RoundedCornerShape(16.dp))
+            .clickable(enabled = enabled) { onClick() }
+            .padding(16.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = title,
+                color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f)
+            )
+            if (selected) {
+                Icon(
+                    imageVector = Icons.Outlined.CheckCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = description,
+            color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 12.sp,
+            lineHeight = 16.sp
+        )
+    }
+}
+
+// ─── ForgotPasswordScreen ──────────────────────────────────────────────────────
 @Composable
 fun ForgotPasswordScreen(
     state: ForgotPasswordFormState,

@@ -73,7 +73,14 @@ data class AuthUiState(
     val forgotPassword: ForgotPasswordFormState = ForgotPasswordFormState(),
     val otp: OtpFormState = OtpFormState(),
     /** Persisted across Register → OTP → Home so we can create the profile row. */
-    val pendingRegistration: PendingRegistration? = null
+    val pendingRegistration: PendingRegistration? = null,
+    /** True while the Custom Tab is open and we're waiting for the deep-link callback. */
+    val isGoogleSigningIn: Boolean = false,
+    /**
+     * True when an OAuth user signed in but no profile row exists yet — we
+     * route them to the role picker before letting them into the app.
+     */
+    val needsOAuthRoleSelection: Boolean = false
 )
 
 /**

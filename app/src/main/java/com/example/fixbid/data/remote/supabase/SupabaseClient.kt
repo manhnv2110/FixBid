@@ -35,6 +35,8 @@ fun createFixBidSupabaseClient(): SupabaseClient = createSupabaseClient(
     install(Auth) {
         flowType = FlowType.PKCE
         alwaysAutoRefresh = true
+        scheme = "fixbid"
+        host = "auth-callback"
     }
     install(Postgrest)
     install(Realtime)

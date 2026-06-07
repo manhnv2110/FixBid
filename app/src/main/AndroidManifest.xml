@@ -73,6 +73,17 @@
                     android:scheme="fixbid"
                     android:host="vnpay-return" />
             </intent-filter>
+
+            <!-- Supabase OAuth (Google) redirect — completes the PKCE flow
+                 by handing the URL back to supabase.handleDeeplinks(). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="fixbid"
+                    android:host="auth-callback" />
+            </intent-filter>
         </activity>
 
         <!-- FCM: receives background/killed-app push and renders via AppNotificationManager.
