@@ -57,12 +57,14 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val appTheme by userPreferencesDataStore.appTheme.collectAsState(initial = "system")
+            val dynamicColor by userPreferencesDataStore.dynamicColorEnabled
+                .collectAsState(initial = false)
             val isDark = when (appTheme) {
                 "dark" -> true
                 "light" -> false
                 else -> androidx.compose.foundation.isSystemInDarkTheme()
             }
-            FixBidTheme(darkTheme = isDark) {
+            FixBidTheme(darkTheme = isDark, dynamicColor = dynamicColor) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background

@@ -1,11 +1,19 @@
 package com.example.fixbid.ui.theme
 
 import android.app.Activity
+import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.*
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
@@ -66,10 +74,10 @@ private val DarkColorScheme = darkColorScheme(
 @Composable
 fun SetStatusBarColor(darkIcons: Boolean, darkTheme: Boolean = isSystemInDarkTheme()) {
     val view = LocalView.current
-    
+
     // In dark theme, status bar icons should always be light (not darkIcons)
     val appearanceLightIcons = if (darkTheme) false else darkIcons
-    
+
     if (!view.isInEditMode) {
         DisposableEffect(appearanceLightIcons) {
             var context = view.context
@@ -78,7 +86,7 @@ fun SetStatusBarColor(darkIcons: Boolean, darkTheme: Boolean = isSystemInDarkThe
                 context = context.baseContext
             }
             val activity = context as? Activity
-            
+
             if (activity != null) {
                 val window = activity.window
                 val controller = WindowCompat.getInsetsController(window, window.decorView)
@@ -94,14 +102,46 @@ fun SetStatusBarColor(darkIcons: Boolean, darkTheme: Boolean = isSystemInDarkThe
     }
 }
 
-val LocalIsDarkTheme = androidx.compose.runtime.compositionLocalOf { false }
+val LocalIsDarkTheme = compositionLocalOf { false }
 
+/**
+ * Whether Material You dynamic colors are actually supported on this device.
+ * Used by the theme settings UI to gate the toggle (we hide the option on
+ * older Androids rather than show a non-functional switch).
+ */
+val SupportsDynamicColor: Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+
+/**
+ * Root theme composable.
+ *
+ * Color scheme priority:
+ *   1. If [dynamicColor] is requested **and** the device is API 31+ (a.k.a.
+ *      Material You), pull the wallpaper-derived palette via
+ *      [dynamicLightColorScheme]/[dynamicDarkColorScheme]. The user's
+ *      wallpaper drives every Material color slot — primary, surface, etc.
+ *   2. Otherwise fall back to FixBid's hand-tuned palette
+ *      ([LightColorScheme] / [DarkColorScheme]).
+ *
+ * Note: status palette ([LightStatusColors] / [DarkStatusColors]) keeps using
+ * our domain-meaningful colors (booking pending = orange, completed = green)
+ * even when dynamic color is on — a bidding chip should remain "đang nhận
+ * báo giá" green, not turn into the user's wallpaper teal. Only the Material
+ * scheme follows the wallpaper.
+ */
 @Composable
 fun FixBidTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val colorScheme: ColorScheme = when {
+        dynamicColor && SupportsDynamicColor -> {
+            val ctx = LocalContext.current
+            if (darkTheme) dynamicDarkColorScheme(ctx) else dynamicLightColorScheme(ctx)
+        }
+        darkTheme -> DarkColorScheme
+        else -> LightColorScheme
+    }
     val statusColors = if (darkTheme) DarkStatusColors else LightStatusColors
 
     CompositionLocalProvider(
