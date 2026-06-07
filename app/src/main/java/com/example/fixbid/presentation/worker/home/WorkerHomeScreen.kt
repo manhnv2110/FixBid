@@ -42,7 +42,6 @@ import coil.request.ImageRequest
 import com.example.fixbid.core.components.AppBottomBar
 import com.example.fixbid.core.components.BottomNavDestination
 import com.example.fixbid.core.components.ChatBell
-import com.example.fixbid.core.components.DraggableAiFab
 import com.example.fixbid.core.components.NotificationBell
 import com.example.fixbid.core.utils.formatCurrencyVnd
 import com.example.fixbid.core.utils.formatShortDateTime
@@ -223,19 +222,9 @@ fun WorkerHomeScreen(
                 }
             }
 
-            // Draggable AI assistant overlay — only on the dashboard tab.
-            if (currentRoute == WorkerTab.HOME) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(bottom = innerPadding.calculateBottomPadding())
-                ) {
-                    DraggableAiFab(
-                        onClick = onChatbotClick,
-                        storageKey = "worker_ai_fab"
-                    )
-                }
-            }
+            // The AI assistant FAB is now hosted globally by `FixBidNavHost`,
+            // so it can travel across every worker screen (jobs, wallet, profile…)
+            // instead of being pinned to the dashboard tab.
         }
     }
 }

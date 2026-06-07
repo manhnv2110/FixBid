@@ -37,7 +37,6 @@ import com.example.fixbid.domain.model.ServiceCategory
 import com.example.fixbid.core.components.AppBottomBar
 import com.example.fixbid.core.components.BottomNavDestination
 import com.example.fixbid.core.components.CategoryGrid
-import com.example.fixbid.core.components.DraggableAiFab
 import com.example.fixbid.core.components.NotificationBell
 import com.example.fixbid.core.components.NotificationCard
 import com.example.fixbid.core.components.PrimaryTopBar
@@ -185,20 +184,10 @@ fun HomeScreen(
                 }
             }
 
-            // Draggable AI assistant overlay — only on the home tab so it
-            // doesn't cover other screens' primary actions.
-            if (currentRoute == CustomerTab.HOME) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(bottom = innerPadding.calculateBottomPadding())
-                ) {
-                    DraggableAiFab(
-                        onClick = onChatbotClick,
-                        storageKey = "customer_ai_fab"
-                    )
-                }
-            }
+            // The AI assistant FAB is now hosted globally by `FixBidNavHost`,
+            // so it can travel across every screen (home, booking detail, wallet…)
+            // instead of being pinned to one tab. We keep `onChatbotClick` here
+            // for any future entry point on the home tab itself.
 
             if (showLocationPicker) {
                 AddressPickerSheet(

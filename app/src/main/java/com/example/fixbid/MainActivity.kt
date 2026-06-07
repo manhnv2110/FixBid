@@ -30,6 +30,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.fixbid.domain.model.UserRole
 import com.example.fixbid.presentation.auth.*
+import com.example.fixbid.core.components.DraggableAiFab
 import com.example.fixbid.presentation.customer.bidding.BiddingWorkersScreen
 import com.example.fixbid.presentation.customer.booking.BookingScreen
 import com.example.fixbid.presentation.customer.booking.BookingSuccessScreen
@@ -183,11 +184,29 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
         }
     }
 
-    NavHost(
-        navController = navController,
-        startDestination = startDestination,
-        modifier = Modifier.fillMaxSize()
-    ) {
+    // Routes where the global AI FAB should NOT be shown:
+    //   - any auth screen (user not logged in yet)
+    //   - the chatbot itself (you're already inside it)
+    //   - payment / VNPay flows (we don't want a roaming FAB during checkout)
+    val hideAiFab = uiState.isBootstrapping ||
+        !uiState.isAuthenticated ||
+        currentRoute == "chatbot" ||
+        currentRoute?.startsWith("payment/") == true ||
+        currentRoute?.startsWith("vnpay_return/") == true ||
+        currentRoute in setOf(
+            AuthRoutes.Welcome,
+            AuthRoutes.Login,
+            AuthRoutes.Register,
+            AuthRoutes.Otp,
+            AuthRoutes.ForgotPassword
+        )
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        NavHost(
+            navController = navController,
+            startDestination = startDestination,
+            modifier = Modifier.fillMaxSize()
+        ) {
         // ─── Auth screens ─────────────────────────────────────────────────
         composable(AuthRoutes.Welcome) {
             WelcomeScreen(
@@ -685,6 +704,22 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
         ) {
             ChatScreen(
                 onBackClick = { navController.popBackStack() }
+            )
+        }
+        }
+
+        // Global AI assistant FAB. Drawn on top of every NavHost screen except
+        // auth/payment/chatbot itself (see `hideAiFab` above). The FAB position
+        // persists across screens via `rememberSaveable` inside
+        // [DraggableAiFab].
+        if (!hideAiFab) {
+            DraggableAiFab(
+                onClick = {
+                    if (currentRoute != "chatbot") {
+                        runCatching { navController.navigate("chatbot") }
+                    }
+                },
+                storageKey = "global_ai_fab"
             )
         }
     }
