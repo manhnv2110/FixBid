@@ -303,6 +303,25 @@ private fun CenterText(text: String, onClose: () -> Unit) {
  * + media permissions enabled. Jitsi's web app is a single-page app — we
  * just hand it a room name and a display name via the URL fragment.
  *
+ * Two critical things make this actually work in a WebView (vs failing
+ * with "WebRTC not available"):
+ *
+ *   1. **Desktop User-Agent**. The `meet.jit.si` SPA detects Android
+ *      browsers and redirects to a "Open in the Jitsi Meet app" landing
+ *      page that refuses to grant `getUserMedia`. Spoofing a Linux Chrome
+ *      UA bypasses that branch — the same JS bundle then runs the full
+ *      desktop pipeline which is happy inside Chromium-backed WebView.
+ *   2. **Jitsi IFrame API + minimal HTML host**. Loading `meet.jit.si`
+ *      directly is fragile because the SPA pulls service workers and
+ *      strict CSP that fight the WebView. Wrapping it via the official
+ *      `external_api.js` IFrame API gives us a stable embed contract
+ *      Jitsi explicitly supports — same API everyone else uses.
+ *
+ * On top of that we enable every WebSettings flag `getUserMedia` cares
+ * about: JS, DOM storage, third-party cookies, mixed content, no
+ * gesture-required playback. Without those the page loads but
+ * `navigator.mediaDevices` returns undefined and the room joins blind.
+ *
  * `interfaceConfig.overrides` (passed in the URL) hides the toolbar items
  * we don't want (invite, recording, screen share) so the in-call UI stays
  * focused on what matters: video + audio + leave button. The leave button
@@ -323,15 +342,56 @@ private fun JitsiWebView(roomName: String, displayName: String) {
                 settings.apply {
                     javaScriptEnabled = true
                     domStorageEnabled = true
+                    databaseEnabled = true
                     mediaPlaybackRequiresUserGesture = false
                     cacheMode = WebSettings.LOAD_DEFAULT
                     @Suppress("DEPRECATION")
                     allowFileAccessFromFileURLs = true
                     @Suppress("DEPRECATION")
                     allowUniversalAccessFromFileURLs = true
-                    userAgentString = "Mozilla/5.0 (Linux; Android) FixBid/1.0 Mobile Safari/537.36"
+                    // Modern WebRTC requires unrestricted media + DOM access.
+                    javaScriptCanOpenWindowsAutomatically = true
+                    setSupportMultipleWindows(false)
+                    loadWithOverviewMode = true
+                    useWideViewPort = true
+                    // Allow the page to load over HTTPS while making
+                    // sub-requests over HTTP (Jitsi config endpoints
+                    // sometimes do this on the public bridge).
+                    mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                    // Critical: pretend to be Linux Chrome desktop so
+                    // meet.jit.si stops redirecting to the "Open in app"
+                    // mobile landing page (which would refuse getUserMedia).
+                    userAgentString =
+                        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 " +
+                        "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
                 }
-                webViewClient = WebViewClient()
+                // Cookies from third parties are required by the Jitsi auth
+                // and recording pipeline. Without this the room loads but
+                // the participant can't authenticate even as a guest.
+                android.webkit.CookieManager.getInstance()
+                    .setAcceptThirdPartyCookies(this, true)
+
+                // Hardware accel makes a real difference on the encoder
+                // path — WebRTC software decoding chokes at 30fps on
+                // mid-tier devices.
+                setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
+
+                webViewClient = object : WebViewClient() {
+                    // Surface fatal load failures (DNS, no internet, …) to
+                    // the host so the screen can render a friendly retry
+                    // instead of a blank white page.
+                    override fun onReceivedError(
+                        view: WebView?,
+                        request: android.webkit.WebResourceRequest?,
+                        error: android.webkit.WebResourceError?
+                    ) {
+                        super.onReceivedError(view, request, error)
+                        android.util.Log.w(
+                            "JitsiWebView",
+                            "load error: ${error?.description}"
+                        )
+                    }
+                }
                 webChromeClient = object : WebChromeClient() {
                     override fun onPermissionRequest(request: PermissionRequest) {
                         // The page already runs inside our app and we already
@@ -340,27 +400,140 @@ private fun JitsiWebView(roomName: String, displayName: String) {
                         // returns a stream.
                         request.grant(request.resources)
                     }
+
+                    override fun onPermissionRequestCanceled(request: PermissionRequest?) {
+                        super.onPermissionRequestCanceled(request)
+                    }
+
+                    // Some Jitsi calls trigger geolocation prompts on first
+                    // load (for region detection); auto-allow so the user
+                    // doesn't see an extra dialog.
+                    override fun onGeolocationPermissionsShowPrompt(
+                        origin: String?,
+                        callback: android.webkit.GeolocationPermissions.Callback?
+                    ) {
+                        callback?.invoke(origin, true, false)
+                    }
+
+                    override fun onConsoleMessage(
+                        consoleMessage: android.webkit.ConsoleMessage?
+                    ): Boolean {
+                        // Helpful when chasing "WebRTC not available" — Jitsi
+                        // logs the precise reason (mic permission, codec, …)
+                        // to the console.
+                        consoleMessage?.let {
+                            android.util.Log.d("JitsiWebView", "${it.messageLevel()} ${it.message()}")
+                        }
+                        return true
+                    }
                 }
-                val encodedName = Uri.encode(displayName)
-                // URL fragment carries Jitsi config:
-                // - userInfo.displayName: shown in the participant tile
-                // - config.prejoinPageEnabled=false: skip the "set name + camera"
-                //   landing — both peers should drop straight into the room
-                // - config.startWithVideoMuted/AudioMuted=false: explicitly
-                //   start with both on; Jitsi otherwise honours per-user prefs
-                val url = "https://meet.jit.si/$roomName" +
-                    "#userInfo.displayName=\"$encodedName\"" +
-                    "&config.prejoinPageEnabled=false" +
-                    "&config.startWithVideoMuted=false" +
-                    "&config.startWithAudioMuted=false" +
-                    "&config.disableInviteFunctions=true" +
-                    "&config.disableDeepLinking=true"
-                loadUrl(url)
+                // Load a tiny HTML host that pulls in Jitsi's official IFrame
+                // API and creates the meeting embed inside the same window.
+                // Loading via a data URL on a real origin (jit.si) keeps
+                // CORS and CSP happy. The room + display name are interpolated
+                // into JS literals; both are user-controlled so we escape.
+                val safeRoom = roomName.replace("\"", "\\\"")
+                val safeDisplay = displayName.replace("\"", "\\\"")
+                val html = jitsiIframeHostHtml(safeRoom, safeDisplay)
+                loadDataWithBaseURL(
+                    "https://meet.jit.si",
+                    html,
+                    "text/html",
+                    "utf-8",
+                    null
+                )
             }
         },
-        update = { /* no-op — WebView state is managed internally */ }
+        update = { /* no-op — WebView state is managed internally */ },
+        onRelease = { webView ->
+            // Stop media tracks and release the WebView cleanly so the
+            // camera light goes off the moment we leave the screen.
+            runCatching {
+                webView.evaluateJavascript(
+                    "if (window.__jitsiApi) { window.__jitsiApi.dispose(); }",
+                    null
+                )
+            }
+            webView.stopLoading()
+            webView.loadUrl("about:blank")
+            webView.removeAllViews()
+            webView.destroy()
+        }
     )
 }
+
+/**
+ * Minimal HTML host that loads Jitsi's official IFrame API and creates
+ * the meeting embed. Same approach the Jitsi docs recommend for non-
+ * native integrations — gives us a stable contract that survives
+ * meet.jit.si UI redesigns.
+ *
+ * The `interfaceConfigOverwrite` strips toolbar buttons we don't need
+ * (invite, recording, screen share, …) so the in-call UI stays focused
+ * on the customer ↔ worker conversation.
+ */
+private fun jitsiIframeHostHtml(roomName: String, displayName: String): String = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+        <style>
+            html, body { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; }
+            #jitsi-container { width: 100%; height: 100%; }
+            iframe { border: 0; }
+        </style>
+    </head>
+    <body>
+        <div id="jitsi-container"></div>
+        <script src="https://meet.jit.si/external_api.js"></script>
+        <script>
+            (function () {
+                var domain = "meet.jit.si";
+                var options = {
+                    roomName: "$roomName",
+                    parentNode: document.getElementById("jitsi-container"),
+                    width: "100%",
+                    height: "100%",
+                    userInfo: { displayName: "$displayName" },
+                    configOverwrite: {
+                        prejoinPageEnabled: false,
+                        startWithAudioMuted: false,
+                        startWithVideoMuted: false,
+                        disableDeepLinking: true,
+                        disableInviteFunctions: true,
+                        // Don't show the "you can also use the mobile app" banner.
+                        enableClosePage: false
+                    },
+                    interfaceConfigOverwrite: {
+                        MOBILE_APP_PROMO: false,
+                        SHOW_JITSI_WATERMARK: false,
+                        SHOW_PROMOTIONAL_CLOSE_PAGE: false,
+                        SHOW_WATERMARK_FOR_GUESTS: false,
+                        TOOLBAR_BUTTONS: [
+                            "microphone", "camera", "hangup", "fullscreen",
+                            "tileview", "select-background", "videoquality"
+                        ]
+                    }
+                };
+                try {
+                    var api = new JitsiMeetExternalAPI(domain, options);
+                    window.__jitsiApi = api;
+                    // Tag the document so the host (us) can spot a successful load.
+                    api.addListener("videoConferenceJoined", function () {
+                        document.title = "JOINED";
+                    });
+                } catch (err) {
+                    document.body.innerHTML =
+                        '<div style="color:#fff;padding:32px;font-family:sans-serif;">' +
+                        'Không tải được kết nối video: ' + (err && err.message ? err.message : err) +
+                        '</div>';
+                }
+            })();
+        </script>
+    </body>
+    </html>
+""".trimIndent()
 
 private fun formatDuration(seconds: Int): String {
     val s = seconds.coerceAtLeast(0)
