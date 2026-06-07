@@ -97,11 +97,11 @@ class NotificationRepositoryImpl @Inject constructor(
     override fun observeNotifications(userId: String): Flow<List<Notification>> {
         val channel = client.realtime.channel("notification_updates_${userId}_${System.currentTimeMillis()}")
 
-        val changes = channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
+        val changes = channel.postgresChangeFlow<PostgresAction>(schema = "public") {
             table  = Tables.NOTIFICATIONS
             filter("user_id", FilterOperator.EQ, userId)
         }.map {
-            // Khi có thông báo mới, load lại toàn bộ
+            // Khi có thay đổi (thêm mới hoặc cập nhật), load lại toàn bộ
             (getNotifications(userId) as? Resource.Success)?.data ?: emptyList()
         }
         return channel.liveFlow(changes)

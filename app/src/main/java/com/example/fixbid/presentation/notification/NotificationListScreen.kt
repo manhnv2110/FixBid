@@ -1,6 +1,7 @@
 package com.example.fixbid.presentation.notification
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -210,6 +211,20 @@ fun NotificationListItem(
         label = "notif_container"
     )
 
+    val elevationState by animateDpAsState(
+        targetValue = if (notification.isRead) 0.dp else 2.dp,
+        label = "notif_elevation"
+    )
+
+    val borderColor by animateColorAsState(
+        targetValue = if (notification.isRead) {
+            Color.Transparent
+        } else {
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        },
+        label = "notif_border"
+    )
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -217,12 +232,9 @@ fun NotificationListItem(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = containerColor),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = if (notification.isRead) 0.dp else 2.dp
+            defaultElevation = elevationState
         ),
-        border = if (notification.isRead) null else BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-        )
+        border = BorderStroke(1.dp, borderColor)
     ) {
         Row(
             modifier = Modifier

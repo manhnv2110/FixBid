@@ -29,9 +29,9 @@ class ObserveUnreadNotificationCountUseCase @Inject constructor(
         suspend fun currentCount(): Int =
             (notificationRepository.getUnreadCount(user.id) as? Resource.Success)?.data ?: 0
 
-        // Seed with the current count, then recompute on every new notification.
+        // Seed with the current count, then recompute on every notification change (insert, update, delete).
         emitAll(
-            notificationRepository.observeNewNotifications(user.id)
+            notificationRepository.observeNotifications(user.id)
                 .map { currentCount() }
                 .onStart { emit(currentCount()) }
         )
