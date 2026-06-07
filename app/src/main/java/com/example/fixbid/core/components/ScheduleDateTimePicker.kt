@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -77,12 +78,12 @@ fun ScheduleDateTimePicker(
     val dateLabel = scheduledAtMillis?.let { formatDate(it) } ?: "Chọn ngày"
     val timeLabel = scheduledAtMillis?.let { formatTime(it) } ?: "Chọn giờ"
 
-    Row(
+    Column(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         PickerField(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.fillMaxWidth(),
             icon = Icons.Outlined.CalendarToday,
             label = "Ngày",
             value = dateLabel,
@@ -90,7 +91,7 @@ fun ScheduleDateTimePicker(
             onClick = { showDatePicker = true }
         )
         PickerField(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.fillMaxWidth(),
             icon = Icons.Outlined.Schedule,
             label = "Giờ",
             value = timeLabel,
@@ -228,7 +229,7 @@ private fun PickerField(
     isSet: Boolean,
     onClick: () -> Unit
 ) {
-    Box(
+    Column(
         modifier = modifier
             .clip(RoundedCornerShape(10.dp))
             .background(
@@ -236,37 +237,36 @@ private fun PickerField(
                 else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
             )
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 12.dp)
-            .height(56.dp)
+            .padding(horizontal = 14.dp, vertical = 8.dp)
+            .heightIn(min = 56.dp),
+        verticalArrangement = Arrangement.Center
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.Center
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.Medium
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Text(
-                text = label,
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = FontWeight.Medium
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = if (isSet) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp)
             )
-            Spacer(modifier = Modifier.height(2.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = if (isSet) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = value,
-                    fontSize = 14.sp,
-                    fontWeight = if (isSet) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (isSet) MaterialTheme.colorScheme.onSurface
-                    else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = value,
+                fontSize = 14.sp,
+                fontWeight = if (isSet) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (isSet) MaterialTheme.colorScheme.onSurface
+                else MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
