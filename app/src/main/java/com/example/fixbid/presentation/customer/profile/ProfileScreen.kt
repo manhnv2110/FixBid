@@ -433,15 +433,7 @@ fun ProfileScreen(
                                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
                                 )
                             }
-                            ProfileMenuItem(
-                                icon = Icons.Outlined.Payment,
-                                title = "Thanh toán",
-                                subtitle = "Quản lý phương thức thanh toán"
-                            )
-                            HorizontalDivider(
-                                modifier = Modifier.padding(horizontal = 20.dp),
-                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                            )
+
                             ThemeSelectorMenuItem(
                                 currentTheme = currentTheme,
                                 onThemeChange = viewModel::saveTheme
