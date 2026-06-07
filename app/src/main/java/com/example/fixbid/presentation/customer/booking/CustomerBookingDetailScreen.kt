@@ -132,6 +132,30 @@ fun CustomerBookingDetailScreen(
                 CustomerBookingDetailEvent.BookingDeleted -> {
                     onBackClick()
                 }
+                is CustomerBookingDetailEvent.ShareReceipt -> {
+                    // Launch the system share sheet so the customer can drop
+                    // the PDF straight into email / Drive / Zalo without
+                    // leaving FixBid. We use ACTION_SEND with an explicit
+                    // PDF mime type — that filters the chooser to apps that
+                    // actually accept attachments.
+                    val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                        type = "application/pdf"
+                        putExtra(android.content.Intent.EXTRA_STREAM, event.uri)
+                        putExtra(android.content.Intent.EXTRA_SUBJECT, "Biên lai dịch vụ FixBid")
+                        putExtra(
+                            android.content.Intent.EXTRA_TEXT,
+                            "Biên lai dịch vụ FixBid đính kèm."
+                        )
+                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    runCatching {
+                        context.startActivity(
+                            android.content.Intent.createChooser(shareIntent, "Chia sẻ biên lai")
+                        )
+                    }.onFailure {
+                        Toast.makeText(context, "Không thể mở ứng dụng chia sẻ", Toast.LENGTH_SHORT).show()
+                    }
+                }
             }
         }
     }
@@ -276,6 +300,44 @@ fun CustomerBookingDetailScreen(
                     // payments table so the customer has a clear receipt.
                     if (booking.status == BookingStatus.COMPLETED && uiState.payment != null) {
                         CompletedPaymentCard(payment = uiState.payment!!)
+                        // Download-receipt CTA lets the customer share the
+                        // PDF for tax/expense use. Disabled while the
+                        // generator is running so a double-tap doesn't
+                        // queue two share sheets.
+                        Button(
+                            onClick = viewModel::downloadReceipt,
+                            enabled = !uiState.isGeneratingReceipt,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        ) {
+                            if (uiState.isGeneratingReceipt) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Đang tạo biên lai…", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Outlined.Download,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    "Tải biên lai PDF",
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 14.sp
+                                )
+                            }
+                        }
                     }
 
                     // Main info Card (View mode or Edit mode)

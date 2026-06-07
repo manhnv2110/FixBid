@@ -46,12 +46,20 @@ data class CustomerBookingDetailUiState(
     val isCancelling: Boolean = false,
     val isDeleting: Boolean = false,
     /** True while accept/reject quote network call is in flight. */
-    val isRespondingQuote: Boolean = false
+    val isRespondingQuote: Boolean = false,
+    /** True while the receipt PDF is being generated + the share sheet opens. */
+    val isGeneratingReceipt: Boolean = false
 )
 
 sealed interface CustomerBookingDetailEvent {
     data class Toast(val message: String) : CustomerBookingDetailEvent
     data object BookingDeleted : CustomerBookingDetailEvent
+    /**
+     * A receipt PDF was just rendered to a sharable Uri. The screen
+     * launches a ShareSheet with this Uri so the customer can attach
+     * the file to email / Drive / Zalo without leaving FixBid.
+     */
+    data class ShareReceipt(val uri: android.net.Uri) : CustomerBookingDetailEvent
 }
 
 @HiltViewModel
@@ -66,7 +74,11 @@ class CustomerBookingDetailViewModel @Inject constructor(
     private val rejectDirectQuoteUseCase: com.example.fixbid.domain.usecase.customer.RejectDirectQuoteUseCase,
     private val aiAgentRepository: com.example.fixbid.domain.repository.AiAgentRepository,
     private val authRepository: com.example.fixbid.domain.repository.AuthRepository,
-    private val aiSuggestionEngine: com.example.fixbid.domain.usecase.shared.AiSuggestionEngine
+    private val aiSuggestionEngine: com.example.fixbid.domain.usecase.shared.AiSuggestionEngine,
+    private val generateReceiptUseCase: com.example.fixbid.domain.usecase.customer.GeneratePaymentReceiptUseCase,
+    private val receiptPdfRenderer: com.example.fixbid.core.pdf.ReceiptPdfRenderer,
+    @dagger.hilt.android.qualifiers.ApplicationContext
+    private val appContext: android.content.Context
 ) : ViewModel() {
 
     val geocoder: GeocoderRepository get() = geocoderRepository
@@ -461,6 +473,39 @@ class CustomerBookingDetailViewModel @Inject constructor(
                     _events.trySend(
                         CustomerBookingDetailEvent.Toast(
                             "Từ chối báo giá thất bại: ${result.message}"
+                        )
+                    )
+                }
+                is Resource.Loading -> { /* no-op */ }
+            }
+        }
+    }
+
+    // ─── Receipt PDF download ────────────────────────────────────────────────
+    //
+    // Renders the payment receipt as an A4 PDF and emits a ShareReceipt event
+    // the screen forwards to the system Share sheet. The PDF rendering runs
+    // off the main thread (PdfDocument writes to disk), guarded by an
+    // `isGeneratingReceipt` flag so a double-tap doesn't queue two jobs.
+
+    fun downloadReceipt() {
+        val booking = _uiState.value.booking ?: return
+        if (_uiState.value.isGeneratingReceipt) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isGeneratingReceipt = true) }
+            when (val res = generateReceiptUseCase(booking.id)) {
+                is Resource.Success -> {
+                    val uri = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        receiptPdfRenderer.render(appContext, res.data)
+                    }
+                    _events.trySend(CustomerBookingDetailEvent.ShareReceipt(uri))
+                    _uiState.update { it.copy(isGeneratingReceipt = false) }
+                }
+                is Resource.Error -> {
+                    _uiState.update { it.copy(isGeneratingReceipt = false) }
+                    _events.trySend(
+                        CustomerBookingDetailEvent.Toast(
+                            "Không thể tạo biên lai: ${res.message}"
                         )
                     )
                 }
