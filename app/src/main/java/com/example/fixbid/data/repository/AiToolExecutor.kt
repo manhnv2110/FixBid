@@ -734,6 +734,7 @@ class AiToolExecutor @Inject constructor(
     private fun statusLabel(status: BookingStatus): String = when (status) {
         BookingStatus.PENDING -> "Chờ xác nhận"
         BookingStatus.BIDDING -> "Đang nhận báo giá"
+        BookingStatus.QUOTED -> "Chờ duyệt báo giá"
         BookingStatus.AWAITING_PAYMENT -> "Chờ thanh toán"
         BookingStatus.CONFIRMED -> "Đã xác nhận"
         BookingStatus.IN_PROGRESS -> "Đang thực hiện"

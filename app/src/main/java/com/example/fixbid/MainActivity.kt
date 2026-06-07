@@ -748,6 +748,17 @@ private fun handleNotificationClick(
         com.example.fixbid.domain.model.NotificationType.BID_RECEIVED ->
             "bidding_workers/$referenceId"
 
+        // Direct-booking quote flow: customer is the one who needs to act on a
+        // BOOKING_QUOTED, the worker on a BOOKING_QUOTE_ACCEPTED / REJECTED.
+        com.example.fixbid.domain.model.NotificationType.BOOKING_QUOTED ->
+            if (isWorker) "worker_job_detail/$referenceId"
+            else "customer_booking_detail/$referenceId"
+
+        com.example.fixbid.domain.model.NotificationType.BOOKING_QUOTE_ACCEPTED,
+        com.example.fixbid.domain.model.NotificationType.BOOKING_QUOTE_REJECTED ->
+            if (isWorker) "worker_job_detail/$referenceId"
+            else "customer_booking_detail/$referenceId"
+
         com.example.fixbid.domain.model.NotificationType.JOB_COMPLETED ->
             if (isWorker) "worker_job_detail/$referenceId"
             else "completion_confirm/$referenceId"

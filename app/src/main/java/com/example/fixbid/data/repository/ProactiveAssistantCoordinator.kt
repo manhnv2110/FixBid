@@ -128,6 +128,21 @@ class ProactiveAssistantCoordinator @Inject constructor(
                 ("Nhắc giúp mình lịch hẹn sắp tới $short" to
                     "Sắp đến lịch hẹn. Cần mình tóm tắt thông tin không?")
             }
+            NotificationType.BOOKING_QUOTED -> {
+                if (role != UserRole.CUSTOMER) return null
+                ("Thợ vừa báo giá đơn $short, giúp mình đánh giá có hợp lý không" to
+                    "Thợ vừa gửi báo giá cho đơn của bạn. Cần mình tóm tắt và gợi ý có nên chấp nhận không?")
+            }
+            NotificationType.BOOKING_QUOTE_ACCEPTED -> {
+                if (role != UserRole.WORKER) return null
+                ("Khách đã chấp nhận báo giá đơn $short, giờ tôi cần làm gì?" to
+                    "Khách vừa chấp nhận báo giá của bạn. Mình hướng dẫn các bước tiếp theo nhé?")
+            }
+            NotificationType.BOOKING_QUOTE_REJECTED -> {
+                if (role != UserRole.WORKER) return null
+                ("Khách từ chối báo giá đơn $short, gợi ý mức giá phù hợp" to
+                    "Khách chưa đồng ý mức giá. Cần mình gợi ý điều chỉnh báo giá không?")
+            }
             // Skip noisy / non-conversational types.
             NotificationType.NEW_MESSAGE,
             NotificationType.BOOKING_CONFIRMED,
