@@ -61,7 +61,7 @@ fun ChatbotScreen(
     val streamingTextLen = uiState.messages.lastOrNull()?.takeIf { it.isStreaming }?.text?.length ?: 0
     LaunchedEffect(uiState.messages.size, streamingTextLen) {
         val count = uiState.messages.size
-        if (count > 0) listState.animateScrollToItem(count - 1)
+        if (count > 0) listState.animateScrollToItem(0)
     }
 
     Scaffold(
@@ -118,15 +118,8 @@ fun ChatbotScreen(
                 )
             )
         },
-        bottomBar = {
-            ChatInputBar(
-                value = uiState.input,
-                enabled = !uiState.isThinking,
-                onValueChange = viewModel::onInputChange,
-                onSend = viewModel::send
-            )
-        },
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
 
@@ -143,13 +136,15 @@ fun ChatbotScreen(
                 }
             }
 
+            val reversedMessages = remember(uiState.messages) { uiState.messages.reversed() }
             LazyColumn(
                 state = listState,
+                reverseLayout = true,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(uiState.messages, key = { it.id }) { msg ->
+                items(reversedMessages, key = { it.id }) { msg ->
                     MessageBubble(
                         msg = msg,
                         onNavigate = viewModel::onNavigationClick,
@@ -178,6 +173,13 @@ fun ChatbotScreen(
                     }
                 }
             }
+
+            ChatInputBar(
+                value = uiState.input,
+                enabled = !uiState.isThinking,
+                onValueChange = viewModel::onInputChange,
+                onSend = viewModel::send
+            )
         }
     }
 }
@@ -506,6 +508,7 @@ private fun ChatInputBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
+                .imePadding()
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
