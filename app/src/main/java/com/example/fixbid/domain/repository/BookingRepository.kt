@@ -29,6 +29,36 @@ interface BookingRepository {
     /** Worker declines a DIRECT booking → status=CANCELLED, reason saved in cancel_reason. */
     suspend fun declineDirectBooking(bookingId: String, reason: String): Resource<Booking>
 
+    /**
+     * Worker sends a price quote on a DIRECT booking. Status moves to QUOTED so
+     * the customer can review and accept/reject the price before payment. The
+     * proposed price + message + duration are persisted in the dedicated
+     * `quoted_*` columns; `agreed_price` is only set later when the customer
+     * accepts the quote (see [acceptDirectQuote]).
+     */
+    suspend fun quoteDirectBooking(
+        bookingId: String,
+        proposedPrice: Double,
+        message: String,
+        estimatedDurationHours: Double?
+    ): Resource<Booking>
+
+    /**
+     * Customer accepts the worker's quote: backend copies `quoted_price` into
+     * `agreed_price` and transitions the booking to AWAITING_PAYMENT so the
+     * payment screen can render with a non-null amount.
+     */
+    suspend fun acceptDirectQuote(bookingId: String): Resource<Booking>
+
+    /**
+     * Customer rejects the quote with an optional reason. The booking goes
+     * back to PENDING and the quote columns are cleared so the worker can
+     * either send a new quote or decline the job entirely. The reason is
+     * stored in `worker_note` so the worker sees actionable feedback when
+     * they reopen the request.
+     */
+    suspend fun rejectDirectQuote(bookingId: String, reason: String?): Resource<Booking>
+
     suspend fun confirmBooking(bookingId: String): Resource<Booking>
     suspend fun startJob(bookingId: String): Resource<Booking>
     suspend fun completeJob(bookingId: String, workerNote: String?): Resource<Booking>
