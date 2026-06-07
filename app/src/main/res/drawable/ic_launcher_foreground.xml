@@ -1,17 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    FixBid launcher foreground — "FIXBID" word-mark drawn as bold block letters.
-    All glyphs are built from axis-aligned rectangles plus, for X only, two
-    filled parallelograms (real diagonals). No curves means the icon stays
-    crisp at every density and on every device icon mask.
-
-    Layout:
-      glyph cell        = 8 wide × 22 tall
-      stroke thickness  = 3
-      gap between cells = 2
-      total word width  = 6*8 + 5*2 = 58
-      first cell starts at x = 25  (centres the word in the 108 viewport)
-      glyph top         = 43, bottom = 65  (vertically centred)
+    FixBid launcher foreground — "FIXBID" word-mark drawn as clean bold sans-serif letters.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
@@ -19,54 +8,40 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- F : x = 25..33 — left bar + top bar + mid bar -->
+    <!-- F : x = 25..32.5 -->
     <path
         android:fillColor="#111418"
-        android:pathData="
-            M 25,43 h 3 v 22 h -3 z
-            M 25,43 h 8 v 3 h -8 z
-            M 25,52 h 6 v 3 h -6 z" />
+        android:pathData="M 25,43 h 7.5 v 3 h -4.5 v 6 h 4 v 3 h -4 v 10 h -3 z" />
 
-    <!-- I : x = 35..43 — top cap + middle bar + bottom cap -->
+    <!-- I : x = 36.5..39.5 -->
     <path
         android:fillColor="#111418"
-        android:pathData="
-            M 35,43 h 8 v 3 h -8 z
-            M 37.5,46 h 3 v 16 h -3 z
-            M 35,62 h 8 v 3 h -8 z" />
+        android:pathData="M 36.5,43 h 3 v 22 h -3 z" />
 
-    <!-- X : x = 45..53 — two real diagonals (parallelograms drawn with lineTo) -->
+    <!-- X : x = 43.5..51.5 — entire letter X in blue -->
     <path
         android:fillColor="#00629E"
         android:pathData="
-            M 45,43 l 3,0 l 8,22 l -3,0 z
-            M 50,43 l 3,0 l -8,22 l -3,0 z" />
+            M 43.5,43 h 3.3 l 4.7,22 h -3.3 z
+            M 48.2,43 h 3.3 l -4.7,22 h -3.3 z" />
 
-    <!-- B : x = 55..63 — left bar + 3 horizontals + right bars on the two lobes -->
+    <!-- B : x = 55.5..63.5 -->
     <path
         android:fillColor="#111418"
         android:pathData="
-            M 55,43 h 3 v 22 h -3 z
-            M 55,43 h 6 v 3 h -6 z
-            M 55,52.5 h 6 v 3 h -6 z
-            M 55,62 h 6 v 3 h -6 z
-            M 60,46 h 3 v 6.5 h -3 z
-            M 60,55.5 h 3 v 6.5 h -3 z" />
+            M 55.5,43 h 5 c 2,0 3,2 3,5.25 c 0,3.25 -1,5.25 -3,5.25 c 2,0 3,2.5 3,5.75 c 0,3.25 -1,5.75 -3,5.75 h -5 z
+            M 58.5,52 h 2 c 1.1,0 1.1,-6 0,-6 h -2 z
+            M 58.5,62 h 2 c 1.2,0 1.2,-7 0,-7 h -2 z" />
 
-    <!-- I : x = 65..73 -->
+    <!-- I : x = 67.5..70.5 -->
+    <path
+        android:fillColor="#111418"
+        android:pathData="M 67.5,43 h 3 v 22 h -3 z" />
+
+    <!-- D : x = 74.5..82.5 -->
     <path
         android:fillColor="#111418"
         android:pathData="
-            M 65,43 h 8 v 3 h -8 z
-            M 67.5,46 h 3 v 16 h -3 z
-            M 65,62 h 8 v 3 h -8 z" />
-
-    <!-- D : x = 75..83 — left bar + top cap + bottom cap + right bar (full height) -->
-    <path
-        android:fillColor="#111418"
-        android:pathData="
-            M 75,43 h 3 v 22 h -3 z
-            M 75,43 h 6 v 3 h -6 z
-            M 75,62 h 6 v 3 h -6 z
-            M 80,46 h 3 v 16 h -3 z" />
+            M 74.5,43 h 4 c 2.5,0 4,4.5 4,11 c 0,6.5 -1.5,11 -4,11 h -4 z
+            M 77.5,62 h 1 c 1.2,0 1.2,-16 0,-16 h -1 z" />
 </vector>
