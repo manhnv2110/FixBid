@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    FileProvider paths for sharing generated content (PDF receipts, edited
+    photos) with external apps via android.support.FileProvider. Only files
+    placed under these roots are exposed; everything else stays private.
+
+    - cache/receipts: temporary location for generated PDF receipts the
+      user wants to share with email / Drive / Zalo. The receipts are
+      regenerated on demand so cache is the right home — Android can
+      reclaim the space without breaking the feature.
+-->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <cache-path name="receipts" path="receipts/" />
+    <cache-path name="photo_edits" path="photo_edits/" />
+    <files-path name="exports" path="exports/" />
+</paths>

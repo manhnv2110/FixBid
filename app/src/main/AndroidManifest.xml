@@ -78,6 +78,20 @@
             </intent-filter>
         </receiver>
 
+        <!-- Exposes generated files (PDF receipts, edited photos) to other
+             apps via grantUriPermission. Authority pattern follows the
+             documented "${applicationId}.fileprovider" convention so the
+             ShareSheet works without manual MIME negotiation. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_provider_paths" />
+        </provider>
+
         <!-- Default channel + small icon for any notification-style payloads. -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
