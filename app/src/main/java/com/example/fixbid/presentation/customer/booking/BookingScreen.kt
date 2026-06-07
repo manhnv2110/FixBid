@@ -36,6 +36,8 @@ import coil.compose.AsyncImage
 import com.example.fixbid.core.components.AppHeader
 import com.example.fixbid.core.components.PhotoEditorScreen
 import com.example.fixbid.core.components.ScheduleDateTimePicker
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import com.example.fixbid.domain.model.ServiceCategory
 import kotlinx.coroutines.launch
 
@@ -72,6 +74,7 @@ fun BookingScreen(
     var addressLatitude by remember { mutableStateOf<Double?>(null) }
     var addressLongitude by remember { mutableStateOf<Double?>(null) }
     var scheduledAtMillis by remember { mutableStateOf<Long?>(null) }
+    var estimatedDurationHours by remember { mutableStateOf("1.0") }
     var showAddressPicker by remember { mutableStateOf(false) }
     var isFetchingMyLocation by remember { mutableStateOf(false) }
     
@@ -342,6 +345,53 @@ fun BookingScreen(
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    SectionLabel(icon = Icons.Outlined.Timer, text = "Thời gian làm việc dự kiến (giờ)")
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = estimatedDurationHours,
+                        onValueChange = { newValue ->
+                            val sanitized = newValue.filter { it.isDigit() || it == '.' }
+                            if (sanitized.count { it == '.' } <= 1) {
+                                estimatedDurationHours = sanitized
+                            }
+                        },
+                        placeholder = { Text("Ví dụ: 1.5, 2, 4", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = fieldColors()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("1.0", "2.0", "4.0", "8.0").forEach { hours ->
+                            Box(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (estimatedDurationHours == hours) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.surfaceVariant
+                                    )
+                                    .clickable {
+                                        estimatedDurationHours = hours
+                                    }
+                                    .padding(horizontal = 14.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    text = "${hours}h",
+                                    fontSize = 12.sp,
+                                    color = if (estimatedDurationHours == hours) MaterialTheme.colorScheme.onPrimary
+                                    else MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -616,11 +666,13 @@ fun BookingScreen(
 
             // Submit button
             val requiresSchedule = selectedCategory == ServiceCategory.CLEANING
+            val duration = estimatedDurationHours.toDoubleOrNull()
             val canSubmit = uiState !is BookingUiState.Loading &&
                     description.isNotBlank() &&
                     address.isNotBlank() &&
                     phoneNumber.isNotBlank() &&
                     fullName.isNotBlank() &&
+                    duration != null && duration > 0.0 &&
                     (!requiresSchedule || scheduledAtMillis != null)
 
             Button(
@@ -634,6 +686,7 @@ fun BookingScreen(
                         notes = notes,
                         scheduledAtMillis = scheduledAtMillis
                             ?: System.currentTimeMillis(),
+                        estimatedDurationHours = duration ?: 1.0,
                         latitude = addressLatitude,
                         longitude = addressLongitude,
                         directWorkerId = directWorkerId,
