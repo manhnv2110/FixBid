@@ -51,11 +51,28 @@ import com.example.fixbid.ui.theme.*
 fun JobDetailScreen(
     onBackClick: () -> Unit,
     onNavigateToCustomer: (String) -> Unit = {},
+    onOpenChatWithPrefill: (String) -> Unit = {},
     viewModel: JobDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    // ── AI shortcuts ────────────────────────────────────────────────────────
+    // Same pattern as the customer detail screen: the controller drives an
+    // inline analysis card the screen renders inside JobDetailContent, plus
+    // a `pendingChatPrefill` flow we forward to the navigator.
+    val aiInlineState by viewModel.aiController.inlineState.collectAsState()
+    val aiPendingPrefill by viewModel.aiController.pendingChatPrefill.collectAsState()
+    LaunchedEffect(aiPendingPrefill) {
+        aiPendingPrefill?.let {
+            onOpenChatWithPrefill(it)
+            viewModel.aiController.consumeChatPrefill()
+        }
+    }
+    val aiSuggestions = remember(uiState.data?.booking?.status, uiState.data?.booking?.id) {
+        viewModel.aiSuggestions()
+    }
 
     // Hoisted to the screen level so the photo editor overlay sits above
     // the report-completion ModalBottomSheet (which itself lives in a
@@ -138,7 +155,13 @@ fun JobDetailScreen(
                     data = uiState.data!!,
                     payment = uiState.payment,
                     currentUserId = uiState.currentUserId,
-                    contentPadding = innerPadding
+                    contentPadding = innerPadding,
+                    aiSuggestions = aiSuggestions,
+                    aiInlineState = aiInlineState,
+                    onAiSuggestionClick = { viewModel.aiController.onSuggestionTapped(it) },
+                    onAiInlineRetry = { viewModel.aiController.retryInline() },
+                    onAiInlineDismiss = { viewModel.aiController.dismissInline() },
+                    onAiInlineOpenChat = { viewModel.aiController.openInlineInChat() }
                 )
             }
         }
@@ -248,7 +271,14 @@ private fun JobDetailContent(
     data: com.example.fixbid.domain.usecase.worker.JobDetailData,
     payment: com.example.fixbid.domain.model.Payment?,
     currentUserId: String?,
-    contentPadding: PaddingValues
+    contentPadding: PaddingValues,
+    aiSuggestions: List<com.example.fixbid.domain.model.AiSuggestion> = emptyList(),
+    aiInlineState: com.example.fixbid.presentation.ai.InlineAiState =
+        com.example.fixbid.presentation.ai.InlineAiState.Idle,
+    onAiSuggestionClick: (com.example.fixbid.domain.model.AiSuggestion) -> Unit = {},
+    onAiInlineRetry: () -> Unit = {},
+    onAiInlineDismiss: () -> Unit = {},
+    onAiInlineOpenChat: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -262,6 +292,19 @@ private fun JobDetailContent(
             .padding(top = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        // AI shortcut surface — sits high in the scroll so the chips are
+        // visible without scrolling. The strip auto-hides when the engine
+        // returns nothing.
+        com.example.fixbid.presentation.ai.AiSuggestionStrip(
+            suggestions = aiSuggestions,
+            onSuggestionClick = onAiSuggestionClick
+        )
+        com.example.fixbid.presentation.ai.InlineAiAnalysisCard(
+            state = aiInlineState,
+            onRetry = onAiInlineRetry,
+            onDismiss = onAiInlineDismiss,
+            onOpenChat = onAiInlineOpenChat
+        )
         // Worker cancellation receipt — rendered above the rest of the detail
         // so the worker immediately sees what was deducted from their wallet
         // and the reason they originally typed. Predicate matches Req 8.3:

@@ -112,7 +112,9 @@ class JobDetailViewModel @Inject constructor(
     private val paymentRepository: com.example.fixbid.domain.repository.PaymentRepository,
     private val sendNotification: SendNotificationUseCase,
     private val workerCancelBookingUseCase: WorkerCancelBookingUseCase,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val aiAgentRepository: com.example.fixbid.domain.repository.AiAgentRepository,
+    private val aiSuggestionEngine: com.example.fixbid.domain.usecase.shared.AiSuggestionEngine
 ) : ViewModel() {
 
     private val bookingId: String = savedStateHandle.get<String>("bookingId") ?: ""
@@ -122,6 +124,41 @@ class JobDetailViewModel @Inject constructor(
 
     private val _events = Channel<JobDetailEvent>(Channel.BUFFERED)
     val events = _events.receiveAsFlow()
+
+    /**
+     * AI shortcut controller — drives the suggestion strip + inline analysis
+     * card on the JobDetailScreen. Worker role is assumed (this VM is only
+     * used from the worker stack).
+     */
+    val aiController: com.example.fixbid.presentation.ai.AiSuggestionController by lazy {
+        com.example.fixbid.presentation.ai.AiSuggestionController(
+            scope = viewModelScope,
+            aiAgentRepository = aiAgentRepository,
+            role = com.example.fixbid.domain.model.UserRole.WORKER
+        )
+    }
+
+    /** Re-derive AI suggestions whenever the loaded JobDetailData changes. */
+    fun aiSuggestions(): List<com.example.fixbid.domain.model.AiSuggestion> {
+        val data = _uiState.value.data ?: return emptyList()
+        val booking = data.booking
+        return aiSuggestionEngine(
+            com.example.fixbid.domain.model.AiContext(
+                screen = com.example.fixbid.domain.model.AiContextScreen.WORKER_JOB_DETAIL,
+                userRole = com.example.fixbid.domain.model.UserRole.WORKER,
+                data = mapOf(
+                    "bookingId" to booking.id,
+                    "bookingStatus" to booking.status.name,
+                    "bookingType" to booking.type.name,
+                    "category" to booking.category.displayName,
+                    "competitorBidsCount" to data.competitorBidsCount,
+                    "averageBid" to data.averageBid,
+                    "lowestBid" to data.lowestBid,
+                    "highestBid" to data.highestBid
+                )
+            )
+        )
+    }
 
     init {
         loadCurrentUser()
