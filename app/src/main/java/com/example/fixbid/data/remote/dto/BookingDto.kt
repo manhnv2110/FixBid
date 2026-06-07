@@ -29,6 +29,10 @@ data class BookingDto(
     @SerialName("description_images") val descriptionImages: List<String>? = null,
     @SerialName("completion_note") val completionNote: String? = null,
     @SerialName("completion_images") val completionImages: List<String>? = null,
+    @SerialName("quoted_price") val quotedPrice: Double? = null,
+    @SerialName("quote_message") val quoteMessage: String? = null,
+    @SerialName("quoted_at") val quotedAt: String? = null,
+    @SerialName("quote_estimated_duration_hours") val quoteEstimatedDurationHours: Double? = null,
     @SerialName("created_at") val createdAt: String? = null,
     @SerialName("updated_at") val updatedAt: String? = null
 ) {
@@ -55,6 +59,10 @@ data class BookingDto(
         descriptionImages = descriptionImages,
         completionNote = completionNote,
         completionImages = completionImages,
+        quotedPrice = quotedPrice,
+        quoteMessage = quoteMessage,
+        quotedAt = quotedAt?.toEpochMillis(),
+        quoteEstimatedDurationHours = quoteEstimatedDurationHours,
         createdAt = createdAt?.toEpochMillis() ?: 0L,
         updatedAt = updatedAt?.toEpochMillis() ?: 0L
     )
@@ -79,5 +87,9 @@ fun Booking.toDto() = BookingDto(
     cancelReason           = cancelReason,
     descriptionImages      = descriptionImages?.ifEmpty { null },
     completionNote         = completionNote,
-    completionImages       = completionImages?.ifEmpty { null }
+    completionImages       = completionImages?.ifEmpty { null },
+    quotedPrice            = quotedPrice,
+    quoteMessage           = quoteMessage,
+    quotedAt               = quotedAt?.let { java.time.Instant.ofEpochMilli(it).toString() },
+    quoteEstimatedDurationHours = quoteEstimatedDurationHours
 )

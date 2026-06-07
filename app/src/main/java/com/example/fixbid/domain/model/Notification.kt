@@ -13,6 +13,9 @@ data class Notification(
 
 enum class NotificationType {
     BOOKING_REQUEST,       // thợ nhận được yêu cầu đặt lịch
+    BOOKING_QUOTED,        // khách: thợ đã gửi báo giá cho đơn đặt trực tiếp
+    BOOKING_QUOTE_ACCEPTED,// thợ: khách đã chấp nhận báo giá
+    BOOKING_QUOTE_REJECTED,// thợ: khách từ chối báo giá / yêu cầu báo lại
     BOOKING_CONFIRMED,     // khách được thông báo thợ đã confirm
     BOOKING_CANCELLED,
     BOOKING_REMINDER,      // nhắc lịch hẹn sắp tới (cleaning schedule reminder)

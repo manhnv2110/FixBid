@@ -28,6 +28,7 @@ data class StatusColors(
     val cancelled: Color,          // đã huỷ / trung tính
     val disputed: Color,           // tranh chấp
     val bidding: Color,            // đang nhận báo giá
+    val quoted: Color,             // thợ vừa báo giá, chờ khách duyệt (direct)
     val awaitingPayment: Color,    // chờ thanh toán
     val rating: Color,             // sao đánh giá
     val positive: Color,           // tiền vào ví / thành công
@@ -45,6 +46,7 @@ internal val LightStatusColors = StatusColors(
     cancelled = Color(0xFFB0BEC5),
     disputed = Color(0xFFD32F2F),
     bidding = Color(0xFF00897B),
+    quoted = Color(0xFF7B1FA2),
     awaitingPayment = Color(0xFFF57C00),
     rating = Color(0xFFFFA726),
     positive = Color(0xFF43A047),
@@ -62,6 +64,7 @@ internal val DarkStatusColors = StatusColors(
     cancelled = Color(0xFFCFD8DC),
     disputed = Color(0xFFE57373),
     bidding = Color(0xFF4DB6AC),
+    quoted = Color(0xFFCE93D8),
     awaitingPayment = Color(0xFFFFB74D),
     rating = Color(0xFFFFD54F),
     positive = Color(0xFF81C784),
@@ -91,6 +94,7 @@ fun statusColor(status: BookingStatus): Color {
     return when (status) {
         BookingStatus.PENDING -> c.pending
         BookingStatus.BIDDING -> c.bidding
+        BookingStatus.QUOTED -> c.quoted
         BookingStatus.AWAITING_PAYMENT -> c.awaitingPayment
         BookingStatus.CONFIRMED -> c.confirmed
         BookingStatus.IN_PROGRESS -> c.inProgress
@@ -104,6 +108,7 @@ fun statusColor(status: BookingStatus): Color {
 fun statusLabel(status: BookingStatus): String = when (status) {
     BookingStatus.PENDING -> "Chờ xác nhận"
     BookingStatus.BIDDING -> "Chờ báo giá"
+    BookingStatus.QUOTED -> "Chờ duyệt báo giá"
     BookingStatus.AWAITING_PAYMENT -> "Chờ thanh toán"
     BookingStatus.CONFIRMED -> "Đã xác nhận"
     BookingStatus.IN_PROGRESS -> "Đang làm"
