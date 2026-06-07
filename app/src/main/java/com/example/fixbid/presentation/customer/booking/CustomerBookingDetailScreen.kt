@@ -56,11 +56,29 @@ fun CustomerBookingDetailScreen(
     onNavigateToPayment: (String) -> Unit,
     onNavigateToCompletionConfirm: (String) -> Unit,
     onWalletClick: () -> Unit = {},
+    onOpenChatWithPrefill: (String) -> Unit = {},
     viewModel: CustomerBookingDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    // ── AI shortcuts ─────────────────────────────────────────────────────
+    // Surface an "AI suggestions" strip + an inline analysis card driven by
+    // the suggestion controller. The strip recomputes when the booking
+    // status flips (so a new QUOTED row immediately shows "Đánh giá báo giá"
+    // chips), and the inline card slots above the action buttons.
+    val aiInlineState by viewModel.aiController.inlineState.collectAsState()
+    val aiPendingPrefill by viewModel.aiController.pendingChatPrefill.collectAsState()
+    LaunchedEffect(aiPendingPrefill) {
+        aiPendingPrefill?.let {
+            onOpenChatWithPrefill(it)
+            viewModel.aiController.consumeChatPrefill()
+        }
+    }
+    val aiSuggestions = remember(uiState.booking?.status, uiState.booking?.id, uiState.booking?.quotedPrice) {
+        viewModel.aiSuggestions()
+    }
 
     var showAddressPicker by remember { mutableStateOf(false) }
     var isFetchingMyLocation by remember { mutableStateOf(false) }
@@ -689,6 +707,23 @@ fun CustomerBookingDetailScreen(
                                 }
                             }
                         }
+                    }
+
+                    // ── AI shortcuts ────────────────────────────────────────
+                    // Suggestion chips + inline analysis card. The strip is
+                    // hidden when the engine returns no suggestions for the
+                    // current state, so closed bookings stay clean.
+                    if (!uiState.isEditing) {
+                        com.example.fixbid.presentation.ai.AiSuggestionStrip(
+                            suggestions = aiSuggestions,
+                            onSuggestionClick = { viewModel.aiController.onSuggestionTapped(it) }
+                        )
+                        com.example.fixbid.presentation.ai.InlineAiAnalysisCard(
+                            state = aiInlineState,
+                            onRetry = { viewModel.aiController.retryInline() },
+                            onDismiss = { viewModel.aiController.dismissInline() },
+                            onOpenChat = { viewModel.aiController.openInlineInChat() }
+                        )
                     }
 
                     // Action buttons

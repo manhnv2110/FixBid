@@ -63,7 +63,10 @@ class CustomerBookingDetailViewModel @Inject constructor(
     private val locationRepository: LocationRepository,
     private val sendNotification: SendNotificationUseCase,
     private val acceptDirectQuoteUseCase: com.example.fixbid.domain.usecase.customer.AcceptDirectQuoteUseCase,
-    private val rejectDirectQuoteUseCase: com.example.fixbid.domain.usecase.customer.RejectDirectQuoteUseCase
+    private val rejectDirectQuoteUseCase: com.example.fixbid.domain.usecase.customer.RejectDirectQuoteUseCase,
+    private val aiAgentRepository: com.example.fixbid.domain.repository.AiAgentRepository,
+    private val authRepository: com.example.fixbid.domain.repository.AuthRepository,
+    private val aiSuggestionEngine: com.example.fixbid.domain.usecase.shared.AiSuggestionEngine
 ) : ViewModel() {
 
     val geocoder: GeocoderRepository get() = geocoderRepository
@@ -76,6 +79,48 @@ class CustomerBookingDetailViewModel @Inject constructor(
 
     private val _events = Channel<CustomerBookingDetailEvent>(Channel.BUFFERED)
     val events = _events.receiveAsFlow()
+
+    /**
+     * Lazily-initialised AI shortcut controller. Lives for the ViewModel's
+     * lifetime; emits inline analysis state and pending nav/prefill intents
+     * the screen consumes.
+     */
+    val aiController: com.example.fixbid.presentation.ai.AiSuggestionController by lazy {
+        // We can't read the role synchronously here so the controller starts
+        // as CUSTOMER (this whole VM is customer-only anyway).
+        com.example.fixbid.presentation.ai.AiSuggestionController(
+            scope = viewModelScope,
+            aiAgentRepository = aiAgentRepository,
+            role = com.example.fixbid.domain.model.UserRole.CUSTOMER
+        )
+    }
+
+    /**
+     * Compute AI suggestions from the latest booking snapshot. Recomputes
+     * inside the screen via `remember(uiState.booking?.status)` so the chip
+     * row stays in sync as the realtime observer pushes status transitions.
+     */
+    fun aiSuggestions(): List<com.example.fixbid.domain.model.AiSuggestion> {
+        val booking = _uiState.value.booking ?: return emptyList()
+        return aiSuggestionEngine(
+            com.example.fixbid.domain.model.AiContext(
+                screen = com.example.fixbid.domain.model.AiContextScreen.CUSTOMER_BOOKING_DETAIL,
+                userRole = com.example.fixbid.domain.model.UserRole.CUSTOMER,
+                data = mapOf(
+                    "bookingId" to booking.id,
+                    "bookingStatus" to booking.status.name,
+                    "bookingType" to booking.type.name,
+                    "category" to booking.category.displayName,
+                    "quotedPrice" to booking.quotedPrice,
+                    "agreedPrice" to booking.agreedPrice,
+                    "address" to booking.address,
+                    "scheduledAt" to booking.scheduledAt,
+                    "workerName" to booking.worker?.fullName,
+                    "workerId" to booking.workerId.takeIf { it.isNotBlank() }
+                )
+            )
+        )
+    }
 
     init {
         loadBooking()
