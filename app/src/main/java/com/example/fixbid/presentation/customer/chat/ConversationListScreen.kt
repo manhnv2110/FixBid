@@ -198,7 +198,13 @@ private fun ConversationItem(
                 overflow = TextOverflow.Ellipsis
             )
             Spacer(modifier = Modifier.height(2.dp))
-            val preview = conversation.lastMessage?.content
+            val lastMsg = conversation.lastMessage
+            val preview = when {
+                lastMsg == null -> null
+                lastMsg.type == com.example.fixbid.domain.model.MessageType.IMAGE ->
+                    "📷 Ảnh"
+                else -> lastMsg.content
+            }
             Text(
                 text = if (preview.isNullOrBlank()) "Bắt đầu cuộc trò chuyện" else preview,
                 style = MaterialTheme.typography.bodySmall,
