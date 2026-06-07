@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Check
@@ -44,8 +42,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -56,21 +52,22 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.example.fixbid.core.map.MapStyles
 import com.example.fixbid.data.location.GeocoderRepository
 import com.example.fixbid.data.location.LocationRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import org.osmdroid.events.MapListener
-import org.osmdroid.events.ScrollEvent
-import org.osmdroid.events.ZoomEvent
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory
-import org.osmdroid.util.GeoPoint
-import org.osmdroid.views.MapView
+import org.maplibre.android.camera.CameraPosition
+import org.maplibre.android.camera.CameraUpdateFactory
+import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.maps.MapLibreMap
+import org.maplibre.android.maps.MapView
+import org.maplibre.android.maps.Style
 
 /**
- * Full-height Material 3 bottom sheet with an osmdroid map. The user drags the map
+ * Full-height Material 3 bottom sheet with a MapLibre map. The user drags the map
  * under a fixed center pin, the address is reverse-geocoded as the map settles, and a
  * "Confirm" button returns both the typed address and the precise coordinates.
  *
@@ -98,85 +95,86 @@ fun AddressPickerSheet(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    val primaryArgb = MaterialTheme.colorScheme.primary.toArgb()
-
     // Default to Hanoi when neither initial coords nor a fix have arrived yet.
-    val fallbackPoint = remember { GeoPoint(21.0285, 105.8542) }
-    var selectedLat by remember { mutableStateOf(initialLatitude ?: fallbackPoint.latitude) }
-    var selectedLng by remember { mutableStateOf(initialLongitude ?: fallbackPoint.longitude) }
+    val fallbackLat = 21.0285
+    val fallbackLng = 105.8542
+    var selectedLat by remember { mutableStateOf(initialLatitude ?: fallbackLat) }
+    var selectedLng by remember { mutableStateOf(initialLongitude ?: fallbackLng) }
     var displayAddress by remember { mutableStateOf(initialAddress) }
     var isResolvingAddress by remember { mutableStateOf(false) }
     var isFetchingLocation by remember { mutableStateOf(false) }
 
-    // Re-create the MapView once per composition; lifecycle binding handles pause/resume.
     val mapView = remember {
         MapView(context).apply {
-            setTileSource(TileSourceFactory.MAPNIK)
-            setMultiTouchControls(true)
-            zoomController.setVisibility(
-                org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER
-            )
-            controller.setZoom(if (initialLatitude != null && initialLongitude != null) 17.0 else 14.0)
-            controller.setCenter(
-                GeoPoint(
-                    initialLatitude ?: fallbackPoint.latitude,
-                    initialLongitude ?: fallbackPoint.longitude
-                )
-            )
+            // MapLibre needs lifecycle bookkeeping even when hosted by Compose; we
+            // call onCreate/onStart eagerly here and route the rest of the events
+            // through the lifecycle observer below.
+            onCreate(null)
         }
     }
+    val mapHolder = remember { mutableStateOf<MapLibreMap?>(null) }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
+                Lifecycle.Event.ON_START -> mapView.onStart()
                 Lifecycle.Event.ON_RESUME -> mapView.onResume()
                 Lifecycle.Event.ON_PAUSE -> mapView.onPause()
+                Lifecycle.Event.ON_STOP -> mapView.onStop()
+                Lifecycle.Event.ON_DESTROY -> mapView.onDestroy()
                 else -> Unit
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            mapView.onDetach()
+            mapView.onPause()
+            mapView.onStop()
+            mapView.onDestroy()
         }
     }
 
     // Debounce: only reverse-geocode after the map has settled for ~400 ms. Keeping
-    // this in MutableState lets the disposable map listener mutate it without leaking
-    // the scope.
+    // the in-flight job in a MutableState lets the camera-idle listener cancel the
+    // previous one without leaking the scope.
     val pendingGeocodeJob = remember { mutableStateOf<Job?>(null) }
 
     DisposableEffect(mapView) {
-        val listener = object : MapListener {
-            override fun onScroll(event: ScrollEvent?): Boolean {
-                onMapMoved(
-                    mapView = mapView,
-                    scope = scope,
-                    pendingJobHolder = pendingGeocodeJob,
-                    geocoderRepository = geocoderRepository,
-                    onLatLngChange = { lat, lng -> selectedLat = lat; selectedLng = lng },
-                    onAddressChange = { displayAddress = it },
-                    onLoadingChange = { isResolvingAddress = it }
-                )
-                return false
-            }
-
-            override fun onZoom(event: ZoomEvent?): Boolean {
-                onMapMoved(
-                    mapView = mapView,
-                    scope = scope,
-                    pendingJobHolder = pendingGeocodeJob,
-                    geocoderRepository = geocoderRepository,
-                    onLatLngChange = { lat, lng -> selectedLat = lat; selectedLng = lng },
-                    onAddressChange = { displayAddress = it },
-                    onLoadingChange = { isResolvingAddress = it }
-                )
-                return false
-            }
+        val cameraIdleListener = MapLibreMap.OnCameraIdleListener {
+            val map = mapHolder.value ?: return@OnCameraIdleListener
+            val center = map.cameraPosition.target ?: return@OnCameraIdleListener
+            onMapMoved(
+                latitude = center.latitude,
+                longitude = center.longitude,
+                scope = scope,
+                pendingJobHolder = pendingGeocodeJob,
+                geocoderRepository = geocoderRepository,
+                onLatLngChange = { lat, lng -> selectedLat = lat; selectedLng = lng },
+                onAddressChange = { displayAddress = it },
+                onLoadingChange = { isResolvingAddress = it }
+            )
         }
-        mapView.addMapListener(listener)
+
+        // The map isn't ready yet when DisposableEffect runs, so we attach the
+        // listener in the getMapAsync callback below and remove it on dispose.
+        mapView.getMapAsync { mlMap ->
+            mapHolder.value = mlMap
+            mlMap.cameraPosition = CameraPosition.Builder()
+                .target(LatLng(selectedLat, selectedLng))
+                .zoom(if (initialLatitude != null && initialLongitude != null) 17.0 else 14.0)
+                .build()
+            mlMap.setStyle(Style.Builder().fromUri(MapStyles.DEFAULT))
+            mlMap.uiSettings.apply {
+                isAttributionEnabled = true
+                isLogoEnabled = false
+                isCompassEnabled = false
+                isRotateGesturesEnabled = false
+            }
+            mlMap.addOnCameraIdleListener(cameraIdleListener)
+        }
+
         onDispose {
-            mapView.removeMapListener(listener)
+            mapHolder.value?.removeOnCameraIdleListener(cameraIdleListener)
             pendingGeocodeJob.value?.cancel()
         }
     }
@@ -212,8 +210,7 @@ fun AddressPickerSheet(
                 Box(
                     modifier = Modifier
                         .size(40.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
+                        .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -249,7 +246,7 @@ fun AddressPickerSheet(
             ) {
                 AndroidView(
                     modifier = Modifier.fillMaxSize(),
-                    factory = { mapView }
+                    factory = { mapView.also { it.onStart(); it.onResume() } }
                 )
 
                 // Centered fixed pin overlay — feels like the Google Maps "drag to
@@ -262,14 +259,13 @@ fun AddressPickerSheet(
                         .align(Alignment.Center)
                         .size(44.dp)
                 )
-                // The pin's tip points downward — center the *bottom* of the icon on
-                // the geographic center by nudging it up half its height.
-                Spacer(
+                // Tiny dot at the geographic centre so the user can see exactly
+                // where the bottom of the pin "lands".
+                Box(
                     modifier = Modifier
                         .align(Alignment.Center)
                         .size(8.dp)
-                        .clip(CircleShape)
-                        .background(primaryArgb.toComposeColor())
+                        .background(MaterialTheme.colorScheme.primary, CircleShape)
                 )
 
                 // Floating controls
@@ -279,8 +275,12 @@ fun AddressPickerSheet(
                         .padding(end = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    SmallMapFab(Icons.Outlined.Add, "Phóng to") { mapView.controller.zoomIn() }
-                    SmallMapFab(Icons.Outlined.Remove, "Thu nhỏ") { mapView.controller.zoomOut() }
+                    SmallMapFab(Icons.Outlined.Add, "Phóng to") {
+                        mapHolder.value?.animateCamera(CameraUpdateFactory.zoomIn())
+                    }
+                    SmallMapFab(Icons.Outlined.Remove, "Thu nhỏ") {
+                        mapHolder.value?.animateCamera(CameraUpdateFactory.zoomOut())
+                    }
                     SmallMapFab(
                         icon = Icons.Outlined.MyLocation,
                         contentDescription = "Vị trí hiện tại",
@@ -291,9 +291,12 @@ fun AddressPickerSheet(
                             val location = locationRepository.getCurrentLocation()
                             isFetchingLocation = false
                             if (location != null) {
-                                val target = GeoPoint(location.latitude, location.longitude)
-                                mapView.controller.animateTo(target)
-                                mapView.controller.setZoom(17.0)
+                                mapHolder.value?.animateCamera(
+                                    CameraUpdateFactory.newLatLngZoom(
+                                        LatLng(location.latitude, location.longitude),
+                                        17.0
+                                    )
+                                )
                             }
                         }
                     }
@@ -397,15 +400,14 @@ private fun SmallMapFab(
     }
 }
 
-private fun Int.toComposeColor() = androidx.compose.ui.graphics.Color(this)
-
 /**
  * Cancel any in-flight reverse-geocode and schedule a new debounced one tied to the
  * map's current center. Keeping this as a top-level helper lets both the scroll and
  * zoom listeners share the exact same logic.
  */
 private fun onMapMoved(
-    mapView: MapView,
+    latitude: Double,
+    longitude: Double,
     scope: CoroutineScope,
     pendingJobHolder: MutableState<Job?>,
     geocoderRepository: GeocoderRepository,
@@ -413,13 +415,12 @@ private fun onMapMoved(
     onAddressChange: (String) -> Unit,
     onLoadingChange: (Boolean) -> Unit
 ) {
-    val center = mapView.mapCenter as? GeoPoint ?: return
-    onLatLngChange(center.latitude, center.longitude)
+    onLatLngChange(latitude, longitude)
     pendingJobHolder.value?.cancel()
     pendingJobHolder.value = scope.launch {
         delay(400)
         onLoadingChange(true)
-        val resolved = geocoderRepository.reverseGeocode(center.latitude, center.longitude)
+        val resolved = geocoderRepository.reverseGeocode(latitude, longitude)
         onAddressChange(resolved.orEmpty())
         onLoadingChange(false)
     }

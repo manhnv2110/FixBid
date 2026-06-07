@@ -52,7 +52,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -69,14 +71,29 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.example.fixbid.core.components.AppHeader
+import com.example.fixbid.core.map.MapStyles
+import com.example.fixbid.core.map.drawableToBitmap
+import com.example.fixbid.data.location.GeoPoint
 import com.example.fixbid.domain.model.Booking
 import com.example.fixbid.ui.theme.AccentGreen
 import com.example.fixbid.ui.theme.StatusColorsTheme
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory
-import org.osmdroid.util.GeoPoint
-import org.osmdroid.views.MapView
-import org.osmdroid.views.overlay.Marker
-import org.osmdroid.views.overlay.Polyline
+import org.maplibre.android.camera.CameraPosition
+import org.maplibre.android.camera.CameraUpdateFactory
+import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.geometry.LatLngBounds
+import org.maplibre.android.maps.MapLibreMap
+import org.maplibre.android.maps.MapView
+import org.maplibre.android.maps.Style
+import org.maplibre.android.style.expressions.Expression
+import org.maplibre.android.style.layers.LineLayer
+import org.maplibre.android.style.layers.Property
+import org.maplibre.android.style.layers.PropertyFactory
+import org.maplibre.android.style.layers.SymbolLayer
+import org.maplibre.android.style.sources.GeoJsonSource
+import org.maplibre.geojson.Feature
+import org.maplibre.geojson.FeatureCollection
+import org.maplibre.geojson.LineString
+import org.maplibre.geojson.Point
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -187,94 +204,142 @@ private fun MapContent(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val primary = MaterialTheme.colorScheme.primary.toArgb()
-    val accentRoute = StatusColorsTheme.current.inProgress.toArgb()
+    val primaryArgb = MaterialTheme.colorScheme.primary.toArgb()
+    val routeArgb = StatusColorsTheme.current.inProgress.toArgb()
+    val workerColorArgb = AccentGreen.toArgb()
 
+    // The MapLibre `MapView` is a heavy SurfaceView-backed widget, so we only
+    // create it once per composition and route lifecycle events ourselves.
     val mapView = remember {
         MapView(context).apply {
-            setTileSource(TileSourceFactory.MAPNIK)
-            setMultiTouchControls(true)
-            // Hide built-in zoom buttons; we provide our own Material FABs.
-            zoomController.setVisibility(
-                org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER
-            )
-            controller.setZoom(15.0)
-            controller.setCenter(customerLocation)
+            // MapLibre relies on the activity lifecycle to allocate the GL surface;
+            // calling `onCreate(null)` here is the documented pattern when hosting
+            // a `MapView` inside a Compose `AndroidView`.
+            onCreate(null)
         }
     }
 
-    // Bridge the host Composable lifecycle to the MapView so tile fetching pauses
-    // while the user is somewhere else in the app.
+    // Cache references the `update` block needs without rebuilding them every recomposition.
+    val mapHolder = remember { mutableStateOf<MapLibreMap?>(null) }
+    val styleHolder = remember { mutableStateOf<Style?>(null) }
+    val didFitRoute = remember { mutableStateOf(false) }
+
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
+                Lifecycle.Event.ON_START -> mapView.onStart()
                 Lifecycle.Event.ON_RESUME -> mapView.onResume()
                 Lifecycle.Event.ON_PAUSE -> mapView.onPause()
+                Lifecycle.Event.ON_STOP -> mapView.onStop()
+                Lifecycle.Event.ON_DESTROY -> mapView.onDestroy()
                 else -> Unit
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            mapView.onDetach()
+            mapView.onPause()
+            mapView.onStop()
+            mapView.onDestroy()
         }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
-            factory = { mapView },
+            factory = { mapView.also { it.onStart(); it.onResume() } },
             update = { view ->
-                view.overlays.clear()
+                val map = mapHolder.value
+                if (map == null) {
+                    // First composition: load the OSM raster style and seed the camera.
+                    view.getMapAsync { mlMap ->
+                        mapHolder.value = mlMap
+                        mlMap.cameraPosition = CameraPosition.Builder()
+                            .target(customerLocation.toLatLng())
+                            .zoom(15.0)
+                            .build()
+                        mlMap.setStyle(Style.Builder().fromUri(MapStyles.DEFAULT)) { style ->
+                            styleHolder.value = style
 
-                // Customer marker (destination).
-                val customerMarker = Marker(view).apply {
-                    position = customerLocation
-                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                    title = "Khách hàng"
-                    icon = ContextCompatDrawableTinted(
-                        context = view.context,
-                        resId = android.R.drawable.ic_menu_mylocation,
-                        tint = primary
-                    )
-                }
-                view.overlays.add(customerMarker)
+                            // Marker icons must be registered with the style before
+                            // SymbolLayer can reference them by name.
+                            style.addImage(
+                                MapStyles.IMAGE_CUSTOMER,
+                                drawableToBitmap(
+                                    context = view.context,
+                                    resId = android.R.drawable.ic_menu_mylocation,
+                                    tintArgb = primaryArgb
+                                )
+                            )
+                            style.addImage(
+                                MapStyles.IMAGE_WORKER,
+                                drawableToBitmap(
+                                    context = view.context,
+                                    resId = android.R.drawable.ic_menu_compass,
+                                    tintArgb = workerColorArgb
+                                )
+                            )
 
-                // Worker marker (origin) only when we know where they are.
-                workerLocation?.let { wp ->
-                    val workerMarker = Marker(view).apply {
-                        position = wp
-                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                        title = "Vị trí của bạn"
-                        icon = ContextCompatDrawableTinted(
-                            context = view.context,
-                            resId = android.R.drawable.ic_menu_compass,
-                            tint = AccentGreen.toArgb()
-                        )
-                    }
-                    view.overlays.add(workerMarker)
-                }
+                            // Route polyline source + line layer.
+                            style.addSource(
+                                GeoJsonSource(
+                                    MapStyles.SOURCE_ROUTE,
+                                    FeatureCollection.fromFeatures(emptyArray())
+                                )
+                            )
+                            style.addLayer(
+                                LineLayer(MapStyles.LAYER_ROUTE, MapStyles.SOURCE_ROUTE)
+                                    .withProperties(
+                                        PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+                                        PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
+                                        PropertyFactory.lineColor(routeArgb),
+                                        PropertyFactory.lineWidth(6f),
+                                        PropertyFactory.lineOpacity(0.9f)
+                                    )
+                            )
 
-                // Route polyline.
-                if (routePoints.size >= 2) {
-                    val polyline = Polyline(view).apply {
-                        setPoints(routePoints)
-                        outlinePaint.color = accentRoute
-                        outlinePaint.strokeWidth = 12f
-                        outlinePaint.isAntiAlias = true
-                    }
-                    view.overlays.add(polyline)
+                            // Marker source + symbol layer (icons differentiated by
+                            // the `role` feature property).
+                            style.addSource(
+                                GeoJsonSource(
+                                    MapStyles.SOURCE_MARKERS,
+                                    FeatureCollection.fromFeatures(emptyArray())
+                                )
+                            )
+                            style.addLayer(
+                                SymbolLayer(MapStyles.LAYER_MARKERS, MapStyles.SOURCE_MARKERS)
+                                    .withProperties(
+                                        PropertyFactory.iconImage(
+                                            Expression.get("role")
+                                        ),
+                                        PropertyFactory.iconAllowOverlap(true),
+                                        PropertyFactory.iconIgnorePlacement(true),
+                                        PropertyFactory.iconSize(0.9f),
+                                        PropertyFactory.iconAnchor(Property.ICON_ANCHOR_BOTTOM)
+                                    )
+                            )
 
-                    // Auto-fit camera to the whole route the first time we receive it.
-                    val box = org.osmdroid.util.BoundingBox.fromGeoPointsSafe(routePoints)
-                    view.post {
-                        runCatching { view.zoomToBoundingBox(box, true, 96) }
+                            // Push the initial markers + route now that the style
+                            // is ready.
+                            applyMarkers(style, customerLocation, workerLocation)
+                            applyRoute(style, routePoints)
+                            if (routePoints.size >= 2 && !didFitRoute.value) {
+                                fitToRoute(mlMap, routePoints)
+                                didFitRoute.value = true
+                            }
+                        }
                     }
                 } else {
-                    view.controller.setCenter(workerLocation ?: customerLocation)
+                    // Subsequent updates only need to push fresh data into the
+                    // already-loaded sources.
+                    val style = styleHolder.value ?: return@AndroidView
+                    applyMarkers(style, customerLocation, workerLocation)
+                    applyRoute(style, routePoints)
+                    if (routePoints.size >= 2 && !didFitRoute.value) {
+                        fitToRoute(map, routePoints)
+                        didFitRoute.value = true
+                    }
                 }
-
-                view.invalidate()
             }
         )
 
@@ -318,17 +383,63 @@ private fun MapContent(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             MapFab(icon = Icons.Outlined.Add, contentDescription = "Phóng to") {
-                mapView.controller.zoomIn()
+                mapHolder.value?.animateCamera(CameraUpdateFactory.zoomIn())
             }
             MapFab(icon = Icons.Outlined.Remove, contentDescription = "Thu nhỏ") {
-                mapView.controller.zoomOut()
+                mapHolder.value?.animateCamera(CameraUpdateFactory.zoomOut())
             }
             MapFab(icon = Icons.Outlined.MyLocation, contentDescription = "Vị trí của bạn") {
-                workerLocation?.let { mapView.controller.animateTo(it) }
+                workerLocation?.let { wp ->
+                    mapHolder.value?.animateCamera(
+                        CameraUpdateFactory.newLatLngZoom(wp.toLatLng(), 16.0)
+                    )
+                }
             }
         }
     }
 }
+
+/** Push the latest `customer` (and optional `worker`) point into the marker source. */
+private fun applyMarkers(
+    style: Style,
+    customer: GeoPoint,
+    worker: GeoPoint?
+) {
+    val source = style.getSourceAs<GeoJsonSource>(MapStyles.SOURCE_MARKERS) ?: return
+    val features = mutableListOf<Feature>()
+    features += Feature.fromGeometry(
+        Point.fromLngLat(customer.longitude, customer.latitude)
+    ).apply { addStringProperty("role", MapStyles.IMAGE_CUSTOMER) }
+    worker?.let { wp ->
+        features += Feature.fromGeometry(
+            Point.fromLngLat(wp.longitude, wp.latitude)
+        ).apply { addStringProperty("role", MapStyles.IMAGE_WORKER) }
+    }
+    source.setGeoJson(FeatureCollection.fromFeatures(features))
+}
+
+/** Push the latest route polyline into the route source. Empty list clears it. */
+private fun applyRoute(style: Style, points: List<GeoPoint>) {
+    val source = style.getSourceAs<GeoJsonSource>(MapStyles.SOURCE_ROUTE) ?: return
+    if (points.size < 2) {
+        source.setGeoJson(FeatureCollection.fromFeatures(emptyArray()))
+        return
+    }
+    val line = LineString.fromLngLats(
+        points.map { Point.fromLngLat(it.longitude, it.latitude) }
+    )
+    source.setGeoJson(Feature.fromGeometry(line))
+}
+
+/** Auto-fit the camera to the bounding box of the route, leaving a 96 px padding. */
+private fun fitToRoute(map: MapLibreMap, points: List<GeoPoint>) {
+    val builder = LatLngBounds.Builder()
+    points.forEach { builder.include(it.toLatLng()) }
+    val bounds = runCatching { builder.build() }.getOrNull() ?: return
+    map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 96))
+}
+
+private fun GeoPoint.toLatLng(): LatLng = LatLng(latitude, longitude)
 
 @Composable
 private fun MapFab(
@@ -576,19 +687,6 @@ private fun UnresolvedAddressState(booking: Booking?, onOpenExternalMap: () -> U
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-@Suppress("FunctionName")
-private fun ContextCompatDrawableTinted(
-    context: android.content.Context,
-    resId: Int,
-    tint: Int
-): android.graphics.drawable.Drawable? {
-    val drawable = androidx.core.content.ContextCompat.getDrawable(context, resId)
-        ?: return null
-    val mutable = drawable.mutate()
-    androidx.core.graphics.drawable.DrawableCompat.setTint(mutable, tint)
-    return mutable
-}
 
 private fun formatDistance(meters: Double): String =
     if (meters >= 1_000) "%.1f km".format(meters / 1_000.0)

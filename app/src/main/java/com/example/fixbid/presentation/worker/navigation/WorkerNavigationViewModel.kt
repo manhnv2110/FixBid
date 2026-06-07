@@ -3,6 +3,7 @@ package com.example.fixbid.presentation.worker.navigation
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.fixbid.data.location.GeoPoint
 import com.example.fixbid.data.location.GeocoderRepository
 import com.example.fixbid.data.location.LocationRepository
 import com.example.fixbid.data.location.RoutingService
@@ -18,7 +19,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import org.osmdroid.util.GeoPoint
 import javax.inject.Inject
 
 data class WorkerNavigationUiState(
@@ -158,7 +158,7 @@ class WorkerNavigationViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         routePoints = listOf(workerPoint, customer),
-                        distanceMeters = workerPoint.distanceToAsDouble(customer),
+                        distanceMeters = workerPoint.distanceToMeters(customer),
                         durationSeconds = 0.0
                     )
                 }
@@ -196,6 +196,6 @@ class WorkerNavigationViewModel @Inject constructor(
         _uiState.update { it.copy(isResolvingAddress = true) }
         val resolved = geocoderRepository.resolveAddress(booking.address)
         _uiState.update { it.copy(isResolvingAddress = false) }
-        return resolved?.let { GeoPoint(it.latitude, it.longitude) }
+        return resolved
     }
 }
