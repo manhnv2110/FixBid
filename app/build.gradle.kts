@@ -130,8 +130,11 @@ dependencies {
     // Image Loading
     implementation("io.coil-kt:coil-compose:2.6.0")
 
-    // Maps & Navigation (OpenStreetMap)
-    implementation("org.osmdroid:osmdroid-android:6.1.18")
+    // Maps & Navigation — MapLibre Native rendering OpenStreetMap raster tiles.
+    // Routing comes from the public OSRM demo server (see RoutingService); both
+    // are fully open-source and require no API key, matching the project's
+    // "no Google/Mapbox lock-in" stance.
+    implementation("org.maplibre.gl:android-sdk:11.5.1")
 
     // Fused Location (worker current location)
     implementation("com.google.android.gms:play-services-location:21.3.0")
