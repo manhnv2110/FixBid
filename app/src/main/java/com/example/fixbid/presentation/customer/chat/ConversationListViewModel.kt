@@ -11,11 +11,9 @@ import com.example.fixbid.domain.repository.AuthRepository
 import com.example.fixbid.domain.repository.ChatRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -52,7 +50,6 @@ class ConversationListViewModel @Inject constructor(
     init {
         loadConversations()
         observeRealtime()
-        startPolling()
     }
 
     fun loadConversations() {
@@ -70,17 +67,6 @@ class ConversationListViewModel @Inject constructor(
             _isRefreshing.value = true
             fetchConversations()
             _isRefreshing.value = false
-        }
-    }
-
-    /** Polling fallback: refresh every 5s in case Realtime events are missed. */
-    private fun startPolling() {
-        viewModelScope.launch {
-            delay(2000) // short initial delay so initial load completes first
-            while (isActive) {
-                delay(5000)
-                fetchConversations()
-            }
         }
     }
 
