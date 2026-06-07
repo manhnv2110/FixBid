@@ -46,10 +46,9 @@ fun ConversationListScreen(
         modifier = Modifier.fillMaxSize()
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            val convCount = (uiState as? ConversationListUiState.Success)?.conversations?.size ?: 0
             PrimaryTopBar(
                 title = "Tin nhắn",
-                subtitle = if (convCount > 0) "$convCount cuộc trò chuyện" else null,
+                centerTitle = true,
                 leading = if (onBackClick != null) {
                     {
                         IconButton(onClick = onBackClick) {

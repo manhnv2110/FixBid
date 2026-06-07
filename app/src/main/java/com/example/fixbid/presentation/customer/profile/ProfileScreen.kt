@@ -77,7 +77,7 @@ fun ProfileScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         // Header
-        PrimaryTopBar(title = "Hồ sơ cá nhân")
+        PrimaryTopBar(title = "Hồ sơ cá nhân", centerTitle = true)
 
         when {
             uiState.isLoading -> {

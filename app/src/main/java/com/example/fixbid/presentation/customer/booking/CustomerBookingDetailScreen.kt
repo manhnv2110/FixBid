@@ -154,13 +154,42 @@ fun CustomerBookingDetailScreen(
     ) { innerPadding ->
         when {
             uiState.isLoading -> {
-                Box(
+                // Skeleton matches the real layout: status card + main info
+                // card + schedule/location card + action button placeholder.
+                Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(innerPadding),
-                    contentAlignment = Alignment.Center
+                        .padding(innerPadding)
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    com.example.fixbid.core.components.SkeletonBlock(
+                        modifier = Modifier.fillMaxWidth(),
+                        height = 72.dp,
+                        cornerRadius = 14.dp
+                    )
+                    com.example.fixbid.core.components.SkeletonBlock(
+                        modifier = Modifier.fillMaxWidth(),
+                        height = 140.dp,
+                        cornerRadius = 14.dp
+                    )
+                    com.example.fixbid.core.components.SkeletonBlock(
+                        modifier = Modifier.fillMaxWidth(),
+                        height = 110.dp,
+                        cornerRadius = 14.dp
+                    )
+                    com.example.fixbid.core.components.SkeletonBlock(
+                        modifier = Modifier.fillMaxWidth(),
+                        height = 90.dp,
+                        cornerRadius = 14.dp
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    com.example.fixbid.core.components.SkeletonBlock(
+                        modifier = Modifier.fillMaxWidth(),
+                        height = 50.dp,
+                        cornerRadius = 12.dp
+                    )
                 }
             }
             uiState.errorMessage != null -> {

@@ -28,6 +28,12 @@ sealed class BiddingUiState {
     object Loading : BiddingUiState()
     data class Success(val bids: List<Bid>) : BiddingUiState()
     data class Error(val message: String) : BiddingUiState()
+    /**
+     * The underlying booking is gone (deleted) or its status moved past the
+     * bidding stage (cancelled, awaiting_payment, …). The screen should pop
+     * back to a safer location instead of staying on a stale list.
+     */
+    data class BookingUnavailable(val message: String) : BiddingUiState()
 }
 
 sealed class BiddingEvent {
@@ -38,6 +44,9 @@ sealed class BiddingEvent {
         val workerId: String,
         val workerName: String
     ) : BiddingEvent()
+
+    /** Booking deleted/finished — screen owner should pop back. */
+    data object BookingClosed : BiddingEvent()
 }
 
 @HiltViewModel
@@ -68,6 +77,7 @@ class BiddingViewModel @Inject constructor(
     init {
         loadBids()
         observeBidsRealtime()
+        observeBookingLifecycle()
     }
 
     fun loadBids() {
@@ -77,6 +87,31 @@ class BiddingViewModel @Inject constructor(
         }
         viewModelScope.launch {
             _uiState.value = BiddingUiState.Loading
+            // Verify the underlying booking still exists & is in a state where
+            // bids matter — protects the screen from crashing on a deep-link
+            // pointing to a deleted/cancelled booking.
+            when (val bookingRes = bookingRepository.getBookingById(bookingId)) {
+                is Resource.Error -> {
+                    _uiState.value = BiddingUiState.BookingUnavailable(
+                        bookingRes.message ?: "Yêu cầu này không còn tồn tại"
+                    )
+                    return@launch
+                }
+                is Resource.Success -> {
+                    val booking = bookingRes.data
+                    val statusName = booking.status.name
+                    val isBidStage = statusName.equals("BIDDING", ignoreCase = true) ||
+                        statusName.equals("PENDING", ignoreCase = true)
+                    if (!isBidStage) {
+                        _uiState.value = BiddingUiState.BookingUnavailable(
+                            "Yêu cầu này không còn nhận báo giá."
+                        )
+                        return@launch
+                    }
+                }
+                is Resource.Loading -> { /* no-op */ }
+            }
+
             when (val result = bidRepository.getBidsForBooking(bookingId)) {
                 is Resource.Success -> {
                     _uiState.value = BiddingUiState.Success(result.data)
@@ -102,7 +137,45 @@ class BiddingViewModel @Inject constructor(
             bidRepository.observeBidsForBooking(bookingId)
                 .catch { /* realtime drop is non-fatal: the one-time load already populated the UI */ }
                 .collect { bids ->
-                    _uiState.value = BiddingUiState.Success(bids)
+                    // Don't clobber the BookingUnavailable terminal state with
+                    // a stale bid list cached on the realtime side.
+                    if (_uiState.value !is BiddingUiState.BookingUnavailable) {
+                        _uiState.value = BiddingUiState.Success(bids)
+                    }
+                }
+        }
+    }
+
+    /**
+     * Watches the booking row itself so we can react when the customer
+     * cancels (or somebody server-side deletes) the booking while the screen
+     * is open. Without this guard the realtime bid stream keeps pushing
+     * empty lists and the screen sits there confusing the user.
+     */
+    private fun observeBookingLifecycle() {
+        if (bookingId.isBlank()) return
+        viewModelScope.launch {
+            bookingRepository.observeBooking(bookingId)
+                .catch { /* realtime drop is non-fatal */ }
+                .collect { booking ->
+                    if (booking == null) {
+                        // Row vanished — push the user back so they don't
+                        // act on stale bids.
+                        _uiState.value = BiddingUiState.BookingUnavailable(
+                            "Yêu cầu đã bị xoá."
+                        )
+                        _events.emit(BiddingEvent.BookingClosed)
+                        return@collect
+                    }
+                    val statusName = booking.status.name
+                    val stillBidStage = statusName.equals("BIDDING", ignoreCase = true) ||
+                        statusName.equals("PENDING", ignoreCase = true)
+                    if (!stillBidStage && _uiState.value is BiddingUiState.Success) {
+                        // Booking advanced past bidding (someone accepted, or
+                        // customer cancelled) — let the screen know so it can
+                        // navigate away from the bid list.
+                        _events.emit(BiddingEvent.BookingClosed)
+                    }
                 }
         }
     }

@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Badge
+import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Payments
@@ -74,6 +75,15 @@ fun BiddingWorkersScreen(
                     viewModel.clearSelectedWorkerProfile()
                     onNavigateToChat(event.conversationId, event.workerId, event.workerName)
                 }
+                BiddingEvent.BookingClosed -> {
+                    // Booking deleted or moved past the bidding stage server-side
+                    // (e.g. customer cancelled, somebody accepted on another
+                    // device). Pop back so the user doesn't try to act on a
+                    // stale bid list.
+                    showBottomSheet = false
+                    viewModel.clearSelectedWorkerProfile()
+                    onBackClick()
+                }
             }
         }
     }
@@ -91,11 +101,14 @@ fun BiddingWorkersScreen(
         ) {
             when (val state = uiState) {
                 is BiddingUiState.Loading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
+                    // Skeleton list — gives a sense of the upcoming bid cards
+                    // instead of a centered spinner that hides the layout.
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp)
                     ) {
-                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                        com.example.fixbid.core.components.SkeletonList(cardCount = 3)
                     }
                 }
                 is BiddingUiState.Error -> {
@@ -109,6 +122,34 @@ fun BiddingWorkersScreen(
                             Button(onClick = viewModel::loadBids) {
                                 Text("Thử lại")
                             }
+                        }
+                    }
+                }
+                is BiddingUiState.BookingUnavailable -> {
+                    // Booking deleted/closed — show a friendly explanation
+                    // instead of a stale bid list.
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Outlined.Block,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.outline,
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                state.message,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 14.sp
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(onClick = onBackClick) { Text("Quay lại") }
                         }
                     }
                 }

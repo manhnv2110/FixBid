@@ -310,8 +310,23 @@ private fun WorkerDashboard(
 
         when {
             uiState.isLoading && uiState.profile == null -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                // Skeleton dashboard — mimics the real layout so the worker
+                // sees the cards taking shape instead of a blank center
+                // spinner. Kept simple: 1 earnings card + 3 list cards.
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp)
+                        .padding(top = 16.dp, bottom = bottomPadding + 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                ) {
+                    com.example.fixbid.core.components.SkeletonBlock(
+                        modifier = Modifier.fillMaxWidth(),
+                        height = 96.dp,
+                        cornerRadius = 14.dp
+                    )
+                    com.example.fixbid.core.components.SkeletonList(cardCount = 3)
                 }
             }
             uiState.errorMessage != null -> {

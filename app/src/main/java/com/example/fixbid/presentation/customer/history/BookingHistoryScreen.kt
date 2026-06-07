@@ -76,7 +76,7 @@ fun BookingHistoryScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         // Header
-        PrimaryTopBar(title = "Đơn dịch vụ")
+        PrimaryTopBar(title = "Đơn dịch vụ", centerTitle = true)
 
         // Tab Row
         TabRow(
@@ -142,12 +142,15 @@ fun BookingHistoryScreen(
         // Content
         when (val state = uiState) {
             is HistoryUiState.Loading -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, strokeWidth = 3.dp)
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text("Đang tải...", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
-                    }
+                // Skeleton list — gives the user a sense of layout while data
+                // streams in, rather than a centered spinner that hides the
+                // tab structure they just tapped.
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp)
+                ) {
+                    com.example.fixbid.core.components.SkeletonList(cardCount = 4)
                 }
             }
             is HistoryUiState.Error -> {

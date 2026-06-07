@@ -80,6 +80,19 @@ fun PhotoEditorScreen(
     var sourceBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var loadError by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
+    // Tracks whether the screen is still mounted. Switched to false in
+    // onDispose so the save coroutine knows it must NOT call onSave (which
+    // would dispatch a navigate after the user already left).
+    val isMounted = remember { java.util.concurrent.atomic.AtomicBoolean(true) }
+
+    // Intercept system back while a save is in flight so the user can't pop
+    // mid-render and cause a stale callback. We also let `onCancel` itself
+    // honor isSaving below.
+    androidx.activity.compose.BackHandler(enabled = isSaving) {
+        // No-op: save is on the IO thread; a small toast keeps the user
+        // informed that the back press was intentional.
+        Toast.makeText(context, "Đang lưu, vui lòng chờ…", Toast.LENGTH_SHORT).show()
+    }
 
     LaunchedEffect(sourceUri) {
         val bmp = withContext(Dispatchers.IO) {
@@ -109,12 +122,32 @@ fun PhotoEditorScreen(
 
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
 
+    // Track mount state; the save coroutine reads this to decide whether
+    // to fire onSave (avoid leaking the navigate to a popped screen) and
+    // whether to recycle the source bitmap (avoid recycling a bitmap a still-
+    // mounted re-composition is drawing).
+    DisposableEffect(Unit) {
+        onDispose {
+            isMounted.set(false)
+            // If we were not in the middle of a save, the source bitmap is
+            // ours to recycle. If we ARE saving, the IO coroutine will
+            // recycle after it's done — guarded below.
+            if (!isSaving) {
+                sourceBitmap?.recycle()
+                sourceBitmap = null
+            }
+        }
+    }
+
     Scaffold(
         containerColor = Color.Black,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             EditorTopBar(
-                onCancel = onCancel,
+                // Block cancel while saving — prevents a half-baked nav-back
+                // mid-render. The dialog is dismissed via the back-press
+                // toast above instead.
+                onCancel = { if (!isSaving) onCancel() },
                 onUndo = {
                     if (strokes.isNotEmpty()) strokes.removeAt(strokes.lastIndex)
                     spotlightCanvasRect = null
@@ -128,29 +161,64 @@ fun PhotoEditorScreen(
                     if (isSaving) return@save
                     isSaving = true
                     scope.launch {
-                        val result = withContext(Dispatchers.IO) {
-                            // Convert canvas-space artefacts into image-space.
-                            val imageStrokes = strokes
-                            val imageSpotlight = spotlightCanvasRect?.let {
-                                val mapped = mapCanvasRectToImage(
-                                    canvasRect = it,
-                                    canvasSize = canvasSize,
-                                    imageWidth = bmp.width,
-                                    imageHeight = bmp.height
-                                )
-                                when (spotlightShape) {
-                                    SpotlightKind.OVAL -> SpotlightShape.Oval(mapped)
-                                    SpotlightKind.RECT -> SpotlightShape.Rect(mapped)
+                        val result = runCatching {
+                            withContext(Dispatchers.IO) {
+                                // Convert canvas-space artefacts into image-space.
+                                val imageStrokes = strokes
+                                val imageSpotlight = spotlightCanvasRect?.let {
+                                    val mapped = mapCanvasRectToImage(
+                                        canvasRect = it,
+                                        canvasSize = canvasSize,
+                                        imageWidth = bmp.width,
+                                        imageHeight = bmp.height
+                                    )
+                                    when (spotlightShape) {
+                                        SpotlightKind.OVAL -> SpotlightShape.Oval(mapped)
+                                        SpotlightKind.RECT -> SpotlightShape.Rect(mapped)
+                                    }
                                 }
+                                val rendered = BitmapUtils.renderEdits(bmp, imageStrokes, imageSpotlight)
+                                val uri = BitmapUtils.saveToCache(context, rendered)
+                                // Safe to recycle the rendered output regardless
+                                // of mount state — nothing is drawing it now
+                                // that we've serialised it to disk.
+                                if (rendered !== bmp && !rendered.isRecycled) {
+                                    rendered.recycle()
+                                }
+                                uri
                             }
-                            val rendered = BitmapUtils.renderEdits(bmp, imageStrokes, imageSpotlight)
-                            val uri = BitmapUtils.saveToCache(context, rendered)
-                            if (rendered !== bmp) rendered.recycle()
-                            uri
                         }
                         isSaving = false
-                        Toast.makeText(context, "Đã lưu ảnh đã chỉnh sửa", Toast.LENGTH_SHORT).show()
-                        onSave(result)
+
+                        // If the user navigated away while we were saving,
+                        // the cached file is still on disk for them to
+                        // re-edit later — but we must NOT call onSave (the
+                        // hosting nav graph already moved on).
+                        if (!isMounted.get()) {
+                            // Now safe to recycle the source — the dispose
+                            // skipped this because isSaving was true.
+                            sourceBitmap?.takeIf { !it.isRecycled }?.recycle()
+                            sourceBitmap = null
+                            return@launch
+                        }
+
+                        result.fold(
+                            onSuccess = { uri ->
+                                Toast.makeText(
+                                    context,
+                                    "Đã lưu ảnh đã chỉnh sửa",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                onSave(uri)
+                            },
+                            onFailure = {
+                                Toast.makeText(
+                                    context,
+                                    "Lưu ảnh thất bại. Vui lòng thử lại.",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        )
                     }
                 },
                 isSaving = isSaving,
