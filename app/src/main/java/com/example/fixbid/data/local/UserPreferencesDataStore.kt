@@ -23,6 +23,7 @@ class UserPreferencesDataStore @Inject constructor(
         val KEY_USER_ID       = stringPreferencesKey("user_id")
         val KEY_FCM_TOKEN     = stringPreferencesKey("fcm_token")
         val KEY_THEME         = stringPreferencesKey("app_theme")
+        val KEY_DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color_enabled")
         val KEY_NOTIF_ENABLED = booleanPreferencesKey("notif_enabled")
         val KEY_NOTIF_SOUND   = booleanPreferencesKey("notif_sound")
         val KEY_NOTIF_VIBRATE = booleanPreferencesKey("notif_vibrate")
@@ -36,6 +37,15 @@ class UserPreferencesDataStore @Inject constructor(
     val userId: Flow<String?> = context.dataStore.data.map { it[KEY_USER_ID] }
 
     val appTheme: Flow<String> = context.dataStore.data.map { it[KEY_THEME] ?: "system" }
+
+    /**
+     * Material You "dynamic color" preference. Defaults to **false** so the
+     * app keeps its branded palette out of the box; users opt in from the
+     * Profile menu. Only honored on Android 12+ (API 31) regardless of this
+     * flag — see [com.example.fixbid.ui.theme.FixBidTheme] for the gate.
+     */
+    val dynamicColorEnabled: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_DYNAMIC_COLOR] ?: false }
 
     // ─── Notification preferences (default: all on) ──────────────────────────
     val notificationsEnabled: Flow<Boolean> =
@@ -73,6 +83,10 @@ class UserPreferencesDataStore @Inject constructor(
 
     suspend fun saveTheme(theme: String) {
         context.dataStore.edit { it[KEY_THEME] = theme }
+    }
+
+    suspend fun setDynamicColorEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_DYNAMIC_COLOR] = enabled }
     }
 
     suspend fun setNotificationsEnabled(enabled: Boolean) {

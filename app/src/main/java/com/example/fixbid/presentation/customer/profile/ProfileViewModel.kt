@@ -40,6 +40,21 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Material You preference. The UI layer should still gate the toggle on
+     * [com.example.fixbid.ui.theme.SupportsDynamicColor] so users on older
+     * Android versions never see the switch — but persisting the flag is
+     * harmless either way (the theme function falls back to brand colors when
+     * the API isn't available).
+     */
+    val dynamicColorEnabled: Flow<Boolean> = userPreferencesDataStore.dynamicColorEnabled
+
+    fun setDynamicColorEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferencesDataStore.setDynamicColorEnabled(enabled)
+        }
+    }
+
     private val _uiState = MutableStateFlow(ProfileUiState())
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
 
