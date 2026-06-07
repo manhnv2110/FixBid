@@ -56,6 +56,7 @@ sealed interface ChatbotNavEvent {
  */
 @HiltViewModel
 class ChatbotViewModel @Inject constructor(
+    savedStateHandle: androidx.lifecycle.SavedStateHandle,
     private val aiAgentRepository: AiAgentRepository,
     private val authRepository: AuthRepository,
     private val chatHistoryStore: ChatbotHistoryDataStore,
@@ -72,6 +73,23 @@ class ChatbotViewModel @Inject constructor(
     private var userId: String = ""
     private var streamJob: Job? = null
 
+    /**
+     * Optional one-shot prefill: when the chatbot is opened from a screen
+     * shortcut (e.g. `chatbot?prefill=Tôi muốn hỏi…`), drop the text into the
+     * input field so the user can review/edit before sending. We deliberately
+     * do NOT auto-send — the user's last touch was on a non-modal chip on the
+     * source screen, so giving them a chance to refine the question prevents
+     * surprise messages going out.
+     */
+    private val initialPrefill: String? =
+        savedStateHandle.get<String>("prefill")
+            ?.takeIf { it.isNotBlank() }
+            ?.let {
+                runCatching {
+                    java.net.URLDecoder.decode(it, java.nio.charset.StandardCharsets.UTF_8.name())
+                }.getOrDefault(it)
+            }
+
     /** Backwards-compat alias used by the screen. */
     val suggestions: List<String> get() = _uiState.value.suggestions
 
@@ -82,6 +100,7 @@ class ChatbotViewModel @Inject constructor(
             userId = user?.id.orEmpty()
             hydrateOrSeed()
             observeProactivePrompts()
+            initialPrefill?.let { _uiState.update { st -> st.copy(input = it) } }
         }
     }
 

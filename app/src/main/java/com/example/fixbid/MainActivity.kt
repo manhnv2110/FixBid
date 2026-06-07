@@ -190,7 +190,7 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
     //   - payment / VNPay flows (we don't want a roaming FAB during checkout)
     val hideAiFab = uiState.isBootstrapping ||
         !uiState.isAuthenticated ||
-        currentRoute == "chatbot" ||
+        currentRoute?.startsWith("chatbot") == true ||
         currentRoute?.startsWith("payment/") == true ||
         currentRoute?.startsWith("vnpay_return/") == true ||
         currentRoute in setOf(
@@ -323,6 +323,13 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                 onNotificationSettingsClick = { navController.navigate("notification_settings") },
                 onFindWorkersClick = { navController.navigate("discover_workers") },
                 onChatbotClick = { navController.navigate("chatbot") },
+                onChatbotPrefill = { prefill ->
+                    val encoded = java.net.URLEncoder.encode(
+                        prefill,
+                        java.nio.charset.StandardCharsets.UTF_8.name()
+                    )
+                    runCatching { navController.navigate("chatbot?prefill=$encoded") }
+                },
                 onWalletClick = { navController.navigate("customer_wallet") },
                 onHelpSupportClick = { navController.navigate("help_support") }
             )
@@ -360,6 +367,13 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                 },
                 onChatbotClick = {
                     navController.navigate("chatbot")
+                },
+                onChatbotPrefill = { prefill ->
+                    val encoded = java.net.URLEncoder.encode(
+                        prefill,
+                        java.nio.charset.StandardCharsets.UTF_8.name()
+                    )
+                    runCatching { navController.navigate("chatbot?prefill=$encoded") }
                 },
                 onSignOut = {
                     navController.navigate(AuthRoutes.Welcome) {
@@ -448,6 +462,13 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                 onOpenChat = { conversationId, workerId, workerName ->
                     val encodedName = java.net.URLEncoder.encode(workerName, "UTF-8")
                     navController.navigate("chat/$conversationId/$workerId/$encodedName")
+                },
+                onOpenChatWithPrefill = { prefill ->
+                    val encoded = java.net.URLEncoder.encode(
+                        prefill,
+                        java.nio.charset.StandardCharsets.UTF_8.name()
+                    )
+                    runCatching { navController.navigate("chatbot?prefill=$encoded") }
                 }
             )
         }
@@ -461,7 +482,16 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
             )
         }
 
-        composable("chatbot") {
+        composable(
+            route = "chatbot?prefill={prefill}",
+            arguments = listOf(
+                navArgument("prefill") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) {
             com.example.fixbid.presentation.chatbot.ChatbotScreen(
                 onBackClick = { navController.popBackStack() },
                 onNavigateRoute = { route ->
@@ -484,6 +514,13 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                 onBackClick = { navController.popBackStack() },
                 onNavigateToCustomer = { bookingId ->
                     navController.navigate("worker_navigation/$bookingId")
+                },
+                onOpenChatWithPrefill = { prefill ->
+                    val encoded = java.net.URLEncoder.encode(
+                        prefill,
+                        java.nio.charset.StandardCharsets.UTF_8.name()
+                    )
+                    runCatching { navController.navigate("chatbot?prefill=$encoded") }
                 }
             )
         }
@@ -560,7 +597,14 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
                 onNavigateToCompletionConfirm = { bId ->
                     navController.navigate("completion_confirm/$bId")
                 },
-                onWalletClick = { navController.navigate("customer_wallet") }
+                onWalletClick = { navController.navigate("customer_wallet") },
+                onOpenChatWithPrefill = { prefill ->
+                    val encoded = java.net.URLEncoder.encode(
+                        prefill,
+                        java.nio.charset.StandardCharsets.UTF_8.name()
+                    )
+                    runCatching { navController.navigate("chatbot?prefill=$encoded") }
+                }
             )
         }
 
@@ -715,7 +759,7 @@ fun FixBidNavHost(isDark: Boolean, intent: android.content.Intent? = null) {
         if (!hideAiFab) {
             DraggableAiFab(
                 onClick = {
-                    if (currentRoute != "chatbot") {
+                    if (currentRoute?.startsWith("chatbot") != true) {
                         runCatching { navController.navigate("chatbot") }
                     }
                 },
