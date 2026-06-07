@@ -12,6 +12,7 @@ import com.example.fixbid.domain.usecase.worker.AcceptDirectBookingUseCase
 import com.example.fixbid.domain.usecase.worker.DeclineDirectBookingUseCase
 import com.example.fixbid.domain.usecase.worker.GetOpenJobRequestsUseCase
 import com.example.fixbid.domain.usecase.worker.GetWorkerDashboardUseCase
+import com.example.fixbid.domain.usecase.worker.QuoteDirectBookingUseCase
 import com.example.fixbid.domain.usecase.worker.ReleasePendingEscrowsUseCase
 import com.example.fixbid.domain.usecase.worker.UpdateJobStatusUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -58,6 +59,7 @@ class WorkerHomeViewModel @Inject constructor(
     private val updateJobStatusUseCase: UpdateJobStatusUseCase,
     private val acceptDirectBookingUseCase: AcceptDirectBookingUseCase,
     private val declineDirectBookingUseCase: DeclineDirectBookingUseCase,
+    private val quoteDirectBookingUseCase: QuoteDirectBookingUseCase,
     private val releasePendingEscrows: ReleasePendingEscrowsUseCase,
     private val workerRepository: WorkerRepository,
     private val authRepository: AuthRepository
@@ -218,6 +220,40 @@ class WorkerHomeViewModel @Inject constructor(
             when (val result = acceptDirectBookingUseCase(bookingId)) {
                 is Resource.Success -> {
                     _events.trySend(WorkerHomeEvent.Toast("Đã nhận đơn — chờ khách thanh toán"))
+                    loadDashboard()
+                }
+                is Resource.Error -> {
+                    _events.trySend(WorkerHomeEvent.Toast(result.message))
+                    _uiState.update { it.copy(respondingDirectId = null) }
+                }
+                is Resource.Loading -> { /* no-op */ }
+            }
+            _uiState.update { it.copy(respondingDirectId = null) }
+        }
+    }
+
+    /**
+     * Send a price quote on a direct booking from the dashboard quick-action
+     * dialog. The booking advances to QUOTED so the customer can review and
+     * accept/reject; reload so the card moves into the "đã báo giá" state.
+     */
+    fun quoteDirectBooking(
+        bookingId: String,
+        proposedPrice: Double,
+        message: String,
+        estimatedDurationHours: Double?
+    ) {
+        if (_uiState.value.respondingDirectId != null) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(respondingDirectId = bookingId) }
+            when (val result = quoteDirectBookingUseCase(
+                bookingId = bookingId,
+                proposedPrice = proposedPrice,
+                message = message,
+                estimatedDurationHours = estimatedDurationHours
+            )) {
+                is Resource.Success -> {
+                    _events.trySend(WorkerHomeEvent.Toast("Đã gửi báo giá cho khách"))
                     loadDashboard()
                 }
                 is Resource.Error -> {

@@ -15,6 +15,7 @@ import com.example.fixbid.domain.usecase.worker.DeclineDirectBookingUseCase
 import com.example.fixbid.domain.usecase.worker.GetJobDetailUseCase
 import com.example.fixbid.domain.usecase.worker.JobDetailData
 import com.example.fixbid.domain.usecase.worker.PlaceBidUseCase
+import com.example.fixbid.domain.usecase.worker.QuoteDirectBookingUseCase
 import com.example.fixbid.domain.usecase.worker.WorkerCancelBookingUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
@@ -50,6 +51,19 @@ data class CancelFormState(
     val isValid: Boolean get() = trimmedReason.length >= 10
 }
 
+/**
+ * Form state for the worker's price quote on a direct booking. Mirrors the
+ * bid form (price, duration, message) but submits to the dedicated direct-quote
+ * endpoint so the booking advances to QUOTED instead of creating a Bid row.
+ */
+data class QuoteFormState(
+    val price: String = "",
+    val durationHours: String = "",
+    val message: String = "",
+    val isSubmitting: Boolean = false,
+    val errorMessage: String? = null
+)
+
 data class JobDetailUiState(
     val isLoading: Boolean = true,
     val data: JobDetailData? = null,
@@ -65,6 +79,9 @@ data class JobDetailUiState(
     val showCancelDialog: Boolean = false,
     val cancelForm: CancelFormState = CancelFormState(),
     val isCancelling: Boolean = false,
+    /** True while the worker's price-quote submit is in flight. */
+    val showQuoteDialog: Boolean = false,
+    val quoteForm: QuoteFormState = QuoteFormState(),
     /**
      * Current authenticated user id, used by the screen to gate the cancel
      * button visibility and the cancelled banner predicate
@@ -80,6 +97,7 @@ sealed interface JobDetailEvent {
     data object CompletionSubmitted : JobDetailEvent
     data object DirectBookingAccepted : JobDetailEvent
     data object DirectBookingDeclined : JobDetailEvent
+    data object DirectQuoteSent : JobDetailEvent
 }
 
 @HiltViewModel
@@ -89,6 +107,7 @@ class JobDetailViewModel @Inject constructor(
     private val placeBidUseCase: PlaceBidUseCase,
     private val acceptDirectBookingUseCase: AcceptDirectBookingUseCase,
     private val declineDirectBookingUseCase: DeclineDirectBookingUseCase,
+    private val quoteDirectBookingUseCase: QuoteDirectBookingUseCase,
     private val bookingRepository: BookingRepository,
     private val paymentRepository: com.example.fixbid.domain.repository.PaymentRepository,
     private val sendNotification: SendNotificationUseCase,
@@ -468,6 +487,114 @@ class JobDetailViewModel @Inject constructor(
                 is Resource.Loading -> { /* no-op */ }
             }
             _uiState.update { it.copy(isRespondingDirect = false) }
+        }
+    }
+
+    // ─── Direct booking quote flow ───────────────────────────────────────────
+    //
+    // Worker proposes a price + duration on a direct booking. Submitting moves
+    // the booking to QUOTED so the customer can review and accept/reject. If the
+    // customer rejects (booking comes back to PENDING with worker_note holding
+    // the rejection reason), the worker can re-open this dialog and submit a
+    // revised quote.
+
+    /**
+     * Open the quote dialog with sensible defaults: the worker's per-hour rate
+     * × the booking's estimated duration as a starting price, the customer's
+     * estimated duration, and an empty message. If the booking is being
+     * re-quoted (status = QUOTED), pre-fill the previous quote so small edits
+     * don't require re-typing everything.
+     */
+    fun openQuoteDialog() {
+        val booking = _uiState.value.data?.booking ?: return
+        val previousPrice = booking.quotedPrice
+        val previousDuration = booking.quoteEstimatedDurationHours
+        val previousMessage = booking.quoteMessage.orEmpty()
+        _uiState.update {
+            it.copy(
+                showQuoteDialog = true,
+                quoteForm = QuoteFormState(
+                    price = previousPrice?.toLong()?.toString().orEmpty(),
+                    durationHours = (previousDuration ?: booking.estimatedDurationHours)
+                        .takeIf { d -> d > 0 }?.toString().orEmpty(),
+                    message = previousMessage
+                )
+            )
+        }
+    }
+
+    fun closeQuoteDialog() = _uiState.update {
+        it.copy(showQuoteDialog = false, quoteForm = QuoteFormState())
+    }
+
+    fun onQuotePriceChange(value: String) = _uiState.update {
+        val sanitized = value.filter(Char::isDigit)
+        it.copy(quoteForm = it.quoteForm.copy(price = sanitized, errorMessage = null))
+    }
+
+    fun onQuoteDurationChange(value: String) = _uiState.update {
+        val sanitized = value.filter { c -> c.isDigit() || c == '.' || c == ',' }
+            .replace(',', '.')
+        it.copy(quoteForm = it.quoteForm.copy(durationHours = sanitized, errorMessage = null))
+    }
+
+    fun onQuoteMessageChange(value: String) = _uiState.update {
+        it.copy(quoteForm = it.quoteForm.copy(message = value, errorMessage = null))
+    }
+
+    fun submitQuote() {
+        val form = _uiState.value.quoteForm
+        if (form.isSubmitting) return
+
+        val price = form.price.toDoubleOrNull()
+        val duration = form.durationHours.toDoubleOrNull()
+        when {
+            price == null || price <= 0 -> {
+                _uiState.update {
+                    it.copy(quoteForm = it.quoteForm.copy(errorMessage = "Vui lòng nhập giá hợp lệ"))
+                }
+            }
+            duration != null && duration <= 0 -> {
+                _uiState.update {
+                    it.copy(quoteForm = it.quoteForm.copy(errorMessage = "Thời gian dự kiến không hợp lệ"))
+                }
+            }
+            form.message.trim().length < 10 -> {
+                _uiState.update {
+                    it.copy(quoteForm = it.quoteForm.copy(errorMessage = "Lời nhắn cần ít nhất 10 ký tự"))
+                }
+            }
+            else -> {
+                viewModelScope.launch {
+                    _uiState.update {
+                        it.copy(quoteForm = it.quoteForm.copy(isSubmitting = true, errorMessage = null))
+                    }
+                    when (val result = quoteDirectBookingUseCase(
+                        bookingId = bookingId,
+                        proposedPrice = price,
+                        message = form.message,
+                        estimatedDurationHours = duration
+                    )) {
+                        is Resource.Success -> {
+                            _uiState.update {
+                                it.copy(showQuoteDialog = false, quoteForm = QuoteFormState())
+                            }
+                            _events.trySend(JobDetailEvent.Toast("Đã gửi báo giá cho khách"))
+                            _events.trySend(JobDetailEvent.DirectQuoteSent)
+                            load()
+                        }
+                        is Resource.Error -> {
+                            _uiState.update {
+                                it.copy(quoteForm = it.quoteForm.copy(
+                                    isSubmitting = false,
+                                    errorMessage = result.message
+                                ))
+                            }
+                        }
+                        is Resource.Loading -> { /* no-op */ }
+                    }
+                }
+            }
         }
     }
 

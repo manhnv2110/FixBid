@@ -189,7 +189,7 @@ fun WorkerHomeScreen(
                         onSeeAllWork = { switchTab(WorkerTab.WORK) },
                         onStartJob = viewModel::startJob,
                         onCompleteJob = viewModel::completeJob,
-                        onAcceptDirect = viewModel::acceptDirectBooking,
+                        onSendQuote = viewModel::quoteDirectBooking,
                         onDeclineDirect = viewModel::declineDirectBooking
                     )
                 }
@@ -254,7 +254,7 @@ private fun WorkerDashboard(
     onSeeAllWork: () -> Unit,
     onStartJob: (String) -> Unit,
     onCompleteJob: (String) -> Unit,
-    onAcceptDirect: (String) -> Unit,
+    onSendQuote: (bookingId: String, price: Double, message: String, durationHours: Double?) -> Unit,
     onDeclineDirect: (bookingId: String, reason: String) -> Unit
 ) {
     // Local UI state for the decline-reason dialog. The viewmodel already
@@ -262,6 +262,9 @@ private fun WorkerDashboard(
     // so this composable only needs to track which booking is being asked
     // about (held in process memory; recreated cheaply on rotation).
     var declineTarget by remember { mutableStateOf<String?>(null) }
+    // Same pattern for the quote dialog: the dashboard owns which booking
+    // is currently being quoted; the dialog handles the form.
+    var quoteTarget by remember { mutableStateOf<Booking?>(null) }
 
     Column(modifier = Modifier.fillMaxSize()) {
         DashboardHeader(
@@ -343,7 +346,7 @@ private fun WorkerDashboard(
                                     requests = uiState.pendingDirectRequests,
                                     respondingId = uiState.respondingDirectId,
                                     onItemClick = onJobClick,
-                                    onAccept = onAcceptDirect,
+                                    onSendQuote = { booking -> quoteTarget = booking },
                                     onDecline = { bookingId -> declineTarget = bookingId }
                                 )
                             }
@@ -399,6 +402,22 @@ private fun WorkerDashboard(
             onConfirm = { reason ->
                 onDeclineDirect(bookingId, reason)
                 declineTarget = null
+            }
+        )
+    }
+
+    // Quote dialog — opened from a Direct request card when the worker taps
+    // "Báo giá". The dialog collects price + duration + message and submits
+    // through `onSendQuote`. We close it on successful submission so the worker
+    // sees the dashboard reload with the new "đã báo giá" state.
+    quoteTarget?.let { booking ->
+        QuoteDirectFromDashboardDialog(
+            booking = booking,
+            isSubmitting = uiState.respondingDirectId == booking.id,
+            onDismiss = { quoteTarget = null },
+            onConfirm = { price, durationHours, message ->
+                onSendQuote(booking.id, price, message, durationHours)
+                quoteTarget = null
             }
         )
     }
@@ -1315,7 +1334,7 @@ private fun PendingDirectRequestsSection(
     requests: List<Booking>,
     respondingId: String?,
     onItemClick: (String) -> Unit,
-    onAccept: (String) -> Unit,
+    onSendQuote: (Booking) -> Unit,
     onDecline: (String) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1326,7 +1345,7 @@ private fun PendingDirectRequestsSection(
                 booking = booking,
                 isResponding = respondingId == booking.id,
                 onClick = { onItemClick(booking.id) },
-                onAccept = { onAccept(booking.id) },
+                onSendQuote = { onSendQuote(booking) },
                 onDecline = { onDecline(booking.id) }
             )
         }
@@ -1338,10 +1357,16 @@ private fun DirectRequestCard(
     booking: Booking,
     isResponding: Boolean,
     onClick: () -> Unit,
-    onAccept: () -> Unit,
+    onSendQuote: () -> Unit,
     onDecline: () -> Unit
 ) {
-    val accent = StatusColorsTheme.current.pending
+    // Direct bookings show up in two flavours on this card: PENDING means we
+    // still owe the customer a quote, QUOTED means we already sent one and are
+    // waiting on their response. The card adapts the pill, accent colour and
+    // CTA copy so the worker sees at a glance which stage they're in.
+    val isQuoted = booking.status == BookingStatus.QUOTED
+    val accent = if (isQuoted) StatusColorsTheme.current.quoted else StatusColorsTheme.current.pending
+    val pillText = if (isQuoted) "Đã báo giá" else "Đặt trực tiếp"
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -1355,7 +1380,7 @@ private fun DirectRequestCard(
             // Header row — pill + customer
             Row(verticalAlignment = Alignment.CenterVertically) {
                 com.example.fixbid.core.components.StatusPill(
-                    text = "Đặt trực tiếp",
+                    text = pillText,
                     color = accent
                 )
                 Spacer(Modifier.width(8.dp))
@@ -1399,6 +1424,17 @@ private fun DirectRequestCard(
                 text = "Hẹn ${formatShortDateTime(booking.scheduledAt)} • ${booking.estimatedDurationHours}h"
             )
 
+            // When the worker has already sent a quote, surface the proposed
+            // price right on the card so they don't need to open the detail
+            // screen to recall what they offered.
+            if (isQuoted && booking.quotedPrice != null) {
+                Spacer(Modifier.height(4.dp))
+                FocusMetaRow(
+                    icon = Icons.Outlined.Payments,
+                    text = "Đã báo: ${formatCurrencyVnd(booking.quotedPrice)}"
+                )
+            }
+
             Spacer(Modifier.height(14.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1417,7 +1453,7 @@ private fun DirectRequestCard(
                     Text("Từ chối", style = MaterialTheme.typography.labelLarge)
                 }
                 Button(
-                    onClick = onAccept,
+                    onClick = onSendQuote,
                     enabled = !isResponding,
                     modifier = Modifier.weight(1f).height(46.dp),
                     shape = RoundedCornerShape(12.dp),
@@ -1430,7 +1466,10 @@ private fun DirectRequestCard(
                             color = MaterialTheme.colorScheme.onPrimary
                         )
                     } else {
-                        Text("Nhận đơn", style = MaterialTheme.typography.labelLarge)
+                        Text(
+                            text = if (isQuoted) "Sửa báo giá" else "Báo giá",
+                            style = MaterialTheme.typography.labelLarge
+                        )
                     }
                 }
             }
@@ -1511,6 +1550,152 @@ private fun DeclineReasonDialog(
                         color = MaterialTheme.colorScheme.error,
                         fontWeight = FontWeight.Bold
                     )
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(enabled = !isSubmitting, onClick = onDismiss) { Text("Huỷ") }
+        }
+    )
+}
+
+
+/**
+ * Quick price-quote dialog opened from a Direct request card on the dashboard.
+ * Collects the same three inputs the JobDetailScreen quote sheet does (price,
+ * duration, message) but rendered as a compact dialog so the worker doesn't
+ * leave the dashboard. Submitting flips the booking to QUOTED and returns
+ * control here; the dashboard reload then refreshes the card.
+ */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun QuoteDirectFromDashboardDialog(
+    booking: Booking,
+    isSubmitting: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (price: Double, durationHours: Double?, message: String) -> Unit
+) {
+    // Pre-fill with the previous quote when re-quoting (status == QUOTED) so a
+    // small adjustment doesn't require retyping.
+    var price by remember(booking.id) {
+        mutableStateOf(booking.quotedPrice?.toLong()?.toString().orEmpty())
+    }
+    var durationHours by remember(booking.id) {
+        mutableStateOf(
+            (booking.quoteEstimatedDurationHours ?: booking.estimatedDurationHours)
+                .takeIf { it > 0 }?.toString().orEmpty()
+        )
+    }
+    var message by remember(booking.id) { mutableStateOf(booking.quoteMessage.orEmpty()) }
+    var error by remember(booking.id) { mutableStateOf<String?>(null) }
+
+    val isReQuote = booking.status == BookingStatus.QUOTED
+
+    AlertDialog(
+        onDismissRequest = { if (!isSubmitting) onDismiss() },
+        title = {
+            Text(
+                text = if (isReQuote) "Cập nhật báo giá" else "Báo giá cho khách",
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "Khách: ${booking.customer?.fullName ?: "Khách hàng"}\n${booking.category.displayName}",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 16.sp
+                )
+                OutlinedTextField(
+                    value = price,
+                    onValueChange = {
+                        price = it.filter(Char::isDigit).take(9)
+                        error = null
+                    },
+                    label = { Text("Giá đề xuất (VND)") },
+                    placeholder = { Text("vd: 500000") },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                    ),
+                    singleLine = true,
+                    enabled = !isSubmitting,
+                    modifier = Modifier.fillMaxWidth(),
+                    supportingText = {
+                        price.toDoubleOrNull()?.let {
+                            Text(
+                                text = formatCurrencyVnd(it),
+                                color = MaterialTheme.colorScheme.primary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                )
+                OutlinedTextField(
+                    value = durationHours,
+                    onValueChange = {
+                        durationHours = it.filter { c -> c.isDigit() || c == '.' || c == ',' }
+                            .replace(',', '.')
+                        error = null
+                    },
+                    label = { Text("Thời gian dự kiến (giờ)") },
+                    placeholder = { Text("vd: 2") },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
+                    ),
+                    singleLine = true,
+                    enabled = !isSubmitting,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = message,
+                    onValueChange = { message = it; error = null },
+                    label = { Text("Lời nhắn cho khách") },
+                    placeholder = { Text("Mô tả công việc và cam kết của bạn…") },
+                    minLines = 2,
+                    maxLines = 4,
+                    enabled = !isSubmitting,
+                    modifier = Modifier.fillMaxWidth(),
+                    supportingText = {
+                        Text(
+                            text = "${message.length} ký tự (tối thiểu 10)",
+                            fontSize = 11.sp,
+                            color = if (message.length >= 10) MaterialTheme.colorScheme.onSurfaceVariant
+                            else MaterialTheme.colorScheme.error
+                        )
+                    }
+                )
+                error?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = !isSubmitting,
+                onClick = {
+                    val priceValue = price.toDoubleOrNull()
+                    val durationValue = durationHours.toDoubleOrNull()
+                    when {
+                        priceValue == null || priceValue <= 0 ->
+                            error = "Vui lòng nhập giá hợp lệ"
+                        durationValue != null && durationValue <= 0 ->
+                            error = "Thời gian không hợp lệ"
+                        message.trim().length < 10 ->
+                            error = "Lời nhắn cần ít nhất 10 ký tự"
+                        else -> onConfirm(priceValue, durationValue, message.trim())
+                    }
+                }
+            ) {
+                if (isSubmitting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Text(if (isReQuote) "Cập nhật" else "Gửi báo giá", fontWeight = FontWeight.Bold)
                 }
             }
         },

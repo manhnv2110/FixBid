@@ -71,7 +71,8 @@ fun JobDetailScreen(
                 JobDetailEvent.BidPlaced -> { /* state đã update */ }
                 JobDetailEvent.CompletionSubmitted -> { /* state đã update */ }
                 JobDetailEvent.DirectBookingAccepted,
-                JobDetailEvent.DirectBookingDeclined -> { /* state đã update via load() */ }
+                JobDetailEvent.DirectBookingDeclined,
+                JobDetailEvent.DirectQuoteSent -> { /* state đã update via load() */ }
             }
         }
     }
@@ -92,7 +93,7 @@ fun JobDetailScreen(
                     onPlaceBid = viewModel::openBidDialog,
                     onReportCompletion = viewModel::openCompletionDialog,
                     onNavigateToCustomer = { onNavigateToCustomer(data.booking.id) },
-                    onAcceptDirect = viewModel::acceptDirectBooking,
+                    onSendQuote = viewModel::openQuoteDialog,
                     onDeclineDirect = viewModel::openDeclineDialog,
                     onCancelBooking = viewModel::openCancelDialog
                 )
@@ -178,6 +179,21 @@ fun JobDetailScreen(
                 isSubmitting = uiState.isRespondingDirect,
                 onDismiss = viewModel::closeDeclineDialog,
                 onConfirm = { reason -> viewModel.declineDirectBooking(reason) }
+            )
+        }
+
+        // Direct-booking price quote sheet — opens from the "Báo giá" button on
+        // PENDING / QUOTED direct bookings. Submitting moves the booking to
+        // QUOTED so the customer can review and accept/reject the price.
+        if (uiState.showQuoteDialog && uiState.data != null) {
+            QuoteDirectBookingBottomSheet(
+                form = uiState.quoteForm,
+                booking = uiState.data!!.booking,
+                onDismiss = viewModel::closeQuoteDialog,
+                onPriceChange = viewModel::onQuotePriceChange,
+                onDurationChange = viewModel::onQuoteDurationChange,
+                onMessageChange = viewModel::onQuoteMessageChange,
+                onSubmit = viewModel::submitQuote
             )
         }
 
@@ -942,7 +958,7 @@ private fun JobDetailBottomBar(
     onPlaceBid: () -> Unit,
     onReportCompletion: () -> Unit,
     onNavigateToCustomer: () -> Unit,
-    onAcceptDirect: () -> Unit,
+    onSendQuote: () -> Unit,
     onDeclineDirect: () -> Unit,
     onCancelBooking: () -> Unit
 ) {
@@ -959,14 +975,18 @@ private fun JobDetailBottomBar(
         ) {
             when (booking.status) {
                 // PENDING splits two ways: a direct booking is awaiting THIS worker's
-                // accept/decline; a bidding-typed PENDING is the legacy "place bid"
+                // quote/decline; a bidding-typed PENDING is the legacy "place bid"
                 // path (kept for backwards compatibility with existing data).
                 BookingStatus.PENDING -> {
                     if (booking.type == BookingType.DIRECT) {
                         DirectBookingActionRow(
                             isResponding = isResponding,
-                            onAccept = onAcceptDirect,
-                            onDecline = onDeclineDirect
+                            onSendQuote = onSendQuote,
+                            onDecline = onDeclineDirect,
+                            // Surface a customer-rejection note (worker_note)
+                            // if the previous quote came back rejected, so the
+                            // worker knows what to address before re-quoting.
+                            customerFeedback = booking.workerNote?.takeIf { it.isNotBlank() }
                         )
                     } else {
                         BiddingActionRow(
@@ -975,6 +995,17 @@ private fun JobDetailBottomBar(
                         )
                     }
                 }
+
+                // Worker đã báo giá, đang chờ khách duyệt giá
+                BookingStatus.QUOTED -> {
+                    QuotedActionRow(
+                        booking = booking,
+                        isResponding = isResponding,
+                        onReQuote = onSendQuote,
+                        onDecline = onDeclineDirect
+                    )
+                }
+
                 // Bidding stage — worker đặt giá
                 BookingStatus.BIDDING -> {
                     BiddingActionRow(myBid = myBid, onPlaceBid = onPlaceBid)
@@ -1134,20 +1165,49 @@ private fun BiddingActionRow(
 
 /**
  * Action row shown to a worker when a customer has assigned a DIRECT booking
- * to them and is awaiting accept/decline. Mirrors the Place-bid affordance for
- * the bidding flow but routed through the dedicated direct-booking use cases.
+ * to them and is awaiting a price quote. Replaces the older "Nhận đơn"
+ * affordance — the canonical flow now is for the worker to send a price
+ * quote first so the customer has a concrete amount to authorize before
+ * payment. [customerFeedback] surfaces the customer's rejection note from a
+ * previous round so the worker can address it in the new quote.
  */
 @Composable
 private fun DirectBookingActionRow(
     isResponding: Boolean,
-    onAccept: () -> Unit,
-    onDecline: () -> Unit
+    onSendQuote: () -> Unit,
+    onDecline: () -> Unit,
+    customerFeedback: String?
 ) {
     Column {
         StatusInfoRow(
             isPositive = true,
-            text = "Khách hàng đặt thẳng bạn cho công việc này. Hãy phản hồi sớm."
+            text = "Khách đặt thẳng bạn cho công việc này. Hãy gửi báo giá để khách duyệt."
         )
+        if (!customerFeedback.isNullOrBlank()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(MaterialTheme.shapes.small)
+                    .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f))
+                    .padding(10.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                Icon(
+                    Icons.Outlined.Feedback,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Khách phản hồi: $customerFeedback",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    lineHeight = 17.sp
+                )
+            }
+        }
         Spacer(modifier = Modifier.height(10.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -1173,7 +1233,7 @@ private fun DirectBookingActionRow(
                 Text("Từ chối", fontWeight = FontWeight.SemiBold)
             }
             Button(
-                onClick = onAccept,
+                onClick = onSendQuote,
                 enabled = !isResponding,
                 modifier = Modifier
                     .weight(1f)
@@ -1189,13 +1249,97 @@ private fun DirectBookingActionRow(
                     )
                 } else {
                     Icon(
-                        Icons.Outlined.CheckCircle,
+                        Icons.Outlined.Payments,
                         contentDescription = null,
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Nhận đơn", fontWeight = FontWeight.Bold)
+                    Text("Báo giá", fontWeight = FontWeight.Bold)
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Action row shown to the worker while a direct booking is in QUOTED status —
+ * waiting for the customer to accept or reject the price the worker proposed.
+ * Surfaces the proposed price as a confirmation, plus secondary actions to
+ * re-quote (in case the worker realises they need to update the price before
+ * the customer responds) or fully decline the booking.
+ */
+@Composable
+private fun QuotedActionRow(
+    booking: Booking,
+    isResponding: Boolean,
+    onReQuote: () -> Unit,
+    onDecline: () -> Unit
+) {
+    val quoted = booking.quotedPrice
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(MaterialTheme.shapes.medium)
+                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f))
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Outlined.RequestQuote,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Đã gửi báo giá ${quoted?.let { formatCurrencyVnd(it) } ?: ""}",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Đang chờ khách duyệt giá. Bạn có thể gửi lại nếu cần điều chỉnh.",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 16.sp
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            OutlinedButton(
+                onClick = onDecline,
+                enabled = !isResponding,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp),
+                shape = MaterialTheme.shapes.medium,
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error
+                )
+            ) {
+                Text("Huỷ đơn", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            }
+            OutlinedButton(
+                onClick = onReQuote,
+                enabled = !isResponding,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp),
+                shape = MaterialTheme.shapes.medium
+            ) {
+                Icon(
+                    Icons.Outlined.Edit,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Sửa báo giá", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
             }
         }
     }
@@ -1922,4 +2066,266 @@ private fun DeclineDirectBookingDialog(
             }
         }
     )
+}
+
+
+// ─── Quote-direct-booking bottom sheet ────────────────────────────────────────
+
+/**
+ * Bottom sheet the worker uses to send a price quote on a direct booking.
+ * Mirrors the bid sheet so muscle memory carries over, but submits to the
+ * dedicated direct-quote use case (which moves the booking to QUOTED, not
+ * BIDDING). Shown for both the initial quote (status = PENDING) and a
+ * re-quote (status = QUOTED, after the worker tweaks an unanswered offer).
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun QuoteDirectBookingBottomSheet(
+    form: QuoteFormState,
+    booking: Booking,
+    onDismiss: () -> Unit,
+    onPriceChange: (String) -> Unit,
+    onDurationChange: (String) -> Unit,
+    onMessageChange: (String) -> Unit,
+    onSubmit: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val isReQuote = booking.status == BookingStatus.QUOTED
+
+    ModalBottomSheet(
+        onDismissRequest = { if (!form.isSubmitting) onDismiss() },
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+        dragHandle = { BottomSheetDefaults.DragHandle() }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // Title
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Outlined.RequestQuote,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = if (isReQuote) "Cập nhật báo giá" else "Gửi báo giá cho khách",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Khách sẽ duyệt giá trước khi thanh toán",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // Customer feedback from previous rejection (if any) — this is
+            // the same string the action row surfaces, but we duplicate it
+            // inside the sheet so the worker doesn't have to memorise it.
+            booking.workerNote?.takeIf { it.isNotBlank() && booking.status == BookingStatus.PENDING }
+                ?.let { feedback ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(MaterialTheme.shapes.small)
+                            .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f))
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Icon(
+                            Icons.Outlined.Feedback,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Khách phản hồi: $feedback",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            lineHeight = 17.sp
+                        )
+                    }
+                }
+
+            // Price field
+            OutlinedTextField(
+                value = form.price,
+                onValueChange = onPriceChange,
+                label = { Text("Giá đề xuất (VND)") },
+                placeholder = { Text("vd: 500000") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.small,
+                enabled = !form.isSubmitting,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                    focusedLabelColor = MaterialTheme.colorScheme.primary,
+                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                ),
+                supportingText = {
+                    form.price.toDoubleOrNull()?.let {
+                        Text(
+                            text = formatCurrencyVnd(it),
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            )
+
+            // Duration field with quick chips
+            Column {
+                OutlinedTextField(
+                    value = form.durationHours,
+                    onValueChange = onDurationChange,
+                    label = { Text("Thời gian dự kiến (giờ)") },
+                    placeholder = { Text("vd: 2") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.small,
+                    enabled = !form.isSubmitting,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("1", "2", "4", "8").forEach { hours ->
+                        Box(
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .background(
+                                    if (form.durationHours == hours) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.surfaceVariant
+                                )
+                                .clickable(enabled = !form.isSubmitting) {
+                                    onDurationChange(hours)
+                                }
+                                .padding(horizontal = 14.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = "${hours}h",
+                                fontSize = 12.sp,
+                                color = if (form.durationHours == hours) MaterialTheme.colorScheme.onPrimary
+                                else MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Message
+            OutlinedTextField(
+                value = form.message,
+                onValueChange = onMessageChange,
+                label = { Text("Lời nhắn cho khách") },
+                placeholder = {
+                    Text("Mô tả công việc và cam kết của bạn để khách yên tâm…")
+                },
+                minLines = 3,
+                maxLines = 5,
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.small,
+                enabled = !form.isSubmitting,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                    focusedLabelColor = MaterialTheme.colorScheme.primary,
+                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                ),
+                supportingText = {
+                    Text(
+                        text = "${form.message.length} ký tự (tối thiểu 10)",
+                        fontSize = 11.sp,
+                        color = if (form.message.length >= 10) MaterialTheme.colorScheme.onSurfaceVariant
+                        else MaterialTheme.colorScheme.error
+                    )
+                }
+            )
+
+            // Error
+            if (form.errorMessage != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(MaterialTheme.shapes.small)
+                        .background(MaterialTheme.colorScheme.errorContainer)
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Outlined.ErrorOutline,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = form.errorMessage,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        fontSize = 13.sp
+                    )
+                }
+            }
+
+            // Submit
+            Button(
+                onClick = onSubmit,
+                enabled = !form.isSubmitting,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                shape = MaterialTheme.shapes.medium
+            ) {
+                if (form.isSubmitting) {
+                    CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(
+                        Icons.Outlined.Send,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isReQuote) "Cập nhật báo giá" else "Gửi báo giá",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp
+                    )
+                }
+            }
+        }
+    }
 }
