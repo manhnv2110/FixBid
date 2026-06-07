@@ -78,6 +78,7 @@ class BookingHistoryViewModel @Inject constructor(
                     it.status in listOf(
                         BookingStatus.BIDDING,
                         BookingStatus.PENDING,
+                        BookingStatus.QUOTED,
                         BookingStatus.AWAITING_PAYMENT,
                         BookingStatus.CONFIRMED,
                         BookingStatus.IN_PROGRESS,

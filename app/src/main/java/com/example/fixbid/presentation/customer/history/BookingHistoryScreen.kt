@@ -474,6 +474,48 @@ private fun BookingCard(
                 }
             }
 
+            // Direct booking quote stage — surface the proposed price + a CTA
+            // to open the detail screen where the customer can accept/reject.
+            if (booking.status == BookingStatus.QUOTED) {
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(onClick = onClick)
+                        .background(statusInfo.color.copy(alpha = 0.15f))
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Outlined.RequestQuote,
+                            contentDescription = null,
+                            tint = statusInfo.color,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = booking.quotedPrice
+                                ?.let { "Thợ báo giá ${java.text.NumberFormat.getNumberInstance(java.util.Locale("vi", "VN")).format(it.toLong())}đ — bấm để duyệt" }
+                                ?: "Bấm để xem báo giá từ thợ",
+                            fontSize = 12.sp,
+                            color = statusInfo.color,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Icon(
+                        Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = statusInfo.color,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
             if (booking.status == BookingStatus.PENDING_COMPLETION) {
                 Spacer(modifier = Modifier.height(12.dp))
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))

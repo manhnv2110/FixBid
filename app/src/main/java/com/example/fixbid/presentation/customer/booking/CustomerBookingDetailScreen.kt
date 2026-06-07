@@ -68,6 +68,9 @@ fun CustomerBookingDetailScreen(
     var cancelReason by remember { mutableStateOf("") }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var expandedCategoryMenu by remember { mutableStateOf(false) }
+    // Reject-the-worker-quote dialog state. Only opens for QUOTED bookings,
+    // collects an optional reason and forwards it to the use case.
+    var showRejectQuoteDialog by remember { mutableStateOf(false) }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 5)
@@ -794,6 +797,68 @@ fun CustomerBookingDetailScreen(
                                     Text("Tiến hành thanh toán ngay", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                                 }
                             }
+                            BookingStatus.QUOTED -> {
+                                // Worker has sent a price quote — surface the
+                                // proposed price prominently and give the
+                                // customer two actions: accept (→ payment) or
+                                // reject with optional reason (→ back to PENDING
+                                // so the worker can re-quote or decline).
+                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    WorkerQuoteCard(booking = booking)
+
+                                    Button(
+                                        onClick = viewModel::acceptQuote,
+                                        enabled = !uiState.isRespondingQuote,
+                                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = AccentGreen)
+                                    ) {
+                                        if (uiState.isRespondingQuote) {
+                                            CircularProgressIndicator(
+                                                color = MaterialTheme.colorScheme.onPrimary,
+                                                modifier = Modifier.size(20.dp),
+                                                strokeWidth = 2.dp
+                                            )
+                                        } else {
+                                            Icon(Icons.Outlined.CheckCircle, null, modifier = Modifier.size(20.dp))
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("Chấp nhận báo giá", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                        }
+                                    }
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        OutlinedButton(
+                                            onClick = { showRejectQuoteDialog = true },
+                                            enabled = !uiState.isRespondingQuote,
+                                            modifier = Modifier.weight(1f).height(50.dp),
+                                            shape = RoundedCornerShape(12.dp),
+                                            colors = ButtonDefaults.outlinedButtonColors(
+                                                contentColor = MaterialTheme.colorScheme.primary
+                                            )
+                                        ) {
+                                            Icon(Icons.Outlined.Edit, null, modifier = Modifier.size(18.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Yêu cầu báo lại", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                        }
+                                        OutlinedButton(
+                                            onClick = { showCancelDialog = true },
+                                            enabled = !uiState.isRespondingQuote,
+                                            modifier = Modifier.weight(1f).height(50.dp),
+                                            shape = RoundedCornerShape(12.dp),
+                                            colors = ButtonDefaults.outlinedButtonColors(
+                                                contentColor = MaterialTheme.colorScheme.error
+                                            )
+                                        ) {
+                                            Icon(Icons.Outlined.Cancel, null, modifier = Modifier.size(18.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Huỷ yêu cầu", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                        }
+                                    }
+                                }
+                            }
                             BookingStatus.PENDING_COMPLETION -> {
                                 Button(
                                     onClick = { onNavigateToCompletionConfirm(booking.id) },
@@ -947,6 +1012,20 @@ fun CustomerBookingDetailScreen(
                     TextButton(onClick = { showDeleteDialog = false }) {
                         Text("Huỷ")
                     }
+                }
+            )
+        }
+
+        // Reject-the-worker-quote dialog. Reuses the preset-chip pattern from
+        // the cancel dialog but submits to viewModel.rejectQuote so the booking
+        // moves back to PENDING with the reason persisted.
+        if (showRejectQuoteDialog) {
+            RejectQuoteDialog(
+                isSubmitting = uiState.isRespondingQuote,
+                onDismiss = { showRejectQuoteDialog = false },
+                onConfirm = { reason ->
+                    showRejectQuoteDialog = false
+                    viewModel.rejectQuote(reason)
                 }
             )
         }
@@ -1238,4 +1317,168 @@ private fun ReceiptLine(label: String, value: String) {
             color = MaterialTheme.colorScheme.onSurface
         )
     }
+}
+
+
+// ─── Direct booking quote review card ──────────────────────────────────────
+
+/**
+ * Highlight card the customer sees when a direct booking is in QUOTED state.
+ * Surfaces the worker name, the proposed price (centerpiece), the optional
+ * note from the worker and the proposed duration so the customer has the full
+ * context before tapping "Chấp nhận báo giá" or "Yêu cầu báo lại".
+ */
+@Composable
+private fun WorkerQuoteCard(booking: com.example.fixbid.domain.model.Booking) {
+    val price = booking.quotedPrice ?: return
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = AccentGreen.copy(alpha = 0.10f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(AccentGreen.copy(alpha = 0.18f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Outlined.RequestQuote,
+                        contentDescription = null,
+                        tint = AccentGreen,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Báo giá từ thợ",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = booking.worker?.fullName ?: "Thợ",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Text(
+                    text = formatCurrencyVnd(price),
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AccentGreen
+                )
+            }
+            booking.quoteEstimatedDurationHours?.takeIf { it > 0 }?.let { hours ->
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Outlined.Timer,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Thời gian dự kiến: $hours giờ",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+            booking.quoteMessage?.takeIf { it.isNotBlank() }?.let { message ->
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = message,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    lineHeight = 18.sp
+                )
+            }
+        }
+    }
+}
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun RejectQuoteDialog(
+    isSubmitting: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (String?) -> Unit
+) {
+    var reason by remember { mutableStateOf("") }
+    val presetReasons = listOf(
+        "Giá cao hơn ngân sách",
+        "Cần thợ báo giá thấp hơn",
+        "Muốn thay đổi phạm vi công việc",
+        "Cần thảo luận thêm với thợ"
+    )
+
+    AlertDialog(
+        onDismissRequest = { if (!isSubmitting) onDismiss() },
+        title = { Text("Từ chối báo giá?", fontWeight = FontWeight.Bold) },
+        text = {
+            Column {
+                Text(
+                    "Cho thợ biết lý do để họ điều chỉnh báo giá phù hợp hơn:",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(10.dp))
+                androidx.compose.foundation.layout.FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    presetReasons.forEach { preset ->
+                        FilterChip(
+                            selected = reason == preset,
+                            onClick = { reason = preset },
+                            label = { Text(preset, fontSize = 12.sp) }
+                        )
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = reason,
+                    onValueChange = { reason = it },
+                    placeholder = { Text("Hoặc nhập lý do khác (tùy chọn)…") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    maxLines = 4,
+                    enabled = !isSubmitting,
+                    shape = RoundedCornerShape(10.dp),
+                    colors = fieldColors()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = !isSubmitting,
+                onClick = { onConfirm(reason.trim().takeIf { it.isNotBlank() }) }
+            ) {
+                if (isSubmitting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                } else {
+                    Text("Từ chối báo giá", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(enabled = !isSubmitting, onClick = onDismiss) { Text("Đóng") }
+        }
+    )
 }

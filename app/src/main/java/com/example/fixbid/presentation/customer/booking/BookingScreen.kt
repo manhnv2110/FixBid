@@ -584,7 +584,10 @@ fun BookingScreen(
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "Sau khi đặt lịch, các thợ sẽ gửi báo giá cho bạn. Bạn có thể so sánh và chọn thợ phù hợp nhất.",
+                        text = if (!directWorkerId.isNullOrBlank())
+                            "Sau khi đặt, thợ sẽ gửi báo giá cho yêu cầu của bạn. Bạn duyệt giá rồi mới thanh toán — không bị trừ tiền nếu chưa đồng ý."
+                        else
+                            "Sau khi đặt lịch, các thợ sẽ gửi báo giá cho bạn. Bạn có thể so sánh và chọn thợ phù hợp nhất.",
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         lineHeight = 18.sp

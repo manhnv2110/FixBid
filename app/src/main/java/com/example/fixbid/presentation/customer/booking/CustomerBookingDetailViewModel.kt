@@ -44,7 +44,9 @@ data class CustomerBookingDetailUiState(
     val editNotes: String = "",
     val editImageUris: List<Uri> = emptyList(),
     val isCancelling: Boolean = false,
-    val isDeleting: Boolean = false
+    val isDeleting: Boolean = false,
+    /** True while accept/reject quote network call is in flight. */
+    val isRespondingQuote: Boolean = false
 )
 
 sealed interface CustomerBookingDetailEvent {
@@ -59,7 +61,9 @@ class CustomerBookingDetailViewModel @Inject constructor(
     private val paymentRepository: PaymentRepository,
     private val geocoderRepository: GeocoderRepository,
     private val locationRepository: LocationRepository,
-    private val sendNotification: SendNotificationUseCase
+    private val sendNotification: SendNotificationUseCase,
+    private val acceptDirectQuoteUseCase: com.example.fixbid.domain.usecase.customer.AcceptDirectQuoteUseCase,
+    private val rejectDirectQuoteUseCase: com.example.fixbid.domain.usecase.customer.RejectDirectQuoteUseCase
 ) : ViewModel() {
 
     val geocoder: GeocoderRepository get() = geocoderRepository
@@ -348,6 +352,74 @@ class CustomerBookingDetailViewModel @Inject constructor(
                     _events.trySend(CustomerBookingDetailEvent.Toast("Xóa yêu cầu thất bại: ${result.message}"))
                 }
                 is Resource.Loading -> {}
+            }
+        }
+    }
+
+    // ─── Direct booking quote response ──────────────────────────────────────
+    //
+    // Customer accepts/rejects the worker's quote on a direct booking. Accepting
+    // copies quoted_price → agreed_price and moves the booking to AWAITING_PAYMENT
+    // (so the payment screen can finally render with a non-null amount). Rejecting
+    // rolls back to PENDING with the customer's reason persisted in worker_note,
+    // letting the worker either re-quote or decline the job.
+
+    fun acceptQuote() {
+        val booking = _uiState.value.booking ?: return
+        if (_uiState.value.isRespondingQuote) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRespondingQuote = true) }
+            when (val result = acceptDirectQuoteUseCase(booking.id)) {
+                is Resource.Success -> {
+                    _uiState.update {
+                        it.copy(isRespondingQuote = false, booking = result.data)
+                    }
+                    _events.trySend(
+                        CustomerBookingDetailEvent.Toast(
+                            "Đã chấp nhận báo giá. Vui lòng thanh toán để xác nhận lịch."
+                        )
+                    )
+                    loadBooking()
+                }
+                is Resource.Error -> {
+                    _uiState.update { it.copy(isRespondingQuote = false) }
+                    _events.trySend(
+                        CustomerBookingDetailEvent.Toast(
+                            "Chấp nhận báo giá thất bại: ${result.message}"
+                        )
+                    )
+                }
+                is Resource.Loading -> { /* no-op */ }
+            }
+        }
+    }
+
+    fun rejectQuote(reason: String?) {
+        val booking = _uiState.value.booking ?: return
+        if (_uiState.value.isRespondingQuote) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRespondingQuote = true) }
+            when (val result = rejectDirectQuoteUseCase(booking.id, reason)) {
+                is Resource.Success -> {
+                    _uiState.update {
+                        it.copy(isRespondingQuote = false, booking = result.data)
+                    }
+                    _events.trySend(
+                        CustomerBookingDetailEvent.Toast(
+                            "Đã từ chối báo giá. Thợ có thể gửi báo giá khác hoặc huỷ đơn."
+                        )
+                    )
+                    loadBooking()
+                }
+                is Resource.Error -> {
+                    _uiState.update { it.copy(isRespondingQuote = false) }
+                    _events.trySend(
+                        CustomerBookingDetailEvent.Toast(
+                            "Từ chối báo giá thất bại: ${result.message}"
+                        )
+                    )
+                }
+                is Resource.Loading -> { /* no-op */ }
             }
         }
     }
