@@ -151,7 +151,8 @@ fun HomeScreen(
                         onFindWorkersClick = onFindWorkersClick,
                         onCategoryClick = onCategoryClick,
                         onLocationClick = { showLocationPicker = true },
-                        onRetryNotifications = viewModel::loadNotifications
+                        onRetryNotifications = viewModel::loadNotifications,
+                        onDismissNotifications = viewModel::dismissNotifications
                     )
                 }
                 composable(CustomerTab.HISTORY) {
@@ -230,7 +231,8 @@ private fun HomeTabContent(
     onFindWorkersClick: () -> Unit,
     onCategoryClick: (ServiceCategory) -> Unit,
     onLocationClick: () -> Unit,
-    onRetryNotifications: () -> Unit
+    onRetryNotifications: () -> Unit,
+    onDismissNotifications: (List<String>) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         PrimaryTopBar(
@@ -256,7 +258,9 @@ private fun HomeTabContent(
             PromoBanner()
             NotificationSection(
                 state = uiState.notificationState,
-                onRetry = onRetryNotifications
+                dismissedIds = uiState.dismissedNotificationIds,
+                onRetry = onRetryNotifications,
+                onDismiss = onDismissNotifications
             )
             FindWorkersCta(onClick = onFindWorkersClick)
             CategorySection(
@@ -270,7 +274,9 @@ private fun HomeTabContent(
 @Composable
 private fun NotificationSection(
     state: NotificationUiState,
-    onRetry: () -> Unit
+    dismissedIds: Set<String>,
+    onRetry: () -> Unit,
+    onDismiss: (List<String>) -> Unit
 ) {
     when (state) {
         is NotificationUiState.Loading -> {
@@ -284,12 +290,15 @@ private fun NotificationSection(
         }
         is NotificationUiState.Success -> {
             val recent = state.notifications
-                .filter { !it.isRead }
+                .filter { !it.isRead && it.id !in dismissedIds }
                 .take(3)
 
             if (recent.isNotEmpty()) {
                 NotificationCard(
                     notifications = recent,
+                    onDismiss = {
+                        onDismiss(recent.map { it.id })
+                    }
                 )
             }
         }

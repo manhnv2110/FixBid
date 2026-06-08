@@ -39,7 +39,8 @@ import com.example.fixbid.domain.model.Notification
 @Composable
 fun NotificationCard(
     notifications: List<Notification>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onDismiss: () -> Unit = {}
 ) {
     if (notifications.isEmpty()) return
 
@@ -150,8 +151,12 @@ fun NotificationCard(
                     IconButton(
                         onClick = {
                             val next = currentIndex + 1
-                            if (next < notifications.size) currentIndex = next
-                            else isVisible = false
+                            if (next < notifications.size) {
+                                currentIndex = next
+                            } else {
+                                isVisible = false
+                                onDismiss()
+                            }
                         },
                         modifier = Modifier.size(36.dp)
                     ) {

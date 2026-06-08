@@ -27,7 +27,8 @@ data class HomeUiState(
     val notificationState: NotificationUiState = NotificationUiState.Loading,
     val cityName: String = "Hà Nội",
     val latitude: Double? = null,
-    val longitude: Double? = null
+    val longitude: Double? = null,
+    val dismissedNotificationIds: Set<String> = emptySet()
 )
 
 @HiltViewModel
@@ -92,5 +93,11 @@ class HomeViewModel @Inject constructor(
                 is Resource.Loading -> { /* no-op */ }
             }
         }
+    }
+
+    fun dismissNotifications(ids: List<String>) {
+        _uiState.value = _uiState.value.copy(
+            dismissedNotificationIds = _uiState.value.dismissedNotificationIds + ids
+        )
     }
 }

@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -62,33 +63,39 @@ class AppNotificationsViewModel @Inject constructor(
      */
     private fun syncPushToken() {
         viewModelScope.launch {
-            runCatching { registerFcmTokenUseCase() }
+            authRepository.currentUser.collectLatest { user ->
+                if (user != null) {
+                    runCatching { registerFcmTokenUseCase() }
+                }
+            }
         }
     }
 
     private fun observeIncomingForPush() {
         viewModelScope.launch {
-            val user = authRepository.getCurrentUser() ?: return@launch
-            notificationRepository.observeNewNotifications(user.id).collect { notification ->
-                val masterEnabled = preferences.notificationsEnabled.first()
-                if (!masterEnabled) return@collect
+            authRepository.currentUser.collectLatest { user ->
+                if (user == null) return@collectLatest
+                notificationRepository.observeNewNotifications(user.id).collect { notification ->
+                    val masterEnabled = preferences.notificationsEnabled.first()
+                    if (!masterEnabled) return@collect
 
-                // Skip in-app heads-up for chat messages when the user is
-                // already looking at that exact conversation — the new
-                // bubble lands on screen via Realtime so a notification on
-                // top would be redundant noise.
-                if (
-                    notification.type == com.example.fixbid.domain.model.NotificationType.NEW_MESSAGE &&
-                    activeChatTracker.isActive(notification.referenceId)
-                ) return@collect
+                    // Skip in-app heads-up for chat messages when the user is
+                    // already looking at that exact conversation — the new
+                    // bubble lands on screen via Realtime so a notification on
+                    // top would be redundant noise.
+                    if (
+                        notification.type == com.example.fixbid.domain.model.NotificationType.NEW_MESSAGE &&
+                        activeChatTracker.isActive(notification.referenceId)
+                    ) return@collect
 
-                val sound = preferences.notificationSoundEnabled.first()
-                val vibrate = preferences.notificationVibrateEnabled.first()
-                appNotificationManager.show(
-                    notification = notification,
-                    soundEnabled = sound,
-                    vibrateEnabled = vibrate
-                )
+                    val sound = preferences.notificationSoundEnabled.first()
+                    val vibrate = preferences.notificationVibrateEnabled.first()
+                    appNotificationManager.show(
+                        notification = notification,
+                        soundEnabled = sound,
+                        vibrateEnabled = vibrate
+                    )
+                }
             }
         }
     }

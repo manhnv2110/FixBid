@@ -11,6 +11,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -54,24 +55,26 @@ class ProactiveAssistantCoordinator @Inject constructor(
         if (started) return
         started = true
         scope.launch {
-            val user = authRepository.getCurrentUser() ?: return@launch
-            val role = user.role
-            notificationRepository.observeNewNotifications(user.id).collect { n ->
-                // Dedupe so a re-subscription (e.g. process resurrection) won't
-                // re-emit prompts for the same notification rows.
-                if (!seenIds.add(n.id)) return@collect
-                // Cap to prevent unbounded growth — keep only the most recent
-                // 100 ids; older notifications can be safely re-promoted if
-                // they show up again.
-                if (seenIds.size > 100) {
-                    synchronized(seenIds) {
-                        val iter = seenIds.iterator()
-                        repeat(seenIds.size - 100) {
-                            if (iter.hasNext()) { iter.next(); iter.remove() }
+            authRepository.currentUser.collectLatest { user ->
+                if (user == null) return@collectLatest
+                val role = user.role
+                notificationRepository.observeNewNotifications(user.id).collect { n ->
+                    // Dedupe so a re-subscription (e.g. process resurrection) won't
+                    // re-emit prompts for the same notification rows.
+                    if (!seenIds.add(n.id)) return@collect
+                    // Cap to prevent unbounded growth — keep only the most recent
+                    // 100 ids; older notifications can be safely re-promoted if
+                    // they show up again.
+                    if (seenIds.size > 100) {
+                        synchronized(seenIds) {
+                            val iter = seenIds.iterator()
+                            repeat(seenIds.size - 100) {
+                                if (iter.hasNext()) { iter.next(); iter.remove() }
+                            }
                         }
                     }
+                    buildPrompt(n, role)?.let { _prompts.emit(it) }
                 }
-                buildPrompt(n, role)?.let { _prompts.emit(it) }
             }
         }
     }
